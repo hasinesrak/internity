@@ -209,6 +209,50 @@ Required features:
 - written feedback
 - intern feedback view
 
+## Dashboard And Interface Requirements
+
+Every signed-in screen lives in one dashboard shell shared by all five roles. The shell and the per-role layouts are specified in `docs/dashboard-design.md`.
+
+Required shell behavior:
+
+- topbar with department switcher (when the user has more than one department), ⌘K command menu, theme toggle, and user menu with the role badge
+- left navigation built on beUI's `@beui/ai-sidebar` as a keyboard-navigable tree, with a collapsed icon rail on desktop and a bottom sheet below 768px
+- one content template: page header with title, description, and primary action; KPI row on dashboards; panels below
+- row detail and short forms open in a `@beui/drawer` on desktop and a `@beui/bottom-sheet` on mobile
+- every mutation confirms with a toast naming the object acted on
+
+Required screens by role:
+
+| Role | Screens |
+| --- | --- |
+| Admin | platform overview, user management, HR account management, department overrides, activity |
+| HR | department overview and management, invitations (create, revoke, history), staff directory |
+| Supervisor | department overview, instructor roster, department drafts |
+| Instructor | class schedule and scheduler, assignment list and editor, submission review queue and review drawer |
+| Intern | department overview, class schedule, assignment list and detail, submission form, feedback view |
+
+Required interface behavior:
+
+- AI draft actions in the assignment editor and class scheduler run a visible button lifecycle (idle, loading, success, error) and leave the form editable and unchanged until the person accepts the draft
+- every data surface defines loading, empty, error, and success states
+- tables support sorting, filtering, and keyboard row navigation at roster sizes
+- destructive actions (revoke invitation, archive department, remove instructor) require a deliberate confirm step
+
+## Design System Requirements
+
+The interface is assembled from beUI components and shadcn components on Base UI primitives, never from bespoke widgets. The rules live in `docs/design-system.md`.
+
+Required:
+
+- one token set: shadcn semantic color variables in oklch (the beUI default scheme), defined in `packages/ui/src/styles/globals.css`; components reference tokens, never raw color values
+- one icon set: Phosphor Icons at the duotone weight, sized to match adjacent text, recolored per state through `currentColor`
+- one type family: Manrope Variable, with tabular figures in tables, scores, and KPI values
+- motion follows the documented durations and curves: press feedback at `scale(0.96)`, entries from `scale(0.95)` with opacity, exits softer than enters, no animation on keyboard-initiated high-frequency actions
+- hover decoration is gated behind `useHoverCapable()`, and `prefers-reduced-motion` is honored through `useReducedMotion()`
+- focus is visible on every interactive element, and every control defines hover, focus, active, disabled, and loading
+- status is expressed with a badge and a label, never color alone
+- copy uses sentence case, verb-first button labels, and errors that state the fix beside the field that failed
+
 ## Status Values
 
 Recommended user statuses:
@@ -273,6 +317,8 @@ Assignment submission:
 - no real-time socket chat
 - no complex analytics pipeline
 - no automated code execution
+- no custom component library built from scratch
+- no third-party dashboard templates or mixed icon sets
 
 ## Security Requirements
 

@@ -2,7 +2,7 @@
 
 Project name: **InternFlow**
 
-InternFlow is a role-based intern management system. The architecture should stay simple: one frontend app, one backend API, one MongoDB database, Docker images for each app, and GitOps deployment into K3s through Argo CD.
+InternFlow is a role-based intern management system. The architecture stays as one backend codebase, one MongoDB database, and two frontends. The backend image runs twice: a public process for interns and a staff process for admin, HR, supervisor, and instructor routes. Docker images stay split by app, and GitOps deployment goes into K3s through Argo CD.
 
 ## Architecture Goals
 
@@ -16,17 +16,28 @@ InternFlow is a role-based intern management system. The architecture should sta
 ## High-Level System
 
 ```text
-Browser
+Intern browser
   |
   v
-Frontend: TanStack Start
+apps/web  (any address)
   |
   v
-Backend API: Hono.js
+Backend API_SURFACE=public
   |
   v
 MongoDB 7.x
+  ^
+  |
+Backend API_SURFACE=staff
+  ^
+  |
+apps/staff  (office address or VPN)
+  ^
+  |
+Staff browser
 ```
+
+`API_SURFACE=public` registers `/health`, `/api/auth`, `/api/intern`, and `/api/departments`. Staff sign-in and staff activation are refused on that process. `API_SURFACE=staff` registers those routes plus `/api/admin`, `/api/hr`, `/api/supervisor`, and `/api/instructor`. Role checks stay on every mounted route. `STAFF_ALLOWED_IPS` is the office address list. An empty list allows only this computer in development, and production will not start the staff process until the list is set. Staff outside that address use the office VPN. Both processes share `MONGODB_URI` and `JWT_SECRET`. Intern links use `APP_URL`. Staff links use `STAFF_APP_URL`.
 
 Production deployment:
 
@@ -49,36 +60,36 @@ Argo CD
 K3s on Linux VM
 ```
 
-## Recommended Monorepo Structure
+## Monorepo Structure
 
-Use this structure when creating the project:
+The repo is a pnpm workspace (`apps/*`, `packages/*`) driven by Turborepo:
 
 ```text
-internflow/
-  frontend/
-    app/
-    components/
-    routes/
-    styles/
-    public/
-    package.json
-    Dockerfile
-
-  backend/
-    src/
-      config/
-      db/
-      middleware/
-      models/
-      routes/
-      services/
-      validators/
-    package.json
-    Dockerfile
+internity/
+  apps/
+    web/                      # Intern app. Public address.
+    staff/                    # Staff app. Office address or VPN.
+    backend/                  # One Hono image, started as public or staff.
+      src/
+        config/
+        db/
+        middleware/
+        models/
+        routes/
+        services/
+        validators/
+        lib/
+      package.json
+      Dockerfile
 
   packages/
-    shared/
+    ui/                       # design system
       src/
+        components/           # shadcn + Base UI primitives + installed beUI source
+        hooks/
+        lib/
+        styles/globals.css    # tokens, Manrope, radius scale
+      components.json         # shadcn config: base-rhea, neutral base, phosphor icons
       package.json
 
   infra/
@@ -95,28 +106,39 @@ internflow/
   docs/
     plan.md
     architecture.md
-    deployment.md
-    CI-CD.md
+    design-system.md
+    dashboard-design.md
     requirements.md
+    deployment.md
+    CD.md
 
   .github/
     workflows/
 
   package.json
-  package-lock.json
+  pnpm-workspace.yaml
+  pnpm-lock.yaml
   docker-compose.yml
   README.md
 ```
 
 ## Folder Responsibilities
 
-`frontend/`
+`apps/web/`
 
-The TanStack Start application. It owns routing, layouts, dashboard pages, forms, data tables, charts, visual states, and role-aware navigation.
+The intern TanStack Start application. It calls the public API. Screen composition for intern routes follows `docs/dashboard-design.md`.
 
-`backend/`
+`apps/staff/`
+
+The staff TanStack Start application for admin, HR, supervisor, and instructor screens. It calls the staff API and is published only on the office address or VPN. It uses the same `packages/ui` exports.
+
+`apps/backend/`
 
 The Hono API. It owns authentication, authorization, request validation, department scoping, database access, business logic, and secure API responses.
+
+`packages/ui/`
+
+The design system: shadcn-style components on Base UI primitives, the token set in `src/styles/globals.css`, shared hooks and helpers, and beUI components installed as source. Consumed by `apps/web` and `apps/staff` through the `@workspace/ui/*` exports. Defined in `docs/design-system.md`.
 
 `packages/shared/`
 
@@ -136,12 +158,14 @@ GitHub Actions workflows for validation, Docker builds, Docker Hub pushes, and G
 
 ## Frontend Architecture
 
+Intern screens live in `apps/web`. Admin, HR, supervisor, and instructor screens live in `apps/staff`.
+
 Frontend responsibilities:
 
 - login and account activation screens
+- the shared dashboard shell (topbar, ai-sidebar navigation, content template)
 - route-level auth guards
-- role-specific navigation
-- dashboard layout
+- role-specific navigation trees
 - Admin screens
 - HR screens
 - Supervisor screens
@@ -151,20 +175,36 @@ Frontend responsibilities:
 - form validation UI
 - loading, empty, error, and success states
 
-Recommended dashboard pages:
+### Dashboard shell
+
+One shell wraps every signed-in route. Its structure, the `@beui/ai-sidebar` navigation with the approved tweaks, and the per-role layouts are specified in `docs/dashboard-design.md`:
+
+- topbar: department switcher, ⌘K command menu (`@beui/command-palette`), theme toggle (`@beui/theme-toggle`), user menu
+- sidebar: `@beui/ai-sidebar` as a navigation tree with Phosphor duotone icons; a 64px icon rail when collapsed; a `@beui/bottom-sheet` below 768px
+- content: page header, KPI row (`@beui/animated-number` values), panels (`@beui/table`, lists, editors)
+- detail surfaces: `@beui/drawer` desktop, `@beui/bottom-sheet` mobile
+- feedback: `@beui/animated-toast-stack`
+
+Client state that is pure UI (sidebar collapse, open drawer, table filters) lives in Zustand stores in `apps/web/src/stores/`. Route data comes from TanStack Router loaders calling the API client. The sidebar nav is a controlled list: `activeId` derives from the router location and `onActiveChange` navigates.
+
+### Routes
+
+Public:
 
 - `/login`
 - `/activate`
-- `/dashboard`
-- `/admin/users`
-- `/admin/departments`
-- `/hr/departments`
-- `/hr/invitations`
-- `/supervisor/instructors`
-- `/classes`
-- `/assignments`
-- `/submissions`
+
+Inside the dashboard shell:
+
+- `/dashboard` — role home with the KPI row
+- `/admin/users`, `/admin/hr`, `/admin/departments`, `/admin/activity`
+- `/hr/departments`, `/hr/invitations`, `/hr/invitations/new`, `/hr/directory`
+- `/supervisor/instructors`, `/supervisor/drafts`
+- `/classes`, `/classes/new`
+- `/assignments`, `/assignments/new`, `/assignments/:id`
+- `/submissions`, `/submissions/:id` (review drawer)
 - `/settings`
+- `*` — `@beui/not-found-glitch`
 
 The frontend should hide unavailable routes based on role, but that is only for user experience. The backend must still enforce every permission.
 
@@ -193,6 +233,7 @@ Recommended route groups:
 - `/hr`
 - `/supervisor`
 - `/instructor`
+- `/instructor/ai` — assignment and class-agenda drafting (supervisors included)
 - `/intern`
 - `/departments`
 - `/classes`
@@ -362,41 +403,54 @@ If MongoDB runs inside K3s, backups are not optional. Document backup and restor
 
 ## UI Component Strategy
 
-Use Shazia/shadcn-style components as the design foundation.
+The design foundation is beUI components composed with shadcn-style components on Base UI primitives. Both live in `packages/ui` and both use the same shadcn semantic color tokens, so the whole app shares one theme. The full inventory, tokens, icons, and motion rules are in `docs/design-system.md`; screen-level composition is in `docs/dashboard-design.md`.
 
-Recommended dashboard components:
+Layering:
 
-- sidebar
-- breadcrumb
-- command menu
-- data table
-- dialog
-- sheet
-- tabs
-- badge
-- card
-- form
-- select
-- calendar/date picker
-- chart
-- toast/sonner
+- Base UI (`@base-ui/react`) + shadcn-style components: form fields, buttons, cards, tabs structure, dialogs, text areas, calendars
+- beUI (`@beui/*`, installed as source): motion components and composed dashboard blocks
+- `apps/web` composition: shell, page templates, role screens
+
+Dashboard surface mapping:
+
+| Surface | beUI install slug |
+| --- | --- |
+| Dashboard navigation | `@beui/ai-sidebar` (adapted) |
+| Command menu | `@beui/command-palette` |
+| Data tables | `@beui/table`, `@beui/table-async` |
+| Status badges | `@beui/animated-badge` |
+| KPI values | `@beui/animated-number` |
+| Detail drawer / bottom sheet | `@beui/drawer`, `@beui/bottom-sheet` |
+| Modals | `@beui/morphing-modal`, `@beui/center-morph-modal` |
+| Tabs | `@beui/tabs` |
+| Toasts | `@beui/animated-toast-stack` |
+| Tooltip | `@beui/tooltip` |
+| Row actions | `@beui/context-menu`, `@beui/overflow-actions` |
+| Forms | `@beui/input`, `@beui/select`, `@beui/combobox`, `@beui/checkbox`, `@beui/radio`, `@beui/switch`, `@beui/adaptive-stepper` |
+| Buttons | `@beui/button-base`, `@beui/button-stateful`, `@beui/hold-action-button` |
+| AI draft surfaces | `@beui/agent-activity`, `@beui/thinking-shimmer`, `@beui/todo-list`, `@beui/approval-card` |
+| Loading | `@beui/loader` |
+| Theme toggle | `@beui/theme-toggle` |
+| 404 | `@beui/not-found-glitch` |
+
+Install mechanics: slugs come from the live registry (`https://beui.dev/r/registry.json`), are added with `pnpm dlx shadcn@latest add @beui/<slug>` from `packages/ui`, and land as source under `@workspace/ui/*`. Their lucide icon imports are replaced with Phosphor duotone in one reviewed pass and `lucide-react` is dropped. No beUI runtime package exists and no beUI-specific color variables are introduced.
 
 Role-specific UX:
 
-- Admin: global roster tables and system status cards
-- HR: department table, invitation form, staff directory
+- Admin: global roster tables, system status cards, platform activity
+- HR: department table, invitation flow, staff directory
 - Supervisor: instructor roster and department activity
-- Instructor: class scheduler, assignment editor, submission review table
-- Intern: upcoming classes, assignment list, submission status, feedback view
+- Instructor: class scheduler, assignment editor with AI draft, submission review drawer
+- Intern: upcoming classes, assignment list, submission form, feedback view
 
 ## Deployment Architecture
 
 Kubernetes workload plan:
 
-- frontend Deployment
-- frontend Service
-- backend Deployment
-- backend Service
+- intern frontend Deployment and Service
+- staff frontend Deployment and Service, ingress limited to the office range
+- public backend Deployment (`API_SURFACE=public`) and Service
+- staff backend Deployment (`API_SURFACE=staff`) and Service, same image, ingress limited to the office range
 - MongoDB StatefulSet if self-hosted
 - ConfigMaps for non-sensitive config
 - Secrets for sensitive config
@@ -404,8 +458,8 @@ Kubernetes workload plan:
 
 Argo CD application plan:
 
-- one Argo CD app for frontend
-- one Argo CD app for backend
+- one Argo CD app for the intern frontend and one for the staff frontend
+- one Argo CD app for the two backend processes
 - one optional Argo CD app for MongoDB and shared infrastructure
 
 ## Important Decisions
@@ -425,4 +479,20 @@ Reason: Avoids file storage complexity in the MVP.
 Decision 4: Backend authorization is the source of truth.
 
 Reason: UI route guards can be bypassed, but backend permission checks protect the data.
+
+Decision 5: beUI components are the design foundation, with shadcn components on Base UI primitives underneath.
+
+Reason: beUI source uses shadcn semantic tokens, so motion blocks and primitives share one theme with no adapter layer. Installing source through the shadcn registry keeps every component editable in `packages/ui`.
+
+Decision 6: The dashboard navigation is beUI's `ai-sidebar`, adapted rather than replaced.
+
+Reason: it already provides the tree keyboard model, overflow-safe labels, a row menu, and a collapsed-state hook. The approved tweaks are Phosphor icons through `renderIcon`, a navigation row menu through `renderMenu`, and dropping the move/rename callbacks. Everything else is composed around it.
+
+Decision 7: Phosphor Icons at the duotone weight is the only icon set.
+
+Reason: one icon language across beUI source and app screens keeps optical weight consistent; state changes recolor the same icon instead of swapping assets.
+
+Decision 8: Run one backend image as two processes.
+
+Reason: The public process does not register admin, HR, supervisor, or instructor routes, so those URLs are absent from the intern address. The staff process registers every route and keeps the role checks and `STAFF_ALLOWED_IPS` gate. Both processes use one database and one session secret. A second frontend puts staff pages on the restricted address. The route split, not the second frontend, is what keeps staff APIs off the public address.
 

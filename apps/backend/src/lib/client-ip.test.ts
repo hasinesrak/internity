@@ -1,7 +1,12 @@
 import assert from "node:assert/strict"
 import { describe, test } from "node:test"
 
-import { extractClientIp, isStaffIpAllowed, normalizeIp } from "./client-ip.js"
+import {
+  extractClientIp,
+  isStaffIpAllowed,
+  normalizeIp,
+  staffIpPermitted,
+} from "./client-ip.js"
 
 describe("client ip", () => {
   test("treats IPv4 and IPv6 loopback as the same address", () => {
@@ -11,8 +16,12 @@ describe("client ip", () => {
     assert.equal(isStaffIpAllowed("127.0.0.1", ["::1"]), true)
   })
 
-  test("allows every address when the list is empty", () => {
-    assert.equal(isStaffIpAllowed("203.0.113.5", []), true)
+  test("rejects every address when the list is empty", () => {
+    assert.equal(isStaffIpAllowed("203.0.113.5", []), false)
+    assert.equal(isStaffIpAllowed("127.0.0.1", []), false)
+    assert.equal(staffIpPermitted("127.0.0.1", [], true), true)
+    assert.equal(staffIpPermitted("203.0.113.5", [], true), false)
+    assert.equal(staffIpPermitted("127.0.0.1", [], false), false)
   })
 
   test("rejects an address that is not on the list", () => {

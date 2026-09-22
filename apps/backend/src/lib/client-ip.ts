@@ -21,8 +21,18 @@ export function extractClientIp(input: {
 }
 
 export function isStaffIpAllowed(ip: string, allowlist: string[]): boolean {
-  if (allowlist.length === 0) return true
   const normalized = normalizeIp(ip)
-  if (!normalized) return false
+  if (!normalized || allowlist.length === 0) return false
   return allowlist.some((entry) => normalizeIp(entry) === normalized)
+}
+
+export function staffIpPermitted(
+  ip: string,
+  allowlist: string[],
+  loopbackWhenUnset: boolean
+): boolean {
+  if (allowlist.length === 0) {
+    return loopbackWhenUnset && normalizeIp(ip) === "127.0.0.1"
+  }
+  return isStaffIpAllowed(ip, allowlist)
 }

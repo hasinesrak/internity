@@ -23,6 +23,7 @@ import {
   rolePhrase,
   type InvitationRole,
 } from "../config/constants.js"
+import { denyStaff } from "../lib/staff-access.js"
 import { AppError, forbidden, notFound } from "../lib/errors.js"
 import { hashPassword } from "../lib/password.js"
 import { escapeRegex } from "../lib/text.js"
@@ -120,7 +121,10 @@ async function deliverInvitation(input: {
     invitedBy: new Types.ObjectId(input.actor.id),
     userId: input.user._id,
   })
-  const url = appLink(`/activate?token=${encodeURIComponent(token)}`)
+  const url = appLink(
+    `/activate?token=${encodeURIComponent(token)}`,
+    isStaffRole(input.role) ? "staff" : "intern"
+  )
   try {
     const sent = await sendMail({
       to: input.user.email,
@@ -420,13 +424,8 @@ export async function acceptInvitation(
   networkAllowed: boolean
 ) {
   const invitation = await loadTokenInvitation(token)
-  if (isStaffRole(invitation.role) && !networkAllowed) {
-    throw new AppError(
-      403,
-      "IP_RESTRICTED",
-      "Open this link from an approved network to activate a staff account."
-    )
-  }
+  const denial = denyStaff(invitation.role, networkAllowed, "activate")
+  if (denial) throw denial
   const user = await User.findById(invitation.userId).select("+passwordHash")
   if (!user || user.status !== "pending") {
     throw new AppError(

@@ -1,5 +1,22 @@
 name: internity
 
+x-backend-environment: &backend-environment
+  NODE_ENV: development
+  MONGODB_URI: mongodb://mongo:27017/internity
+  APP_URL: ${APP_URL:-http://localhost:3000}
+  STAFF_APP_URL: ${STAFF_APP_URL:-http://localhost:3001}
+  JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-please-32}
+  JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+  COOKIE_SECURE: "false"
+  TRUST_PROXY: ${TRUST_PROXY:-false}
+  RESEND_API_KEY: ${RESEND_API_KEY:-}
+  RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-Internity <beth.t@example.com>}
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
+  GROQ_MODEL: ${GROQ_MODEL:-qwen/qwen3.8-27b}
+  ADMIN_NAME: ${ADMIN_NAME:-Admin}
+  ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+
 services:
   mongo:
     image: mongo:7.0
@@ -14,30 +31,36 @@ services:
       timeout: 5s
       retries: 20
 
-  backend:
+  backend-public:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
     ports:
-      - "4000:4000"
+      - "${PUBLIC_API_BIND:-0.0.0.0}:${PUBLIC_API_PORT:-4000}:${API_CONTAINER_PORT:-4000}"
     environment:
-      NODE_ENV: development
-      PORT: 4000
-      MONGODB_URI: mongodb://mongo:27017/internity
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
-      APP_URL: ${APP_URL:-http://localhost:3000}
-      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-please-32}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
-      COOKIE_SECURE: "false"
+      <<: *backend-environment
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${API_CONTAINER_PORT:-4000}
+      API_SURFACE: public
+      CORS_ORIGIN: ${PUBLIC_CORS_ORIGIN:-http://localhost:3000}
+      STAFF_ALLOWED_IPS: ""
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  backend-staff:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    ports:
+      - "${STAFF_API_BIND:-127.0.0.1}:${STAFF_API_PORT:-4001}:${API_CONTAINER_PORT:-4000}"
+    environment:
+      <<: *backend-environment
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${API_CONTAINER_PORT:-4000}
+      API_SURFACE: staff
+      CORS_ORIGIN: ${STAFF_CORS_ORIGIN:-http://localhost:3001}
       STAFF_ALLOWED_IPS: ${STAFF_ALLOWED_IPS:-}
-      TRUST_PROXY: ${TRUST_PROXY:-false}
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-Internity <beth.t@example.com>}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      GROQ_MODEL: ${GROQ_MODEL:-qwen/qwen3.8-27b}
-      ADMIN_NAME: ${ADMIN_NAME:-Admin}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     depends_on:
       mongo:
         condition: service_healthy

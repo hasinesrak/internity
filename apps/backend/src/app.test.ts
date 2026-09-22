@@ -127,6 +127,9 @@ beforeEach(async () => {
   process.env.GROQ_API_KEY = ""
   process.env.STAFF_ALLOWED_IPS = ""
   process.env.TRUST_PROXY = "false"
+  process.env.API_SURFACE = "staff"
+  process.env.APP_URL = "http://localhost:3000"
+  process.env.STAFF_APP_URL = "http://localhost:3001"
   process.env.RESEND_API_KEY = ""
   setDraftGenerator(null)
   await Promise.all(
@@ -589,5 +592,127 @@ describe("access boundaries", () => {
       body: { groqModel: "llama-3.3-70b-versatile" },
     })
     assert.equal(forbidden.status, 403)
+  })
+})
+
+describe("api surface", () => {
+  test("public process omits staff routes and refuses staff sign-in", async () => {
+    const department = await makeDepartment("Engineering")
+    const admin = await makeUser({ role: "admin" })
+    const hr = await makeUser({ role: "hr" })
+    const instructor = await makeUser({
+      role: "instructor",
+      departmentId: department.id,
+    })
+    const intern = await makeUser({
+      role: "intern",
+      departmentId: department.id,
+    })
+
+    const hrClient = api()
+    await signIn(hrClient, hr.email, hr.password)
+    const invited = await hrClient.call("/api/hr/staff", {
+      method: "POST",
+      body: {
+        email: "new.instructor@example.com",
+        name: "New Instructor",
+        role: "instructor",
+        departmentId: department.id,
+      },
+    })
+    assert.equal(invited.status, 201)
+    const invitedBody = (await json(invited)) as { activationUrl: string }
+    assert.ok(
+      invitedBody.activationUrl.startsWith("http://localhost:3001/activate?")
+    )
+
+    const adminClient = api()
+    await signIn(adminClient, admin.email, admin.password)
+    const internReset = await adminClient.call(
+      `/api/admin/users/${intern.id}/reset-password`,
+      { method: "POST", body: {} }
+    )
+    assert.equal(internReset.status, 200)
+    const internResetBody = (await json(internReset)) as { resetUrl: string }
+    assert.ok(
+      internResetBody.resetUrl.startsWith(
+        "http://localhost:3000/reset-password?"
+      )
+    )
+    const staffReset = await adminClient.call(
+      `/api/admin/users/${instructor.id}/reset-password`,
+      { method: "POST", body: {} }
+    )
+    assert.equal(staffReset.status, 200)
+    const staffResetBody = (await json(staffReset)) as { resetUrl: string }
+    assert.ok(
+      staffResetBody.resetUrl.startsWith(
+        "http://localhost:3001/reset-password?"
+      )
+    )
+
+    const staffLogin = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: hr.email, password: hr.password }),
+    })
+    assert.equal(staffLogin.status, 200)
+    const staffCookie = staffLogin.headers
+      .get("set-cookie")
+      ?.split(";")[0]
+    assert.ok(staffCookie)
+
+    process.env.API_SURFACE = "public"
+    try {
+      const publicApp = createApp()
+      const staffPaths = [
+        "/api/admin/summary",
+        "/api/hr/departments",
+        "/api/supervisor/overview",
+        "/api/instructor/summary",
+      ]
+      for (const path of staffPaths) {
+        assert.equal((await publicApp.request(path)).status, 404, path)
+        assert.equal((await app.request(path)).status, 401, path)
+      }
+
+      const rejected = await publicApp.request("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: hr.email, password: hr.password }),
+      })
+      assert.equal(rejected.status, 403)
+      const rejectedBody = (await json(rejected)) as {
+        error: { code: string }
+      }
+      assert.equal(rejectedBody.error.code, "STAFF_SURFACE")
+
+      const replay = await publicApp.request("/api/auth/me", {
+        headers: { cookie: staffCookie },
+      })
+      assert.equal(replay.status, 403)
+      const departments = await publicApp.request("/api/departments", {
+        headers: { cookie: staffCookie },
+      })
+      assert.equal(departments.status, 403)
+
+      const internLogin = await publicApp.request("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: intern.email,
+          password: intern.password,
+        }),
+      })
+      assert.equal(internLogin.status, 200)
+      const internCookie = internLogin.headers.get("set-cookie")?.split(";")[0]
+      assert.ok(internCookie)
+      const dashboard = await publicApp.request("/api/intern/dashboard", {
+        headers: { cookie: internCookie },
+      })
+      assert.equal(dashboard.status, 200)
+    } finally {
+      process.env.API_SURFACE = "staff"
+    }
   })
 })

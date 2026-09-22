@@ -2,8 +2,9 @@ import { createMiddleware } from "hono/factory"
 import { getCookie } from "hono/cookie"
 
 import { networkAllowsStaff } from "./network.js"
-import { SESSION_COOKIE, isStaffRole, type Role } from "../config/constants.js"
+import { SESSION_COOKIE, type Role } from "../config/constants.js"
 import { AppError, forbidden } from "../lib/errors.js"
+import { denyStaff } from "../lib/staff-access.js"
 import { readSession } from "../lib/session.js"
 import { User } from "../models/user.js"
 import type { AppEnv } from "../types.js"
@@ -24,13 +25,8 @@ export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   if (user.tokenVersion !== session.tokenVersion) {
     throw new AppError(401, "UNAUTHENTICATED", "Sign in to continue.")
   }
-  if (isStaffRole(user.role) && !networkAllowsStaff(c)) {
-    throw new AppError(
-      403,
-      "IP_RESTRICTED",
-      "Sign in from an approved network to use this account."
-    )
-  }
+  const denial = denyStaff(user.role, networkAllowsStaff(c), "sign-in")
+  if (denial) throw denial
   c.set("user", {
     id: user._id.toString(),
     name: user.name,

@@ -10,6 +10,7 @@ import { User } from "./models/user.js"
 
 async function ensureBootstrapAdmin(): Promise<void> {
   const env = getEnv()
+  if (env.apiSurface !== "staff") return
   if (!env.adminEmail || !env.adminPassword) return
   const password = passwordSchema.safeParse(env.adminPassword)
   if (!password.success) {
@@ -51,12 +52,15 @@ async function main(): Promise<void> {
   const server = serve({
     fetch: createApp().fetch,
     port: env.port,
-    hostname: "0.0.0.0",
+    hostname: env.host,
   })
   console.info(
     JSON.stringify({
       msg: "listening",
       url: `http://localhost:${env.port}`,
+      host: env.host,
+      surface: env.apiSurface,
+      officeAddresses: env.staffAllowedIps.length,
       email: env.resendApiKey ? "on" : "off",
       drafting: env.groqApiKey ? "on" : "off",
     })

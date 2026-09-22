@@ -2,7 +2,7 @@ import { getConnInfo } from "@hono/node-server/conninfo"
 import type { Context } from "hono"
 
 import { getEnv } from "../config/env.js"
-import { extractClientIp, isStaffIpAllowed } from "../lib/client-ip.js"
+import { extractClientIp, staffIpPermitted } from "../lib/client-ip.js"
 
 export function clientIp(c: Context): string {
   let remote = ""
@@ -12,6 +12,7 @@ export function clientIp(c: Context): string {
     remote = ""
   }
   const env = getEnv()
+  if (!remote && env.nodeEnv === "test") remote = "127.0.0.1"
   return extractClientIp({
     forwardedFor: c.req.header("x-forwarded-for"),
     realIp: c.req.header("x-real-ip"),
@@ -21,5 +22,10 @@ export function clientIp(c: Context): string {
 }
 
 export function networkAllowsStaff(c: Context): boolean {
-  return isStaffIpAllowed(clientIp(c), getEnv().staffAllowedIps)
+  const env = getEnv()
+  return staffIpPermitted(
+    clientIp(c),
+    env.staffAllowedIps,
+    env.nodeEnv !== "production"
+  )
 }

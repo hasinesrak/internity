@@ -35,26 +35,27 @@ export function createApp(): Hono<AppEnv> {
       allowHeaders: ["Content-Type"],
     })
   )
-  installErrors(app)
-  for (const router of [
+  const staffSurface = env.apiSurface === "staff"
+  const routers = [
     healthRoutes,
     authRoutes,
-    adminRoutes,
-    hrRoutes,
-    supervisorRoutes,
-    instructorRoutes,
     internRoutes,
     departmentRoutes,
-  ]) {
-    installErrors(router)
-  }
+    ...(staffSurface
+      ? [adminRoutes, hrRoutes, supervisorRoutes, instructorRoutes]
+      : []),
+  ]
+  installErrors(app)
+  for (const router of routers) installErrors(router)
   app.route("/health", healthRoutes)
   app.route("/api/auth", authRoutes)
-  app.route("/api/admin", adminRoutes)
-  app.route("/api/hr", hrRoutes)
-  app.route("/api/supervisor", supervisorRoutes)
-  app.route("/api/instructor", instructorRoutes)
   app.route("/api/intern", internRoutes)
   app.route("/api/departments", departmentRoutes)
+  if (staffSurface) {
+    app.route("/api/admin", adminRoutes)
+    app.route("/api/hr", hrRoutes)
+    app.route("/api/supervisor", supervisorRoutes)
+    app.route("/api/instructor", instructorRoutes)
+  }
   return app
 }

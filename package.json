@@ -6,6 +6,7 @@
     "build": "turbo build",
     "dev": "turbo dev",
     "dev:web": "pnpm --filter web dev",
+    "dev:staff": "pnpm --filter staff dev",
     "dev:backend": "pnpm --filter backend dev",
     "seed": "pnpm --filter backend seed",
     "test": "turbo test",

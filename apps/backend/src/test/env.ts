@@ -6,6 +6,7 @@ const forced: Record<string, string> = {
   COOKIE_SECURE: "false",
   TRUST_PROXY: "false",
   STAFF_ALLOWED_IPS: "",
+  API_SURFACE: "staff",
   GROQ_API_KEY: "",
   RESEND_API_KEY: "",
 }
@@ -13,6 +14,7 @@ const forced: Record<string, string> = {
 const defaults: Record<string, string> = {
   CORS_ORIGIN: "http://localhost:3000",
   APP_URL: "http://localhost:3000",
+  STAFF_APP_URL: "http://localhost:3001",
   JWT_EXPIRES_IN: "8h",
   GROQ_MODEL: "qwen/qwen3.8-27b",
 }

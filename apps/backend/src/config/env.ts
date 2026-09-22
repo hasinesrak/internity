@@ -1,12 +1,17 @@
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
+export type ApiSurface = "public" | "staff"
+
 export type AppEnvConfig = {
   nodeEnv: "development" | "test" | "production"
+  apiSurface: ApiSurface
+  host: string
   port: number
   mongodbUri: string
   corsOrigins: string[]
   appUrl: string
+  staffAppUrl: string
   jwtSecret: string
   jwtMaxAgeSeconds: number
   cookieSecure: boolean
@@ -90,6 +95,9 @@ export function getEnv(): AppEnvConfig {
     )
   }
 
+  const host = optional("HOST", "0.0.0.0")
+  if (!host) throw new Error("HOST is required")
+
   const port = Number(optional("PORT", "4000"))
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error("PORT must be a valid port")
@@ -124,19 +132,59 @@ export function getEnv(): AppEnvConfig {
     nodeEnv === "production" ? "true" : "false"
   )
 
+  const surfaceRaw = optional(
+    "API_SURFACE",
+    nodeEnv === "production" ? "" : "staff"
+  ).toLowerCase()
+  if (surfaceRaw !== "public" && surfaceRaw !== "staff") {
+    throw new Error("API_SURFACE must be public or staff")
+  }
+  const apiSurface = surfaceRaw
+
+  const appUrl = optional(
+    "APP_URL",
+    nodeEnv === "production" ? "" : "http://localhost:3000"
+  ).replace(/\/$/, "")
+  if (!appUrl) throw new Error("APP_URL is required")
+
+  let staffAppUrl = optional(
+    "STAFF_APP_URL",
+    nodeEnv === "production" ? "" : "http://localhost:3001"
+  ).replace(/\/$/, "")
+  if (!staffAppUrl) {
+    if (nodeEnv === "production" && apiSurface === "staff") {
+      throw new Error("STAFF_APP_URL is required")
+    }
+    staffAppUrl = appUrl
+  }
+
+  const staffAllowedIps = optional("STAFF_ALLOWED_IPS")
+    .split(",")
+    .map((ip) => ip.trim())
+    .filter(Boolean)
+  if (
+    nodeEnv === "production" &&
+    apiSurface === "staff" &&
+    staffAllowedIps.length === 0
+  ) {
+    throw new Error(
+      "STAFF_ALLOWED_IPS must list the office address for the staff process"
+    )
+  }
+
   return {
     nodeEnv,
+    apiSurface,
+    host,
     port,
     mongodbUri,
     corsOrigins,
-    appUrl: optional("APP_URL", "http://localhost:3000").replace(/\/$/, ""),
+    appUrl,
+    staffAppUrl,
     jwtSecret,
     jwtMaxAgeSeconds: parseDurationSeconds(optional("JWT_EXPIRES_IN", "8h")),
     cookieSecure: cookieRaw === "true" || cookieRaw === "1",
-    staffAllowedIps: optional("STAFF_ALLOWED_IPS")
-      .split(",")
-      .map((ip) => ip.trim())
-      .filter(Boolean),
+    staffAllowedIps,
     trustProxy: ["true", "1"].includes(optional("TRUST_PROXY").toLowerCase()),
     resendApiKey: optional("RESEND_API_KEY"),
     resendFromEmail: optional(
@@ -152,7 +200,12 @@ export function getEnv(): AppEnvConfig {
   }
 }
 
-export function appLink(path: string): string {
+export function appLink(
+  path: string,
+  audience: "intern" | "staff" = "intern"
+): string {
+  const env = getEnv()
+  const base = audience === "staff" ? env.staffAppUrl : env.appUrl
   const normalized = path.startsWith("/") ? path : `/${path}`
-  return `${getEnv().appUrl}${normalized}`
+  return `${base}${normalized}`
 }

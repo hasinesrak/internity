@@ -99,8 +99,15 @@ Frontend:
 - TanStack Router
 - React
 - TypeScript
-- Tailwind CSS
-- Shazia/shadcn-style registry components
+- Tailwind CSS v4
+- shadcn-style components on Base UI primitives (`@base-ui/react`) in `packages/ui`
+- beUI components (`@beui/*`) installed as source for motion and composed blocks
+- Phosphor Icons at the duotone weight
+- Manrope Variable
+- Zustand for UI state
+- shadcn semantic color tokens in oklch (the beUI default scheme)
+
+Design system details live in `docs/design-system.md`. Dashboard shell and layouts live in `docs/dashboard-design.md`.
 
 Backend:
 
@@ -121,7 +128,8 @@ AI:
 
 Infrastructure:
 
-- npm workspaces
+- pnpm workspaces with Turborepo
+- dependency versions pinned one week behind (`minimumReleaseAge` in `pnpm-workspace.yaml`)
 - Docker
 - Docker Compose
 - Docker Hub
@@ -136,7 +144,7 @@ Use one simple monorepo for the first version.
 The detailed notes mention dedicated frontend and backend repositories. That can work later, but for this stage a monorepo is easier because:
 
 - frontend and backend changes can be reviewed together
-- shared types can live in one place
+- shared UI and types can live in one place (`packages/ui`)
 - CI/CD is easier to understand at the beginning
 - Docker Compose can run the whole project from one repo
 - Argo CD manifests can live beside the app until the deployment process is stable
@@ -147,25 +155,55 @@ If the project grows, split into three repositories later:
 - `internflow-backend`
 - `internflow-gitops`
 
-## Future Monorepo Structure
+## Monorepo Structure
 
-Create this later when implementation begins:
+The repo uses pnpm workspaces (`apps/*`, `packages/*`) with Turborepo scripts at the root:
 
 ```text
-internflow/
-  frontend/
-  backend/
+internity/
+  apps/
+    web/                    # TanStack Start frontend
+      src/
+        routes/
+        components/
+      package.json
+      Dockerfile
+    backend/                # Hono API
+      src/
+        config/
+        db/
+        middleware/
+        models/
+        routes/
+        services/
+        validators/
+      package.json
+      Dockerfile
   packages/
-    shared/
+    ui/                     # design system: shadcn + Base UI + installed beUI source
+      src/
+        components/
+        hooks/
+        lib/
+        styles/globals.css
+      components.json       # shadcn config: base-rhea, neutral base, phosphor icons
   infra/
     k8s/
     argocd/
     docker/
   docs/
+    plan.md
+    architecture.md
+    design-system.md
+    dashboard-design.md
+    requirements.md
+    deployment.md
+    CD.md
   .github/
     workflows/
   package.json
-  package-lock.json
+  pnpm-workspace.yaml
+  pnpm-lock.yaml
   docker-compose.yml
   README.md
 ```
@@ -285,10 +323,10 @@ Exit criteria:
 
 Deliverables:
 
-- npm workspace root
-- `frontend/` app folder
-- `backend/` app folder
-- optional `packages/shared/`
+- pnpm workspace root with Turborepo
+- `apps/web` frontend app
+- `apps/backend` API app
+- `packages/ui` design system package
 - root scripts for install, lint, test, build, and dev
 - environment examples
 - project README
@@ -296,7 +334,7 @@ Deliverables:
 Exit criteria:
 
 - frontend and backend can be started locally
-- npm workspace commands are clear
+- pnpm workspace commands are clear
 
 ## Phase 3: Backend Foundation
 
@@ -320,16 +358,20 @@ Exit criteria:
 Deliverables:
 
 - TanStack Start app
-- dashboard shell
+- design system in `packages/ui`: shadcn semantic tokens, Manrope, Phosphor duotone icons, Base UI primitives
+- beUI components installed from `@beui/*` slugs with lucide swapped for Phosphor
+- dashboard shell from `@beui/ai-sidebar` with the tweaks in `docs/dashboard-design.md`
+- ⌘K command menu, theme toggle, toast stack
 - route-level guards
-- role-aware navigation
-- auth pages
-- basic department dashboard
-- reusable UI layout components
+- role-aware navigation trees
+- auth and activation pages (`@beui/signup-form` based)
+- role home screens with the KPI row and page template
+- loading, empty, error, and success states
 
 Exit criteria:
 
 - users see only the dashboard areas allowed for their role
+- every screen composes beUI components and shadcn/Base UI primitives per `docs/design-system.md`
 
 ## Phase 5: Core Product Modules
 
@@ -343,6 +385,7 @@ Deliverables:
 - Intern class and assignment dashboard
 - Intern submission form
 - Instructor submission review flow
+- screens assembled from the beUI blocks listed in `docs/dashboard-design.md`
 
 Exit criteria:
 
@@ -420,41 +463,27 @@ Exit criteria:
 
 ## Dashboard UX Direction
 
-InternFlow should feel like a practical operations dashboard, not a marketing site.
+InternFlow should feel like a practical operations dashboard, not a marketing site. The full specification lives in `docs/dashboard-design.md`. Tokens, icons, motion, and the component inventory live in `docs/design-system.md`.
 
-Use dashboard patterns that match the product:
+One shell serves all five roles:
 
-- left sidebar navigation
-- role-specific home screen
-- compact KPI cards
-- department tables
-- intern rosters
-- assignment status cards
-- submission review table
-- class schedule timeline
-- detail drawers for fast review
-- assignment editor action that fills title, instructions, rubric, and a suggested deadline
-- class scheduler action that fills title and agenda, leaving date and meeting link for the person to enter
-- clear empty, loading, error, and success states on both draft actions
+- topbar with the department switcher, a ⌘K command menu (`@beui/command-palette`), the theme toggle (`@beui/theme-toggle`), and the user menu
+- left navigation built on beUI's `@beui/ai-sidebar`, adapted into a navigation tree with Phosphor duotone icons and a collapsed icon rail
+- one content template: page header, KPI row, panels
+- detail surfaces as `@beui/drawer` on desktop and `@beui/bottom-sheet` on mobile
 
-Good Shazia/shadcn-style UX experiments:
+Patterns by screen:
 
-- fixed sidebar vs collapsible sidebar
-- command menu vs simple top search
-- table row detail drawer vs full detail page
-- assignment cards vs dense assignment table
-- intern onboarding checklist vs simple activation flow
-- score entry inside drawer vs dedicated review page
-- status badges vs timeline-style submission history
+- role-specific home screen with compact KPI cards (`@beui/animated-number` values)
+- department tables, intern rosters, and submission review tables on `@beui/table` and `@beui/table-async`
+- status shown as `@beui/animated-badge`, never color alone
+- class schedule timeline with the agenda in `@beui/bouncy-accordion`
+- assignment editor and class scheduler whose AI draft action fills the fields, which the person then edits and saves through the normal action
+- clear empty, loading, error, and success states on every surface
 
-Useful component sources to inspect before implementation:
+Component sourcing is beUI first: install `@beui/*` slugs from the live registry (`https://beui.dev/r/registry.json`) with pnpm, swap their lucide icons for Phosphor duotone, and cover the rest with shadcn components on Base UI primitives in `packages/ui`. No third-party dashboard templates.
 
-- official shadcn/ui components, blocks, charts, and registry directory
-- Shadcn UI Kit admin dashboard blocks and templates
-- Shadcn Space dashboard-compatible blocks and components
-- Shadcn Admin Kit for admin panel and B2B dashboard patterns
-
-Review licenses before using third-party blocks in production.
+Interface copy follows one voice: sentence case, verb-first buttons, errors that name the fix beside the field that failed.
 
 ## Success Criteria
 
@@ -473,15 +502,15 @@ The project is successful when:
 - Docker can run the app locally
 - GitHub Actions can publish images
 - Argo CD can deploy the app to K3s
+- every dashboard is built from beUI components and shadcn/Base UI primitives, follows `docs/design-system.md`, and matches the layouts in `docs/dashboard-design.md`
 
 ## Immediate Next Steps
 
 1. Confirm the name **InternFlow**.
-2. Confirm monorepo instead of separate frontend/backend repos.
-3. Create the actual project folders.
-4. Scaffold frontend and backend.
-5. Add MongoDB local Docker Compose.
-6. Implement auth and role boundaries first.
-7. Add the intern invitation workflow.
-8. After the assignment editor and class scheduler exist, add the two Groq drafting routes.
+2. Install the design system: beUI slugs, Phosphor duotone icon pass, token check in `packages/ui`.
+3. Build the dashboard shell from `@beui/ai-sidebar` per `docs/dashboard-design.md`.
+4. Implement auth and role boundaries first.
+5. Add the intern invitation workflow.
+6. Build the role screens from the beUI block lists in `docs/dashboard-design.md`.
+7. After the assignment editor and class scheduler exist, add the two Groq drafting routes and their draft surfaces.
 
