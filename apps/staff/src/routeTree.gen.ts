@@ -18,6 +18,11 @@ import { Route as AppAdminActivityRouteImport } from './routes/_app/admin.activi
 import { Route as AppAdminDepartmentsRouteImport } from './routes/_app/admin.departments'
 import { Route as AppAdminHrRouteImport } from './routes/_app/admin.hr'
 import { Route as AppAdminUsersRouteImport } from './routes/_app/admin.users'
+import { Route as AppHrIndexRouteImport } from './routes/_app/hr.index'
+import { Route as AppHrDepartmentsRouteImport } from './routes/_app/hr.departments'
+import { Route as AppHrDirectoryRouteImport } from './routes/_app/hr.directory'
+import { Route as AppHrInvitationsRouteImport } from './routes/_app/hr.invitations'
+import { Route as AppHrInvitationsNewRouteImport } from './routes/_app/hr.invitations.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -63,6 +68,31 @@ const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
   path: '/admin/users',
   getParentRoute: () => AppRoute,
 } as any)
+const AppHrIndexRoute = AppHrIndexRouteImport.update({
+  id: '/hr/',
+  path: '/hr/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHrDepartmentsRoute = AppHrDepartmentsRouteImport.update({
+  id: '/hr/departments',
+  path: '/hr/departments',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHrDirectoryRoute = AppHrDirectoryRouteImport.update({
+  id: '/hr/directory',
+  path: '/hr/directory',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHrInvitationsRoute = AppHrInvitationsRouteImport.update({
+  id: '/hr/invitations',
+  path: '/hr/invitations',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppHrInvitationsNewRoute = AppHrInvitationsNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AppHrInvitationsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -72,7 +102,12 @@ export interface FileRoutesByFullPath {
   '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/hr': typeof AppAdminHrRoute
   '/admin/users': typeof AppAdminUsersRoute
+  '/hr/departments': typeof AppHrDepartmentsRoute
+  '/hr/directory': typeof AppHrDirectoryRoute
+  '/hr/invitations': typeof AppHrInvitationsRouteWithChildren
   '/admin/': typeof AppAdminIndexRoute
+  '/hr/': typeof AppHrIndexRoute
+  '/hr/invitations/new': typeof AppHrInvitationsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -82,7 +117,12 @@ export interface FileRoutesByTo {
   '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/hr': typeof AppAdminHrRoute
   '/admin/users': typeof AppAdminUsersRoute
+  '/hr/departments': typeof AppHrDepartmentsRoute
+  '/hr/directory': typeof AppHrDirectoryRoute
+  '/hr/invitations': typeof AppHrInvitationsRouteWithChildren
   '/admin': typeof AppAdminIndexRoute
+  '/hr': typeof AppHrIndexRoute
+  '/hr/invitations/new': typeof AppHrInvitationsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -94,7 +134,12 @@ export interface FileRoutesById {
   '/_app/admin/departments': typeof AppAdminDepartmentsRoute
   '/_app/admin/hr': typeof AppAdminHrRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
+  '/_app/hr/departments': typeof AppHrDepartmentsRoute
+  '/_app/hr/directory': typeof AppHrDirectoryRoute
+  '/_app/hr/invitations': typeof AppHrInvitationsRouteWithChildren
   '/_app/admin/': typeof AppAdminIndexRoute
+  '/_app/hr/': typeof AppHrIndexRoute
+  '/_app/hr/invitations/new': typeof AppHrInvitationsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -106,7 +151,12 @@ export interface FileRouteTypes {
     | '/admin/departments'
     | '/admin/hr'
     | '/admin/users'
+    | '/hr/departments'
+    | '/hr/directory'
+    | '/hr/invitations'
     | '/admin/'
+    | '/hr/'
+    | '/hr/invitations/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -116,7 +166,12 @@ export interface FileRouteTypes {
     | '/admin/departments'
     | '/admin/hr'
     | '/admin/users'
+    | '/hr/departments'
+    | '/hr/directory'
+    | '/hr/invitations'
     | '/admin'
+    | '/hr'
+    | '/hr/invitations/new'
   id:
     | '__root__'
     | '/'
@@ -127,7 +182,12 @@ export interface FileRouteTypes {
     | '/_app/admin/departments'
     | '/_app/admin/hr'
     | '/_app/admin/users'
+    | '/_app/hr/departments'
+    | '/_app/hr/directory'
+    | '/_app/hr/invitations'
     | '/_app/admin/'
+    | '/_app/hr/'
+    | '/_app/hr/invitations/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -201,8 +261,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminUsersRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/hr/': {
+      id: '/_app/hr/'
+      path: '/hr'
+      fullPath: '/hr/'
+      preLoaderRoute: typeof AppHrIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/hr/departments': {
+      id: '/_app/hr/departments'
+      path: '/hr/departments'
+      fullPath: '/hr/departments'
+      preLoaderRoute: typeof AppHrDepartmentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/hr/directory': {
+      id: '/_app/hr/directory'
+      path: '/hr/directory'
+      fullPath: '/hr/directory'
+      preLoaderRoute: typeof AppHrDirectoryRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/hr/invitations': {
+      id: '/_app/hr/invitations'
+      path: '/hr/invitations'
+      fullPath: '/hr/invitations'
+      preLoaderRoute: typeof AppHrInvitationsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/hr/invitations/new': {
+      id: '/_app/hr/invitations/new'
+      path: '/new'
+      fullPath: '/hr/invitations/new'
+      preLoaderRoute: typeof AppHrInvitationsNewRouteImport
+      parentRoute: typeof AppHrInvitationsRoute
+    }
   }
 }
+
+interface AppHrInvitationsRouteChildren {
+  AppHrInvitationsNewRoute: typeof AppHrInvitationsNewRoute
+}
+
+const AppHrInvitationsRouteChildren: AppHrInvitationsRouteChildren = {
+  AppHrInvitationsNewRoute: AppHrInvitationsNewRoute,
+}
+
+const AppHrInvitationsRouteWithChildren =
+  AppHrInvitationsRoute._addFileChildren(AppHrInvitationsRouteChildren)
 
 interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
@@ -210,7 +316,11 @@ interface AppRouteChildren {
   AppAdminDepartmentsRoute: typeof AppAdminDepartmentsRoute
   AppAdminHrRoute: typeof AppAdminHrRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
+  AppHrDepartmentsRoute: typeof AppHrDepartmentsRoute
+  AppHrDirectoryRoute: typeof AppHrDirectoryRoute
+  AppHrInvitationsRoute: typeof AppHrInvitationsRouteWithChildren
   AppAdminIndexRoute: typeof AppAdminIndexRoute
+  AppHrIndexRoute: typeof AppHrIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -219,7 +329,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppAdminDepartmentsRoute: AppAdminDepartmentsRoute,
   AppAdminHrRoute: AppAdminHrRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
+  AppHrDepartmentsRoute: AppHrDepartmentsRoute,
+  AppHrDirectoryRoute: AppHrDirectoryRoute,
+  AppHrInvitationsRoute: AppHrInvitationsRouteWithChildren,
   AppAdminIndexRoute: AppAdminIndexRoute,
+  AppHrIndexRoute: AppHrIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
