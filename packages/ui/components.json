@@ -17,6 +17,10 @@
     "lib": "@workspace/ui/lib",
     "ui": "@workspace/ui/components"
   },
+  "registries": {
+    "@dashboardcn": "https://dashboardcn.com/r/{name}.json",
+    "@beui": "https://beui.dev/r/{name}.json"
+  },
   "rtl": false,
   "menuColor": "default",
   "menuAccent": "bold"

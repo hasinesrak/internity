@@ -22,7 +22,8 @@
     "@workspace/ui": "workspace:*",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@tanstack/devtools-vite": "latest",

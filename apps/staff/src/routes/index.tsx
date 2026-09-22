@@ -1,20 +1,21 @@
-import { createFileRoute } from "@tanstack/react-router"
+import { createFileRoute, redirect } from "@tanstack/react-router"
 
-import { apiUrl } from "@/lib/api"
+import { currentUserSync } from "@/lib/data"
+import { staffHome } from "@/lib/guards"
 
-export const Route = createFileRoute("/")({ component: App })
+export const Route = createFileRoute("/")({
+  beforeLoad: () => {
+    if (typeof window === "undefined") return
+    const user = currentUserSync()
+    throw redirect({ to: user ? staffHome(user.role) : "/sign-in" })
+  },
+  component: IndexPage,
+})
 
-function App() {
+function IndexPage() {
   return (
-    <main className="flex min-h-svh p-6">
-      <div className="flex max-w-md min-w-0 flex-col gap-2 text-sm leading-relaxed">
-        <h1 className="text-lg font-medium">InternFlow staff</h1>
-        <p>
-          Departments, classes, assignments, and accounts for HR, instructors,
-          supervisors, and admins.
-        </p>
-        <p className="text-muted-foreground">API {apiUrl()}</p>
-      </div>
+    <main className="flex min-h-svh items-center justify-center bg-background">
+      <p className="text-sm text-muted-foreground">Opening InternFlow staff…</p>
     </main>
   )
 }

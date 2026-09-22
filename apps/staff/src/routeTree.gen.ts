@@ -10,33 +10,130 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppAdminIndexRouteImport } from './routes/_app/admin.index'
+import { Route as AppAdminActivityRouteImport } from './routes/_app/admin.activity'
+import { Route as AppAdminDepartmentsRouteImport } from './routes/_app/admin.departments'
+import { Route as AppAdminHrRouteImport } from './routes/_app/admin.hr'
+import { Route as AppAdminUsersRouteImport } from './routes/_app/admin.users'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminActivityRoute = AppAdminActivityRouteImport.update({
+  id: '/admin/activity',
+  path: '/admin/activity',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminDepartmentsRoute = AppAdminDepartmentsRouteImport.update({
+  id: '/admin/departments',
+  path: '/admin/departments',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminHrRoute = AppAdminHrRouteImport.update({
+  id: '/admin/hr',
+  path: '/admin/hr',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/sign-in': typeof SignInRoute
+  '/settings': typeof AppSettingsRoute
+  '/admin/activity': typeof AppAdminActivityRoute
+  '/admin/departments': typeof AppAdminDepartmentsRoute
+  '/admin/hr': typeof AppAdminHrRoute
+  '/admin/users': typeof AppAdminUsersRoute
+  '/admin/': typeof AppAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/sign-in': typeof SignInRoute
+  '/settings': typeof AppSettingsRoute
+  '/admin/activity': typeof AppAdminActivityRoute
+  '/admin/departments': typeof AppAdminDepartmentsRoute
+  '/admin/hr': typeof AppAdminHrRoute
+  '/admin/users': typeof AppAdminUsersRoute
+  '/admin': typeof AppAdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/sign-in': typeof SignInRoute
+  '/_app/settings': typeof AppSettingsRoute
+  '/_app/admin/activity': typeof AppAdminActivityRoute
+  '/_app/admin/departments': typeof AppAdminDepartmentsRoute
+  '/_app/admin/hr': typeof AppAdminHrRoute
+  '/_app/admin/users': typeof AppAdminUsersRoute
+  '/_app/admin/': typeof AppAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/sign-in'
+    | '/settings'
+    | '/admin/activity'
+    | '/admin/departments'
+    | '/admin/hr'
+    | '/admin/users'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/sign-in'
+    | '/settings'
+    | '/admin/activity'
+    | '/admin/departments'
+    | '/admin/hr'
+    | '/admin/users'
+    | '/admin'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/sign-in'
+    | '/_app/settings'
+    | '/_app/admin/activity'
+    | '/_app/admin/departments'
+    | '/_app/admin/hr'
+    | '/_app/admin/users'
+    | '/_app/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  SignInRoute: typeof SignInRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +145,89 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/': {
+      id: '/_app/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AppAdminIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/activity': {
+      id: '/_app/admin/activity'
+      path: '/admin/activity'
+      fullPath: '/admin/activity'
+      preLoaderRoute: typeof AppAdminActivityRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/departments': {
+      id: '/_app/admin/departments'
+      path: '/admin/departments'
+      fullPath: '/admin/departments'
+      preLoaderRoute: typeof AppAdminDepartmentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/hr': {
+      id: '/_app/admin/hr'
+      path: '/admin/hr'
+      fullPath: '/admin/hr'
+      preLoaderRoute: typeof AppAdminHrRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/users': {
+      id: '/_app/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AppAdminUsersRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppAdminActivityRoute: typeof AppAdminActivityRoute
+  AppAdminDepartmentsRoute: typeof AppAdminDepartmentsRoute
+  AppAdminHrRoute: typeof AppAdminHrRoute
+  AppAdminUsersRoute: typeof AppAdminUsersRoute
+  AppAdminIndexRoute: typeof AppAdminIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppSettingsRoute: AppSettingsRoute,
+  AppAdminActivityRoute: AppAdminActivityRoute,
+  AppAdminDepartmentsRoute: AppAdminDepartmentsRoute,
+  AppAdminHrRoute: AppAdminHrRoute,
+  AppAdminUsersRoute: AppAdminUsersRoute,
+  AppAdminIndexRoute: AppAdminIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  SignInRoute: SignInRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
