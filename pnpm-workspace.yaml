@@ -2,6 +2,13 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# Refuse package versions published less than 7 days ago.
+minimumReleaseAge: 10080
+# The existing lockfile already pins turbo 2.11.2, published inside that window.
+minimumReleaseAgeExclude:
+  - turbo
+  - "@turbo/*"
+
 allowBuilds:
   esbuild: true
   lightningcss: true

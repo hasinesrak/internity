@@ -1,0 +1,60 @@
+import { Hono } from "hono"
+import { cors } from "hono/cors"
+
+import { getEnv } from "./config/env.js"
+import { handleError } from "./middleware/error.js"
+import { adminRoutes } from "./routes/admin.js"
+import { authRoutes } from "./routes/auth.js"
+import { departmentRoutes } from "./routes/departments.js"
+import { healthRoutes } from "./routes/health.js"
+import { hrRoutes } from "./routes/hr.js"
+import { instructorRoutes } from "./routes/instructor.js"
+import { internRoutes } from "./routes/intern.js"
+import { supervisorRoutes } from "./routes/supervisor.js"
+import type { AppEnv } from "./types.js"
+
+function installErrors(app: Hono<AppEnv>) {
+  app.notFound((c) =>
+    c.json(
+      { error: { code: "NOT_FOUND", message: "That route was not found." } },
+      404
+    )
+  )
+  app.onError(handleError)
+}
+
+export function createApp(): Hono<AppEnv> {
+  const app = new Hono<AppEnv>()
+  const env = getEnv()
+  app.use(
+    "*",
+    cors({
+      origin: env.corsOrigins,
+      credentials: true,
+      allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+      allowHeaders: ["Content-Type"],
+    })
+  )
+  installErrors(app)
+  for (const router of [
+    healthRoutes,
+    authRoutes,
+    adminRoutes,
+    hrRoutes,
+    supervisorRoutes,
+    instructorRoutes,
+    internRoutes,
+    departmentRoutes,
+  ]) {
+    installErrors(router)
+  }
+  app.route("/health", healthRoutes)
+  app.route("/api/auth", authRoutes)
+  app.route("/api/admin", adminRoutes)
+  app.route("/api/hr", hrRoutes)
+  app.route("/api/supervisor", supervisorRoutes)
+  app.route("/api/instructor", instructorRoutes)
+  app.route("/api/intern", internRoutes)
+  app.route("/api/departments", departmentRoutes)
+  return app
+}

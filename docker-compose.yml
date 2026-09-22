@@ -1,0 +1,47 @@
+name: internity
+
+services:
+  mongo:
+    image: mongo:7.0
+    container_name: internity-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - internity_mongo:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    ports:
+      - "4000:4000"
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      MONGODB_URI: mongodb://mongo:27017/internity
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-please-32}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      COOKIE_SECURE: "false"
+      STAFF_ALLOWED_IPS: ${STAFF_ALLOWED_IPS:-}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-Internity <beth.t@example.com>}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-qwen/qwen3.8-27b}
+      ADMIN_NAME: ${ADMIN_NAME:-Admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+volumes:
+  internity_mongo:
+    name: internity_mongo
