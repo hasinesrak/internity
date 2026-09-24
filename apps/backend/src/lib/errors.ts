@@ -1,4 +1,14 @@
-export type ErrorStatus = 400 | 401 | 403 | 404 | 409 | 422 | 500 | 502 | 503
+export type ErrorStatus =
+  | 400
+  | 401
+  | 403
+  | 404
+  | 409
+  | 422
+  | 429
+  | 500
+  | 502
+  | 503
 
 export type FieldIssue = {
   path: string
