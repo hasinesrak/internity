@@ -1,0 +1,174 @@
+# Staff CI/CD in one file
+# PRs run CI only
+# Main adds publish, gitops
+
+name: Staff
+
+on:
+  pull_request:
+    paths:
+      - "apps/staff/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/staff.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/staff/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "apps/staff/Dockerfile"
+      - ".github/workflows/staff.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: staff-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10.33.4"
+  REGISTRY: docker.io
+  IMAGE_BASENAME: internity-staff
+
+jobs:
+  # Lint staff code
+  lint:
+    name: staff / lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint staff
+        run: pnpm --filter staff lint
+
+  # Check TypeScript types
+  typecheck:
+    name: staff / typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck staff
+        run: pnpm --filter staff typecheck
+
+  # Verify production build
+  build:
+    name: staff / build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      # Require API URL secret
+      - name: Check API URL set
+        env:
+          VITE_API_URL: ${{ secrets.STAFF_API_URL }}
+        run: test -n "$VITE_API_URL"
+      - name: Build staff
+        run: pnpm --filter staff build
+        env:
+          VITE_API_URL: ${{ secrets.STAFF_API_URL }}
+
+  # Publish image on main
+  publish:
+    name: staff / publish
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, build]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      # Login with GitHub Secrets
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # Tag with commit SHA
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ secrets.DOCKERHUB_USERNAME }}/${{ env.IMAGE_BASENAME }}
+          tags: |
+            type=sha,prefix=sha-,format=long
+            type=ref,event=branch
+      # Build and push image
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/staff/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VITE_API_URL=${{ secrets.STAFF_API_URL }}
+
+  # Update manifest for ArgoCD
+  gitops:
+    name: staff / gitops
+    runs-on: ubuntu-latest
+    needs: [publish]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      # Edit staff tag only
+      - name: Point production at the new staff image
+        env:
+          SHA: ${{ github.sha }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          tag="sha-${SHA}"
+          file=infra/k8s/overlays/production/kustomization.yaml
+          sed -i -e "/- name: internity-staff/,/newTag:/ s|newName: .*|newName: docker.io/${DOCKERHUB_USERNAME}/internity-staff|" "$file"
+          sed -i -e "/- name: internity-staff/,/newTag:/ s|newTag: .*|newTag: ${tag}|" "$file"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$file"
+          git diff --cached --quiet && exit 0
+          git commit -m "Publish staff ${SHA:0:7}"
+          git push

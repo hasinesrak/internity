@@ -26,13 +26,18 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Check API URLs set
+        env:
+          WEB_API_URL: ${{ secrets.WEB_API_URL }}
+          STAFF_API_URL: ${{ secrets.STAFF_API_URL }}
+        run: test -n "$WEB_API_URL" && test -n "$STAFF_API_URL"
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm --filter backend test
       - run: pnpm --filter backend build
       - run: pnpm --filter web build
         env:
-          VITE_API_URL: ${{ vars.WEB_API_URL != '' && vars.WEB_API_URL || 'http://localhost:4000' }}
+          VITE_API_URL: ${{ secrets.WEB_API_URL }}
       - run: pnpm --filter staff build
         env:
-          VITE_API_URL: ${{ vars.STAFF_API_URL != '' && vars.STAFF_API_URL || 'http://localhost:4001' }}
+          VITE_API_URL: ${{ secrets.STAFF_API_URL }}

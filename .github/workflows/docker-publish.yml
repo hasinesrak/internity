@@ -18,10 +18,10 @@ jobs:
             api: ""
           - name: internity-web
             file: apps/web/Dockerfile
-            api: ${{ vars.WEB_API_URL != '' && vars.WEB_API_URL || 'http://localhost:4000' }}
+            api: ${{ secrets.WEB_API_URL }}
           - name: internity-staff
             file: apps/staff/Dockerfile
-            api: ${{ vars.STAFF_API_URL != '' && vars.STAFF_API_URL || 'http://localhost:4001' }}
+            api: ${{ secrets.STAFF_API_URL }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
