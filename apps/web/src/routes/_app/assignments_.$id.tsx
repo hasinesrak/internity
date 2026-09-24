@@ -26,6 +26,7 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { Reveal } from "@workspace/ui/components/reveal"
 import { AssignmentDetailSummary } from "@/components/assignment-list"
+import { AttachmentList } from "@/components/attachment-list"
 import { StatusChip } from "@/components/status-chip"
 import { getAssignment, submitAssignment } from "@/lib/data"
 import { formatDateLong, formatScore, relativeDue } from "@/lib/format"
@@ -132,6 +133,22 @@ function AssignmentDetail({
               </p>
             </CardContent>
           </Card>
+
+          {(assignment.attachments?.length ?? 0) > 0 ? (
+            <Card>
+              <CardHeader>
+                <h2 className="text-base font-medium tracking-tight">
+                  Materials · {assignment.attachments.length}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Files from your instructor. Open to view, or download to keep.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <AttachmentList attachments={assignment.attachments} />
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader>

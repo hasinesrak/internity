@@ -128,6 +128,15 @@ export interface HrDashboard {
   invitationsTrend?: number[]
 }
 
+export interface PublicAttachment {
+  id: string
+  originalName: string
+  mimeType: string
+  size: number
+  url: string
+  createdAt: string
+}
+
 export interface PublicClass {
   id: string
   departmentId: string
@@ -136,6 +145,7 @@ export interface PublicClass {
   meetingUrl: string
   scheduledStart: string
   scheduledEnd: string
+  attachments: PublicAttachment[]
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -148,6 +158,7 @@ export interface PublicAssignment {
   instructions: string
   rubric: RubricCriterion[]
   deadline: string | null
+  attachments: PublicAttachment[]
   status: AssignmentStatus
   maxScore: number
   createdBy: string

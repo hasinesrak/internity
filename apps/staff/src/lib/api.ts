@@ -100,3 +100,28 @@ export function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   inflight.set(key, task)
   return task
 }
+
+/** Multipart upload: FormData sets its own content-type, so no JSON header. */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  const response = await fetch(apiUrl(path), {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  })
+  if (response.status === 204) {
+    getCache.clear()
+    return undefined as T
+  }
+  const body = (await response.json().catch(() => ({}))) as T & ErrorEnvelope
+  if (!response.ok) {
+    const envelope = body.error ?? {}
+    throw new ApiError(
+      response.status,
+      envelope.code ?? "REQUEST_FAILED",
+      envelope.message ?? "Unable to upload that file.",
+      envelope.details ?? [],
+    )
+  }
+  getCache.clear()
+  return body
+}

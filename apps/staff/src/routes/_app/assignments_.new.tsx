@@ -20,6 +20,7 @@ import type { TodoItem } from "@workspace/ui/components/agents/todo-list"
 import { Reveal } from "@workspace/ui/components/reveal"
 
 import { AiDraftPanel } from "@/components/ai-draft-panel"
+import { AttachmentUploader } from "@/components/attachment-uploader"
 import { DateField } from "@/components/date-field"
 import { ErrorPanel, LoadingPanel } from "@/components/data-states"
 import {
@@ -31,7 +32,11 @@ import {
 } from "@/lib/data"
 import { useDraftsStore } from "@/lib/drafts-store"
 import { requireAnyRole } from "@/lib/guards"
-import type { AssignmentDraft, RubricCriterion } from "@/lib/types"
+import type {
+  AssignmentDraft,
+  PublicAttachment,
+  RubricCriterion,
+} from "@/lib/types"
 import { rubricMaxScore } from "@/lib/types"
 import { useResource } from "@/lib/use-resource"
 import { toast } from "@/lib/toast"
@@ -65,6 +70,7 @@ function NewAssignmentPage() {
   const [title, setTitle] = useState("")
   const [instructions, setInstructions] = useState("")
   const [deadline, setDeadline] = useState<Date | null>(null)
+  const [attachments, setAttachments] = useState<PublicAttachment[]>([])
   const [rubric, setRubric] = useState<RubricCriterion[]>([emptyCriterion()])
   const [errors, setErrors] = useState<Record<string, string | undefined>>({})
   const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle")
@@ -83,6 +89,7 @@ function NewAssignmentPage() {
         : [emptyCriterion()],
     )
     setDeadline(existing.data.deadline ? new Date(existing.data.deadline) : null)
+    setAttachments(existing.data.attachments ?? [])
     setErrors({})
   }, [existing.data, search.id])
 
@@ -154,6 +161,7 @@ function NewAssignmentPage() {
         description: row.description.trim(),
       })),
       deadline: deadline ? deadline.toISOString() : null,
+      attachments: attachments.map((item) => item.id),
     }
     try {
       const saved = search.id
@@ -268,6 +276,12 @@ function NewAssignmentPage() {
                   value={deadline}
                   onChange={setDeadline}
                   error={errors.deadline}
+                  disabled={state === "loading"}
+                />
+
+                <AttachmentUploader
+                  attachments={attachments}
+                  onChange={setAttachments}
                   disabled={state === "loading"}
                 />
 

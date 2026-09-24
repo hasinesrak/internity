@@ -19,6 +19,7 @@ import { DetailPanel } from "@/components/detail-panel"
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/data-states"
 import { HoldDialog } from "@/components/hold-dialog"
 import { PageHeader } from "@/components/page-header"
+import { AttachmentList } from "@/components/attachment-list"
 import {
   NameCell,
   RowActionsMenu,
@@ -171,7 +172,7 @@ function AssignmentsPage() {
           <NameCell
             label={`Open ${assignment.title}`}
             title={assignment.title}
-            subtitle={`${assignment.maxScore} points · ${assignment.rubric.length} criteria`}
+            subtitle={`${assignment.maxScore} points · ${assignment.rubric.length} criteria${(assignment.attachments?.length ?? 0) > 0 ? ` · ${assignment.attachments.length} file${assignment.attachments.length === 1 ? "" : "s"}` : ""}`}
             onOpen={() => openAssignment(assignment)}
           />
         </RowContextMenu>
@@ -437,6 +438,16 @@ function AssignmentDrawer({
           <RubricList rubric={assignment.rubric} />
         </div>
       ) : null}
+
+      <div className="flex flex-col gap-2">
+        <span className="text-xs text-muted-foreground">
+          Materials · {assignment.attachments?.length ?? 0}
+        </span>
+        <AttachmentList
+          attachments={assignment.attachments ?? []}
+          emptyLabel="No files attached."
+        />
+      </div>
 
       <div className="flex flex-col gap-2">
         <span className="text-xs text-muted-foreground">

@@ -1,7 +1,7 @@
 // One place for every read and write the staff app makes. Every call goes to
 // apps/backend over REST: there is no offline fixture layer, so a screen never
 // shows data the database does not have and sign-in is only ever the real one.
-import { ApiError, apiFetch } from "./api"
+import { ApiError, apiFetch, apiUpload, apiUrl } from "./api"
 import { expiresWithin } from "./format"
 import type {
   ActivityDay,
@@ -16,6 +16,7 @@ import type {
   InvitationResult,
   PageResult,
   PublicAssignment,
+  PublicAttachment,
   PublicClass,
   PublicDepartment,
   PublicInvitation,
@@ -608,6 +609,24 @@ export interface ClassInput {
   meetingUrl: string
   scheduledStart: string
   scheduledEnd: string
+  attachments?: string[]
+}
+
+export function attachmentFileUrl(attachment: PublicAttachment): string {
+  return apiUrl(attachment.url)
+}
+
+export function uploadAttachment(file: File): Promise<PublicAttachment> {
+  const form = new FormData()
+  form.append("file", file, file.name)
+  return apiUpload<{ attachment: PublicAttachment }>(
+    "/api/instructor/uploads",
+    form,
+  ).then((body) => body.attachment)
+}
+
+export function deleteUpload(id: string): Promise<void> {
+  return request<void>(`/api/instructor/uploads/${id}`, { method: "DELETE" })
 }
 
 export function createClass(input: ClassInput): Promise<PublicClass> {
@@ -649,6 +668,7 @@ export interface AssignmentInput {
   instructions: string
   rubric?: RubricCriterion[]
   deadline?: string | null
+  attachments?: string[]
   status?: "draft" | "published"
 }
 

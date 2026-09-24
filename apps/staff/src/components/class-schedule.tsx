@@ -15,6 +15,7 @@ import type { OverflowActionItem } from "@workspace/ui/components/motion/overflo
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 
 import { StatusChip } from "@/components/status-chip"
+import { AttachmentList } from "@/components/attachment-list"
 import { copyText } from "@/lib/clipboard"
 import { daysUntil, formatDateShort, formatTime } from "@/lib/format"
 import type { PublicClass } from "@/lib/types"
@@ -125,6 +126,14 @@ function ClassAgenda({
         )}
       </div>
       <p className="text-sm leading-6 text-muted-foreground">{session.agenda}</p>
+      {(session.attachments?.length ?? 0) > 0 ? (
+        <div className="flex flex-col gap-2">
+          <span className="text-xs text-muted-foreground">
+            Materials · {session.attachments.length}
+          </span>
+          <AttachmentList attachments={session.attachments} />
+        </div>
+      ) : null}
     </div>
   )
 }

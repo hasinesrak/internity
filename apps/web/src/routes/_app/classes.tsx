@@ -17,6 +17,7 @@ import {
   ErrorPanel,
   LoadingPanel,
 } from "@/components/data-states"
+import { AttachmentList } from "@/components/attachment-list"
 import { PageHeader } from "@/components/page-header"
 import { StatusChip } from "@/components/status-chip"
 import { Reveal } from "@workspace/ui/components/reveal"
@@ -170,8 +171,16 @@ function ClassCard({ session, isPast }: { session: PublicClass; isPast: boolean 
             id: session.id,
             title: "Agenda",
             description: (
-              <span className="flex flex-col gap-2">
+              <span className="flex flex-col gap-3">
                 <span>{session.agenda}</span>
+                {(session.attachments?.length ?? 0) > 0 ? (
+                  <span className="flex flex-col gap-2">
+                    <span className="text-xs text-muted-foreground">
+                      Materials · {session.attachments.length}
+                    </span>
+                    <AttachmentList attachments={session.attachments} />
+                  </span>
+                ) : null}
                 {!isPast ? (
                   <a
                     href={session.meetingUrl}

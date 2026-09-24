@@ -16,6 +16,15 @@ export interface RubricCriterion {
   points: number
 }
 
+export interface PublicAttachment {
+  id: string
+  originalName: string
+  mimeType: string
+  size: number
+  url: string
+  createdAt: string
+}
+
 export interface DepartmentBrief {
   id: string
   name: string
@@ -63,6 +72,7 @@ export interface PublicClass {
   meetingUrl: string
   scheduledStart: string
   scheduledEnd: string
+  attachments: PublicAttachment[]
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -75,6 +85,7 @@ export interface PublicAssignment {
   instructions: string
   rubric: RubricCriterion[]
   deadline: string | null
+  attachments: PublicAttachment[]
   status: AssignmentStatus
   maxScore: number
   createdBy: string

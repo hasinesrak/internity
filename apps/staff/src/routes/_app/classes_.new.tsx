@@ -11,6 +11,7 @@ import { Textarea } from "@workspace/ui/components/textarea"
 import { Reveal } from "@workspace/ui/components/reveal"
 
 import { AiDraftPanel } from "@/components/ai-draft-panel"
+import { AttachmentUploader } from "@/components/attachment-uploader"
 import { DateField } from "@/components/date-field"
 import { ErrorPanel, LoadingPanel } from "@/components/data-states"
 import { TimeField } from "@/components/time-field"
@@ -18,7 +19,7 @@ import { createClass, draftClassAgenda, getClass, updateClass } from "@/lib/data
 import { useDraftsStore } from "@/lib/drafts-store"
 import { requireAnyRole } from "@/lib/guards"
 import { formatDate } from "@/lib/format"
-import type { AgendaDraft } from "@/lib/types"
+import type { AgendaDraft, PublicAttachment } from "@/lib/types"
 import { useResource } from "@/lib/use-resource"
 import { toast } from "@/lib/toast"
 
@@ -76,6 +77,7 @@ function NewClassPage() {
   const [title, setTitle] = useState("")
   const [agenda, setAgenda] = useState("")
   const [meetingUrl, setMeetingUrl] = useState("")
+  const [attachments, setAttachments] = useState<PublicAttachment[]>([])
   const [day, setDay] = useState<Date | null>(tomorrow)
   const [start, setStart] = useState("10:00")
   const [end, setEnd] = useState("11:30")
@@ -90,6 +92,7 @@ function NewClassPage() {
     setTitle(existing.data.title)
     setAgenda(existing.data.agenda)
     setMeetingUrl(existing.data.meetingUrl)
+    setAttachments(existing.data.attachments ?? [])
     setDay(new Date(existing.data.scheduledStart))
     setStart(clock(existing.data.scheduledStart))
     setEnd(clock(existing.data.scheduledEnd))
@@ -151,6 +154,7 @@ function NewClassPage() {
         meetingUrl: meetingUrl.trim(),
         scheduledStart: startsAt as string,
         scheduledEnd: endsAt as string,
+        attachments: attachments.map((item) => item.id),
       }
       const saved = search.id
         ? await updateClass(search.id, payload)
@@ -277,6 +281,12 @@ function NewClassPage() {
                     disabled={state === "loading"}
                   />
                 </div>
+
+                <AttachmentUploader
+                  attachments={attachments}
+                  onChange={setAttachments}
+                  disabled={state === "loading"}
+                />
               </FieldGroup>
             </CardContent>
             <CardFooter className="flex flex-wrap items-center gap-2">
