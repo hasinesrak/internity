@@ -12,7 +12,7 @@ export type PublicSettings = {
 
 export async function getSettings(): Promise<PublicSettings> {
   const fallbackModel = getEnv().groqModel
-  let settings = await PlatformSettings.findOneAndUpdate(
+  const created = await PlatformSettings.findOneAndUpdate(
     { key: "default" },
     {
       $setOnInsert: {
@@ -24,13 +24,13 @@ export async function getSettings(): Promise<PublicSettings> {
     },
     { upsert: true, new: true }
   )
-  if (!settings.groqModel) {
-    settings = await PlatformSettings.findOneAndUpdate(
-      { key: "default" },
-      { $set: { groqModel: fallbackModel } },
-      { new: true }
-    )
-  }
+  const settings = created?.groqModel
+    ? created
+    : await PlatformSettings.findOneAndUpdate(
+        { key: "default" },
+        { $set: { groqModel: fallbackModel } },
+        { new: true }
+      )
   if (!settings) {
     return {
       organizationName: "InternFlow",

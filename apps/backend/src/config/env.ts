@@ -16,6 +16,7 @@ export type AppEnvConfig = {
   jwtMaxAgeSeconds: number
   cookieSecure: boolean
   staffAllowedIps: string[]
+  staffAllowPrivate: boolean
   trustProxy: boolean
   resendApiKey: string
   resendFromEmail: string
@@ -185,6 +186,9 @@ export function getEnv(): AppEnvConfig {
     jwtMaxAgeSeconds: parseDurationSeconds(optional("JWT_EXPIRES_IN", "8h")),
     cookieSecure: cookieRaw === "true" || cookieRaw === "1",
     staffAllowedIps,
+    staffAllowPrivate: ["true", "1"].includes(
+      optional("STAFF_ALLOW_PRIVATE").toLowerCase()
+    ),
     trustProxy: ["true", "1"].includes(optional("TRUST_PROXY").toLowerCase()),
     resendApiKey: optional("RESEND_API_KEY"),
     resendFromEmail: optional(

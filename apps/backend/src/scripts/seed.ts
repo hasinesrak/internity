@@ -9,11 +9,13 @@ import { Department } from "../models/department.js"
 import { PlatformSettings } from "../models/platform-settings.js"
 import { User } from "../models/user.js"
 
-const DEMO_PASSWORD = "Password123!"
+const ADMIN_PASSWORD = "Admin123456"
+const DEMO_PASSWORD = "123456"
 
 type DemoUser = {
   name: string
   email: string
+  password: string
   role: "admin" | "hr" | "supervisor" | "instructor" | "intern"
   department?: boolean
   profile?: {
@@ -27,9 +29,9 @@ type DemoUser = {
 
 async function upsertUser(
   input: DemoUser,
-  passwordHash: string,
   departmentId: Types.ObjectId | null
 ) {
+  const passwordHash = await hashPassword(input.password)
   const existing = await User.findOne({ email: input.email }).select(
     "+passwordHash"
   )
@@ -95,28 +97,40 @@ async function main(): Promise<void> {
     { upsert: true, new: true }
   )
 
-  const passwordHash = await hashPassword(DEMO_PASSWORD)
   const now = new Date()
   const end = new Date(now)
   end.setMonth(end.getMonth() + 3)
   const users: DemoUser[] = [
-    { name: "Avery Admin", email: "admin@internity.local", role: "admin" },
-    { name: "Harper HR", email: "hr@internity.local", role: "hr" },
+    {
+      name: "Avery Admin",
+      email: "admin@ba-sys.com",
+      password: ADMIN_PASSWORD,
+      role: "admin",
+    },
+    {
+      name: "Harper HR",
+      email: "hr@ba-sys.com",
+      password: DEMO_PASSWORD,
+      role: "hr",
+    },
     {
       name: "Sam Supervisor",
-      email: "supervisor@internity.local",
+      email: "supervisor@ba-sys.com",
+      password: DEMO_PASSWORD,
       role: "supervisor",
       department: true,
     },
     {
       name: "Indira Instructor",
-      email: "instructor@internity.local",
+      email: "instructor@ba-sys.com",
+      password: DEMO_PASSWORD,
       role: "instructor",
       department: true,
     },
     {
       name: "Noah Intern",
-      email: "intern@internity.local",
+      email: "intern@ba-sys.com",
+      password: DEMO_PASSWORD,
       role: "intern",
       department: true,
       profile: {
@@ -132,11 +146,7 @@ async function main(): Promise<void> {
   const created = []
   for (const user of users) {
     created.push(
-      await upsertUser(
-        user,
-        passwordHash,
-        user.department ? department._id : null
-      )
+      await upsertUser(user, user.department ? department._id : null)
     )
   }
   const supervisor = created.find((user) => user.role === "supervisor")
@@ -198,9 +208,11 @@ async function main(): Promise<void> {
     })
   }
 
-  console.info("Seeded demo accounts. Password: Password123!")
   console.info(
-    "admin@internity.local, hr@internity.local, supervisor@internity.local, instructor@internity.local, intern@internity.local"
+    `Seeded demo accounts. admin@ba-sys.com password: ${ADMIN_PASSWORD}`
+  )
+  console.info(
+    `hr@ba-sys.com, supervisor@ba-sys.com, instructor@ba-sys.com, intern@ba-sys.com password: ${DEMO_PASSWORD}`
   )
   await disconnectDb()
 }

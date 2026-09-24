@@ -26,6 +26,7 @@ export function networkAllowsStaff(c: Context): boolean {
   return staffIpPermitted(
     clientIp(c),
     env.staffAllowedIps,
-    env.nodeEnv !== "production"
+    env.nodeEnv !== "production",
+    env.staffAllowPrivate
   )
 }

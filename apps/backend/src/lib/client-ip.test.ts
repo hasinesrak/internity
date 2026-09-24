@@ -24,6 +24,21 @@ describe("client ip", () => {
     assert.equal(staffIpPermitted("127.0.0.1", [], false), false)
   })
 
+  test("allows a private address only when that access is requested", () => {
+    assert.equal(staffIpPermitted("172.18.0.1", [], true, false), false)
+    assert.equal(staffIpPermitted("172.18.0.1", [], false, true), true)
+    assert.equal(staffIpPermitted("10.1.2.3", [], false, true), true)
+    assert.equal(staffIpPermitted("192.168.1.20", [], false, true), true)
+    assert.equal(staffIpPermitted("127.0.0.1", [], false, true), true)
+    assert.equal(staffIpPermitted("203.0.113.5", [], false, true), false)
+    assert.equal(staffIpPermitted("172.15.0.1", [], false, true), false)
+    assert.equal(staffIpPermitted("172.32.0.1", [], false, true), false)
+    assert.equal(
+      staffIpPermitted("172.18.0.1", ["203.0.113.5"], false, true),
+      false
+    )
+  })
+
   test("rejects an address that is not on the list", () => {
     assert.equal(isStaffIpAllowed("203.0.113.5", ["10.0.0.8"]), false)
     assert.equal(isStaffIpAllowed("", ["10.0.0.8"]), false)
