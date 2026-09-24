@@ -1,0 +1,3 @@
+# MongoDB bind-mount contents stay local; only the folder structure is tracked.
+/db/*
+!/db/.gitkeep

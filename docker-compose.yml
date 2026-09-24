@@ -24,7 +24,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - internity_mongo:/data/db
+      - ./data/db:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 5s
@@ -95,6 +95,3 @@ services:
       STAFF_ALLOW_PRIVATE: ${STAFF_ALLOW_PRIVATE:-true}
       TRUST_PROXY: ${TRUST_PROXY:-false}
 
-volumes:
-  internity_mongo:
-    name: internity_mongo
