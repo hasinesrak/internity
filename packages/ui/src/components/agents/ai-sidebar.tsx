@@ -415,7 +415,7 @@ function ResourceRow({
       onRenameStart();
     },
     moves,
-  }) ?? (
+  }) ?? (mutable ? (
     <>
       <ResourceMenuAction
         icon={PencilSimpleIcon}
@@ -456,7 +456,7 @@ function ResourceRow({
         </ResourceMenuAction>
       ) : null}
     </>
-  );
+  ) : null);
 
   return (
     <motion.div
@@ -730,10 +730,11 @@ export function AISidebar({
   }, []);
 
   // The same four moves `Alt+Shift+Arrow` performs, handed to the row menu so
-  // they survive on a device with no drag and no modifier keys.
+  // they survive on a device with no drag and no modifier keys. A host with
+  // no mutation callback gets a static tree, so there are no move commands.
   const moveCommands = useCallback(
     (row: FlatResource): SidebarResourceMoveCommands => {
-      if (row.item.disabled) return {};
+      if (!mutable || row.item.disabled) return {};
       const index = flat.findIndex(({ item }) => item.id === row.item.id);
       const previous = flat[index - 1];
       const next = flat[index + 1];
@@ -782,7 +783,7 @@ export function AISidebar({
 
       return commands;
     },
-    [flat, performMove],
+    [flat, mutable, performMove],
   );
 
   const handleKeyDown = useCallback(

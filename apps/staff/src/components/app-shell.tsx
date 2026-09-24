@@ -17,7 +17,6 @@ import {
 import { Topbar } from "@/components/topbar"
 import { ErrorPanel, InlineLoader } from "@/components/data-states"
 import type { PublicUser, StaffRole } from "@/lib/types"
-import { roleLabel } from "@/lib/types"
 import { getShellAssignments, getShellPeople, getMe, signOut } from "@/lib/data"
 import { useIsMobile, useShellStore } from "@/lib/shell-store"
 import { useToastStore } from "@/lib/toast"
@@ -108,18 +107,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               onNavigate={onNavigate}
               isCurrent={(id) => id === activeId}
             />
-            <div className="mt-auto flex items-center justify-between gap-2 pt-2 group-data-[state=collapsed]/sidebar:hidden">
-              <span className="px-1 text-xs text-muted-foreground">
-                {user ? roleLabel(user.role) : ""}
-              </span>
-              <button
-                type="button"
-                onClick={toggleSidebar}
-                className="rounded-lg px-2 py-1 text-xs text-muted-foreground outline-none transition-[background-color,color,transform] duration-150 ease-out hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.96]"
-              >
-                Collapse
-              </button>
-            </div>
             <button
               type="button"
               onClick={toggleSidebar}

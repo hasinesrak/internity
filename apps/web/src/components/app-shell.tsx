@@ -47,11 +47,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigateToNav = useNavigateToNav()
   const activeId = useActiveNavId(assignments, pinnedIds)
 
-  const openAssignmentCount = useMemo(
-    () => assignments.filter((row) => row.submission?.status !== "reviewed").length,
-    [assignments],
-  )
-
   const onNavigate = (id: string) => {
     setMobileNavOpen(false)
     navigateToNav(id)
@@ -100,18 +95,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               onNavigate={onNavigate}
               isCurrent={(id) => id === activeId}
             />
-            <div className="mt-auto flex items-center justify-between gap-2 pt-2 group-data-[state=collapsed]/sidebar:hidden">
-              <span className="px-1 text-xs text-muted-foreground tabular-nums">
-                {openAssignmentCount} open
-              </span>
-              <button
-                type="button"
-                onClick={toggleSidebar}
-                className="rounded-lg px-2 py-1 text-xs text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                Collapse
-              </button>
-            </div>
             <button
               type="button"
               onClick={toggleSidebar}
