@@ -4,6 +4,11 @@ import { memberDepartmentId, ownDepartmentId } from "./access.js"
 import { recordActivity } from "./activity.service.js"
 import { requireActiveDepartment } from "./department.service.js"
 import { serializeAssignment, type PublicAssignment } from "./serializers.js"
+import {
+  attachmentsFor,
+  deleteUploadsForAssignment,
+  resolveAttachmentIds,
+} from "./upload.service.js"
 import { AppError, notFound, validation } from "../lib/errors.js"
 import {
   Assignment,
@@ -35,6 +40,7 @@ export async function createAssignment(
     instructions: string
     rubric?: RubricCriterion[]
     deadline?: string | null
+    attachments?: string[]
     status?: "draft" | "published"
   }
 ): Promise<PublicAssignment> {
@@ -45,12 +51,14 @@ export async function createAssignment(
   if (status === "published" && !deadline) {
     throw validation("Add a deadline before publishing.", "deadline")
   }
+  const attachments = await resolveAttachmentIds(actor, input.attachments)
   const assignment = await Assignment.create({
     departmentId: new Types.ObjectId(departmentId),
     title: input.title.trim(),
     instructions: input.instructions.trim(),
     rubric: cleanRubric(input.rubric),
     deadline,
+    attachments,
     createdBy: new Types.ObjectId(actor.id),
     status,
   })
@@ -62,7 +70,10 @@ export async function createAssignment(
     departmentId,
     metadata: { title: assignment.title, status },
   })
-  return serializeAssignment(assignment)
+  return serializeAssignment(
+    assignment,
+    await attachmentsFor(assignment.attachments)
+  )
 }
 
 export async function listAssignments(
@@ -79,7 +90,14 @@ export async function listAssignments(
   if (options.internView) filter.status = { $in: ["published", "closed"] }
   else if (options.status) filter.status = options.status
   const assignments = await Assignment.find(filter).sort({ createdAt: -1 })
-  return assignments.map(serializeAssignment)
+  return Promise.all(
+    assignments.map(async (assignment) =>
+      serializeAssignment(
+        assignment,
+        await attachmentsFor(assignment.attachments ?? [])
+      )
+    )
+  )
 }
 
 export async function getAssignment(
@@ -97,6 +115,18 @@ export async function getAssignment(
   return assignment
 }
 
+export async function getAssignmentPublic(
+  actor: SessionUser,
+  id: string,
+  internView = false
+): Promise<PublicAssignment> {
+  const assignment = await getAssignment(actor, id, internView)
+  return serializeAssignment(
+    assignment,
+    await attachmentsFor(assignment.attachments ?? [])
+  )
+}
+
 export async function updateAssignment(
   actor: SessionUser,
   id: string,
@@ -105,6 +135,7 @@ export async function updateAssignment(
     instructions?: string
     rubric?: RubricCriterion[]
     deadline?: string | null
+    attachments?: string[]
   }
 ): Promise<PublicAssignment> {
   const departmentId = ownDepartmentId(actor)
@@ -113,6 +144,12 @@ export async function updateAssignment(
   if (input.title) assignment.title = input.title.trim()
   if (input.instructions) assignment.instructions = input.instructions.trim()
   if (input.rubric) assignment.rubric = cleanRubric(input.rubric)
+  if (input.attachments !== undefined) {
+    assignment.attachments = await resolveAttachmentIds(
+      actor,
+      input.attachments
+    )
+  }
   if (input.deadline !== undefined) {
     assignment.deadline = input.deadline ? new Date(input.deadline) : null
   }
@@ -130,7 +167,10 @@ export async function updateAssignment(
     entityId: id,
     departmentId,
   })
-  return serializeAssignment(assignment)
+  return serializeAssignment(
+    assignment,
+    await attachmentsFor(assignment.attachments ?? [])
+  )
 }
 
 export async function publishAssignment(actor: SessionUser, id: string) {
@@ -155,7 +195,10 @@ export async function publishAssignment(actor: SessionUser, id: string) {
     entityId: id,
     departmentId,
   })
-  return serializeAssignment(assignment)
+  return serializeAssignment(
+    assignment,
+    await attachmentsFor(assignment.attachments ?? [])
+  )
 }
 
 export async function closeAssignment(actor: SessionUser, id: string) {
@@ -173,7 +216,10 @@ export async function closeAssignment(actor: SessionUser, id: string) {
     entityId: id,
     departmentId,
   })
-  return serializeAssignment(assignment)
+  return serializeAssignment(
+    assignment,
+    await attachmentsFor(assignment.attachments ?? [])
+  )
 }
 
 export async function deleteAssignment(actor: SessionUser, id: string) {
@@ -187,7 +233,9 @@ export async function deleteAssignment(actor: SessionUser, id: string) {
       "This assignment has submissions, so it cannot be deleted."
     )
   }
+  const attachmentIds = [...(assignment.attachments ?? [])]
   await assignment.deleteOne()
+  await deleteUploadsForAssignment(actor, id, attachmentIds)
   await recordActivity({
     actorId: actor.id,
     action: "assignment.deleted",

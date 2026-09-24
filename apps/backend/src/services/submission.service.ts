@@ -10,6 +10,7 @@ import {
   serializeUser,
   type PublicSubmission,
 } from "./serializers.js"
+import { attachmentsFor } from "./upload.service.js"
 import { AppError, forbidden, notFound, validation } from "../lib/errors.js"
 import { listClasses } from "./class.service.js"
 import { Assignment, maxScoreFor } from "../models/assignment.js"
@@ -237,7 +238,10 @@ export async function assignmentRoster(
     ])
   )
   return {
-    assignment: serializeAssignment(assignment),
+    assignment: serializeAssignment(
+      assignment,
+      await attachmentsFor(assignment.attachments ?? [])
+    ),
     data: interns.map((intern) => {
       const submission = byIntern.get(intern._id.toString()) ?? null
       return {
@@ -269,15 +273,20 @@ export async function internDashboard(actor: SessionUser) {
       submission,
     ])
   )
-  const rows = assignments.map((assignment) => {
-    const submission = submissionByAssignment.get(assignment._id.toString())
-    return {
-      assignment: serializeAssignment(assignment),
-      submission: submission
-        ? serializeSubmission(submission, { assignment })
-        : null,
-    }
-  })
+  const rows = await Promise.all(
+    assignments.map(async (assignment) => {
+      const submission = submissionByAssignment.get(assignment._id.toString())
+      return {
+        assignment: serializeAssignment(
+          assignment,
+          await attachmentsFor(assignment.attachments ?? [])
+        ),
+        submission: submission
+          ? serializeSubmission(submission, { assignment })
+          : null,
+      }
+    })
+  )
   return {
     department: departmentMap.get(departmentId) ?? null,
     upcomingClasses: classes.slice(0, 5),

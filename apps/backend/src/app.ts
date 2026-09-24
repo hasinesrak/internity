@@ -12,6 +12,7 @@ import { hrRoutes } from "./routes/hr.js"
 import { instructorRoutes } from "./routes/instructor.js"
 import { internRoutes } from "./routes/intern.js"
 import { supervisorRoutes } from "./routes/supervisor.js"
+import { uploadRoutes } from "./routes/uploads.js"
 import type { AppEnv } from "./types.js"
 
 function installErrors(app: Hono<AppEnv>) {
@@ -54,6 +55,7 @@ export function createApp(): Hono<AppEnv> {
     authRoutes,
     internRoutes,
     departmentRoutes,
+    uploadRoutes,
     ...(staffSurface
       ? [adminRoutes, hrRoutes, supervisorRoutes, instructorRoutes]
       : []),
@@ -64,6 +66,7 @@ export function createApp(): Hono<AppEnv> {
   app.route("/api/auth", authRoutes)
   app.route("/api/intern", internRoutes)
   app.route("/api/departments", departmentRoutes)
+  app.route("/api/uploads", uploadRoutes)
   if (staffSurface) {
     app.route("/api/admin", adminRoutes)
     app.route("/api/hr", hrRoutes)

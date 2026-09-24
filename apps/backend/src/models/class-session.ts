@@ -7,6 +7,7 @@ export interface ClassSessionShape {
   meetingUrl: string
   scheduledStart: Date
   scheduledEnd: Date
+  attachments: Types.ObjectId[]
   createdBy: Types.ObjectId
   createdAt: Date
   updatedAt: Date
@@ -25,6 +26,10 @@ const classSessionSchema = new Schema<ClassSessionShape>(
     meetingUrl: { type: String, required: true, trim: true },
     scheduledStart: { type: Date, required: true },
     scheduledEnd: { type: Date, required: true },
+    attachments: {
+      type: [{ type: Schema.Types.ObjectId, ref: "Upload" }],
+      default: [],
+    },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   },
   { timestamps: true }

@@ -16,6 +16,8 @@ x-backend-environment: &backend-environment
   ADMIN_NAME: ${ADMIN_NAME:-Admin}
   ADMIN_EMAIL: ${ADMIN_EMAIL:-}
   ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+  UPLOAD_DIR: /data/uploads
+  UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-10}
 
 services:
   mongo:
@@ -44,6 +46,8 @@ services:
       API_SURFACE: public
       CORS_ORIGIN: ${PUBLIC_CORS_ORIGIN:-http://localhost:3000}
       STAFF_ALLOWED_IPS: ""
+    volumes:
+      - uploads-data:/data/uploads
     depends_on:
       mongo:
         condition: service_healthy
@@ -62,6 +66,8 @@ services:
       CORS_ORIGIN: ${STAFF_CORS_ORIGIN:-http://localhost:3001}
       STAFF_ALLOWED_IPS: ${STAFF_ALLOWED_IPS:-}
       STAFF_ALLOW_PRIVATE: ${STAFF_ALLOW_PRIVATE:-true}
+    volumes:
+      - uploads-data:/data/uploads
     depends_on:
       mongo:
         condition: service_healthy
@@ -95,3 +101,6 @@ services:
       STAFF_ALLOW_PRIVATE: ${STAFF_ALLOW_PRIVATE:-true}
       TRUST_PROXY: ${TRUST_PROXY:-false}
 
+volumes:
+  uploads-data:
+    name: internity-uploads-data

@@ -26,6 +26,8 @@ export type AppEnvConfig = {
   adminName: string
   adminEmail: string
   adminPassword: string
+  uploadDir: string
+  uploadMaxMb: number
 }
 
 let warnedAboutDevSecret = false
@@ -173,6 +175,14 @@ export function getEnv(): AppEnvConfig {
     )
   }
 
+  const uploadMaxMb = Number(optional("UPLOAD_MAX_MB", "10"))
+  if (!Number.isFinite(uploadMaxMb) || uploadMaxMb < 1 || uploadMaxMb > 100) {
+    throw new Error("UPLOAD_MAX_MB must be a number from 1 to 100")
+  }
+
+  const uploadDir = optional("UPLOAD_DIR", "/data/uploads")
+  if (!uploadDir) throw new Error("UPLOAD_DIR is required")
+
   return {
     nodeEnv,
     apiSurface,
@@ -201,6 +211,8 @@ export function getEnv(): AppEnvConfig {
     adminName: optional("ADMIN_NAME", "Admin"),
     adminEmail: optional("ADMIN_EMAIL").toLowerCase(),
     adminPassword: optional("ADMIN_PASSWORD"),
+    uploadDir,
+    uploadMaxMb,
   }
 }
 

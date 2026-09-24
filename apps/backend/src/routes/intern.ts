@@ -2,11 +2,10 @@ import { Hono } from "hono"
 
 import { requireAuth, requireRoles } from "../middleware/auth.js"
 import {
-  getAssignment,
+  getAssignmentPublic,
   listAssignments,
 } from "../services/assignment.service.js"
 import { getClass, listClasses } from "../services/class.service.js"
-import { serializeAssignment } from "../services/serializers.js"
 import {
   getMySubmission,
   internDashboard,
@@ -41,8 +40,9 @@ internRoutes.get("/assignments", async (c) => {
 })
 
 internRoutes.get("/assignments/:id", async (c) => {
-  const assignment = await getAssignment(c.get("user"), requireId(c), true)
-  return c.json({ assignment: serializeAssignment(assignment) })
+  return c.json({
+    assignment: await getAssignmentPublic(c.get("user"), requireId(c), true),
+  })
 })
 
 internRoutes.put("/assignments/:id/submission", async (c) => {

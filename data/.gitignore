@@ -1,3 +1,6 @@
 # MongoDB bind-mount contents stay local; only the folder structure is tracked.
+# Uploads live in the named volume uploads-data (/data/uploads) in Docker.
 /db/*
 !/db/.gitkeep
+/uploads/*
+!/uploads/.gitkeep

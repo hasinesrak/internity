@@ -472,9 +472,9 @@ Decision 2: Use GitHub Actions for builds, not direct deployment.
 
 Reason: Argo CD should own cluster deployment. GitHub Actions should build and publish images.
 
-Decision 3: Keep intern submissions as external links.
+Decision 3: Keep intern submissions as external links. Instructor materials use file uploads.
 
-Reason: Avoids file storage complexity in the MVP.
+Instructor files (assignment and class attachments) are stored under `/data/uploads/YYYY/MM/DD` on a shared volume (`uploads-data` in Docker Compose, `uploads-data` PVC in K3s). An `Upload` document carries `departmentId`, `originalName`, `relativePath`, `mimeType`, and `size`. Assignments and classes keep `attachments: ObjectId[]`; uploads resolve through `resolveAttachmentIds` and serialize as `{ id, originalName, mimeType, size, url }` where `url` is `/api/uploads/:id/file`. Uploads (`POST /api/instructor/uploads`) are staff-only; downloads (`GET /api/uploads/:id/file`) run on both API surfaces and check the reader's department. Intern submissions stay as `submissionUrl` links to avoid student storage complexity.
 
 Decision 4: Backend authorization is the source of truth.
 

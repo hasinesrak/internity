@@ -104,6 +104,19 @@ spec:
                   name: internity-secrets
                   key: ADMIN_PASSWORD
                   optional: true
+            - name: UPLOAD_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: internity-config
+                  key: UPLOAD_DIR
+            - name: UPLOAD_MAX_MB
+              valueFrom:
+                configMapKeyRef:
+                  name: internity-config
+                  key: UPLOAD_MAX_MB
+          volumeMounts:
+            - name: uploads-data
+              mountPath: /data/uploads
           readinessProbe:
             httpGet:
               path: /health
@@ -114,3 +127,7 @@ spec:
               path: /health
               port: http
             periodSeconds: 20
+      volumes:
+        - name: uploads-data
+          persistentVolumeClaim:
+            claimName: uploads-data

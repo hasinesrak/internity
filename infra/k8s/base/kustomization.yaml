@@ -4,6 +4,7 @@ namespace: internity
 resources:
   - namespace.yaml
   - configmap.yaml
+  - uploads-pvc.yaml
   - mongo-service.yaml
   - mongo-statefulset.yaml
   - backend-public-service.yaml

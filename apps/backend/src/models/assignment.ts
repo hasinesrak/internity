@@ -14,6 +14,7 @@ export interface AssignmentShape {
   instructions: string
   rubric: RubricCriterion[]
   deadline: Date | null
+  attachments: Types.ObjectId[]
   createdBy: Types.ObjectId
   status: AssignmentStatus
   createdAt: Date
@@ -41,6 +42,10 @@ const assignmentSchema = new Schema<AssignmentShape>(
     instructions: { type: String, required: true },
     rubric: { type: [rubricSchema], default: [] },
     deadline: { type: Date, default: null },
+    attachments: {
+      type: [{ type: Schema.Types.ObjectId, ref: "Upload" }],
+      default: [],
+    },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
     status: {
       type: String,

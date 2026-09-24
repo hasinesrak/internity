@@ -15,6 +15,7 @@ import type { DepartmentShape } from "../models/department.js"
 import type { InvitationShape } from "../models/invitation.js"
 import type { ReviewShape } from "../models/review.js"
 import type { SubmissionShape } from "../models/submission.js"
+import type { UploadShape } from "../models/upload.js"
 import type { UserProfile, UserShape } from "../models/user.js"
 
 type WithId<T> = T & { _id: { toString(): string } }
@@ -126,6 +127,28 @@ export function departmentBrief(
   }
 }
 
+export type PublicAttachment = {
+  id: string
+  originalName: string
+  mimeType: string
+  size: number
+  url: string
+  createdAt: string
+}
+
+export function serializeUpload(
+  upload: WithId<UploadShape>
+): PublicAttachment {
+  return {
+    id: upload._id.toString(),
+    originalName: upload.originalName,
+    mimeType: upload.mimeType,
+    size: upload.size,
+    url: `/api/uploads/${upload._id.toString()}/file`,
+    createdAt: upload.createdAt.toISOString(),
+  }
+}
+
 export type PublicClass = {
   id: string
   departmentId: string
@@ -134,13 +157,15 @@ export type PublicClass = {
   meetingUrl: string
   scheduledStart: string
   scheduledEnd: string
+  attachments: PublicAttachment[]
   createdBy: string
   createdAt: string
   updatedAt: string
 }
 
 export function serializeClass(
-  session: WithId<ClassSessionShape>
+  session: WithId<ClassSessionShape>,
+  attachments: PublicAttachment[] = []
 ): PublicClass {
   return {
     id: session._id.toString(),
@@ -150,6 +175,7 @@ export function serializeClass(
     meetingUrl: session.meetingUrl,
     scheduledStart: session.scheduledStart.toISOString(),
     scheduledEnd: session.scheduledEnd.toISOString(),
+    attachments,
     createdBy: session.createdBy.toString(),
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
@@ -163,6 +189,7 @@ export type PublicAssignment = {
   instructions: string
   rubric: RubricCriterion[]
   deadline: string | null
+  attachments: PublicAttachment[]
   status: AssignmentStatus
   maxScore: number
   createdBy: string
@@ -171,7 +198,8 @@ export type PublicAssignment = {
 }
 
 export function serializeAssignment(
-  assignment: WithId<AssignmentShape>
+  assignment: WithId<AssignmentShape>,
+  attachments: PublicAttachment[] = []
 ): PublicAssignment {
   return {
     id: assignment._id.toString(),
@@ -184,6 +212,7 @@ export function serializeAssignment(
       points: item.points,
     })),
     deadline: iso(assignment.deadline),
+    attachments,
     status: assignment.status,
     maxScore: maxScoreFor(assignment.rubric),
     createdBy: assignment.createdBy.toString(),

@@ -230,6 +230,7 @@ export const assignmentWriteSchema = z.object({
   instructions: z.string().trim().min(1, "Enter instructions.").max(20000),
   rubric: z.array(rubricSchema).max(20).optional(),
   deadline: isoDateSchema.nullable().optional(),
+  attachments: z.array(objectIdSchema).max(10).optional(),
   status: z.enum(["draft", "published"]).optional(),
 })
 
@@ -247,6 +248,7 @@ export const classWriteSchema = z.object({
   meetingUrl: httpUrlSchema,
   scheduledStart: isoDateSchema,
   scheduledEnd: isoDateSchema,
+  attachments: z.array(objectIdSchema).max(10).optional(),
 })
 
 export const classUpdateSchema = classWriteSchema.partial()

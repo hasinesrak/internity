@@ -13,10 +13,14 @@ RUN pnpm --filter backend build
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
+ENV UPLOAD_DIR=/data/uploads
+RUN mkdir -p /data/uploads && chown -R node:node /data/uploads
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/backend/package.json ./apps/backend/package.json
 COPY --from=build /app/apps/backend/dist ./apps/backend/dist
 COPY --from=build /app/apps/backend/node_modules ./apps/backend/node_modules
 WORKDIR /app/apps/backend
+USER node
+VOLUME ["/data/uploads"]
 EXPOSE 4000
 CMD ["node", "dist/index.js"]

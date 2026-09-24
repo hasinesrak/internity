@@ -13,3 +13,5 @@ data:
   TRUST_PROXY: "true"
   GROQ_MODEL: qwen/qwen3.8-27b
   MONGODB_URI: mongodb://mongo:27017/internity
+  UPLOAD_DIR: /data/uploads
+  UPLOAD_MAX_MB: "10"

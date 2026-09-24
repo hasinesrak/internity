@@ -4,6 +4,11 @@ import { memberDepartmentId, ownDepartmentId } from "./access.js"
 import { recordActivity } from "./activity.service.js"
 import { requireActiveDepartment } from "./department.service.js"
 import { serializeClass, type PublicClass } from "./serializers.js"
+import {
+  attachmentsFor,
+  deleteUploadsForClass,
+  resolveAttachmentIds,
+} from "./upload.service.js"
 import { notFound, validation } from "../lib/errors.js"
 import { ClassSession, type ClassSessionDoc } from "../models/class-session.js"
 import type { SessionUser } from "../types.js"
@@ -38,6 +43,7 @@ export async function createClass(
     meetingUrl: string
     scheduledStart: string
     scheduledEnd: string
+    attachments?: string[]
   }
 ): Promise<PublicClass> {
   const departmentId = ownDepartmentId(actor)
@@ -45,6 +51,7 @@ export async function createClass(
   const scheduledStart = new Date(input.scheduledStart)
   const scheduledEnd = new Date(input.scheduledEnd)
   assertSchedule(scheduledStart, scheduledEnd)
+  const attachments = await resolveAttachmentIds(actor, input.attachments)
   const session = await ClassSession.create({
     departmentId: new Types.ObjectId(departmentId),
     title: input.title.trim(),
@@ -52,6 +59,7 @@ export async function createClass(
     meetingUrl: input.meetingUrl.trim(),
     scheduledStart,
     scheduledEnd,
+    attachments,
     createdBy: new Types.ObjectId(actor.id),
   })
   await recordActivity({
@@ -62,7 +70,10 @@ export async function createClass(
     departmentId,
     metadata: { title: session.title },
   })
-  return serializeClass(session)
+  return serializeClass(
+    session,
+    await attachmentsFor(session.attachments ?? [])
+  )
 }
 
 export async function listClasses(
@@ -77,7 +88,11 @@ export async function listClasses(
   const sessions = await ClassSession.find(filter).sort(
     when === "past" ? { scheduledStart: -1 } : { scheduledStart: 1 }
   )
-  return sessions.map(serializeClass)
+  return Promise.all(
+    sessions.map(async (session) =>
+      serializeClass(session, await attachmentsFor(session.attachments ?? []))
+    )
+  )
 }
 
 export async function getClass(
@@ -85,7 +100,10 @@ export async function getClass(
   id: string
 ): Promise<PublicClass> {
   const session = await classInDepartment(id, memberDepartmentId(actor))
-  return serializeClass(session)
+  return serializeClass(
+    session,
+    await attachmentsFor(session.attachments ?? [])
+  )
 }
 
 export async function updateClass(
@@ -97,6 +115,7 @@ export async function updateClass(
     meetingUrl?: string
     scheduledStart?: string
     scheduledEnd?: string
+    attachments?: string[]
   }
 ): Promise<PublicClass> {
   const departmentId = ownDepartmentId(actor)
@@ -105,6 +124,9 @@ export async function updateClass(
   if (input.title) session.title = input.title.trim()
   if (input.agenda) session.agenda = input.agenda.trim()
   if (input.meetingUrl) session.meetingUrl = input.meetingUrl.trim()
+  if (input.attachments !== undefined) {
+    session.attachments = await resolveAttachmentIds(actor, input.attachments)
+  }
   if (input.scheduledStart)
     session.scheduledStart = new Date(input.scheduledStart)
   if (input.scheduledEnd) session.scheduledEnd = new Date(input.scheduledEnd)
@@ -117,7 +139,10 @@ export async function updateClass(
     entityId: id,
     departmentId,
   })
-  return serializeClass(session)
+  return serializeClass(
+    session,
+    await attachmentsFor(session.attachments ?? [])
+  )
 }
 
 export async function deleteClass(
@@ -126,7 +151,9 @@ export async function deleteClass(
 ): Promise<void> {
   const departmentId = ownDepartmentId(actor)
   const session = await classInDepartment(id, departmentId)
+  const attachmentIds = [...(session.attachments ?? [])]
   await session.deleteOne()
+  await deleteUploadsForClass(actor, id, attachmentIds)
   await recordActivity({
     actorId: actor.id,
     action: "class.deleted",
