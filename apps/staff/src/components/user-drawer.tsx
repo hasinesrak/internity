@@ -125,7 +125,7 @@ export function UserDrawer({
             )
           }}
         >
-          <CopyIcon weight="duotone" data-icon="inline-start" />
+          <CopyIcon weight="duotone" data-icon="inline-start" className="size-4" />
           Copy email
         </Button>
       </div>

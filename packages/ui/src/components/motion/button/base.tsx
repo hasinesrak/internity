@@ -114,6 +114,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           "inline-flex items-center justify-center font-medium select-none",
           "transition-colors",
           "disabled:pointer-events-none disabled:opacity-50",
+          // Phosphor icons render an svg with no width/height unless sized,
+          // so an unsized icon would blow up to fill the button. Explicit
+          // size classes still win; this only guards the bare case.
+          "[&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
           ripple && "relative overflow-hidden",
           VARIANT_CLASS[variant],
           SIZE_CLASS[size],
@@ -178,6 +182,7 @@ export const ButtonLink = forwardRef<HTMLAnchorElement, ButtonLinkProps>(
         className={cn(
           "inline-flex items-center justify-center font-medium select-none",
           "transition-colors",
+          "[&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
           VARIANT_CLASS[variant],
           SIZE_CLASS[size],
           className,
