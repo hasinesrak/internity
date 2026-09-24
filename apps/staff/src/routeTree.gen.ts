@@ -11,17 +11,33 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/_app'
+import { Route as ActivateRouteImport } from './routes/activate'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as AppAssignmentsRouteImport } from './routes/_app/assignments'
+import { Route as AppClassesRouteImport } from './routes/_app/classes'
+import { Route as AppDraftsRouteImport } from './routes/_app/drafts'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppSubmissionsRouteImport } from './routes/_app/submissions'
 import { Route as AppAdminIndexRouteImport } from './routes/_app/admin.index'
 import { Route as AppAdminActivityRouteImport } from './routes/_app/admin.activity'
 import { Route as AppAdminDepartmentsRouteImport } from './routes/_app/admin.departments'
 import { Route as AppAdminHrRouteImport } from './routes/_app/admin.hr'
+import { Route as AppAdminSettingsRouteImport } from './routes/_app/admin.settings'
 import { Route as AppAdminUsersRouteImport } from './routes/_app/admin.users'
+import { Route as AppAssignmentsNewRouteImport } from './routes/_app/assignments_.new'
+import { Route as AppClassesNewRouteImport } from './routes/_app/classes_.new'
 import { Route as AppHrIndexRouteImport } from './routes/_app/hr.index'
 import { Route as AppHrDepartmentsRouteImport } from './routes/_app/hr.departments'
 import { Route as AppHrDirectoryRouteImport } from './routes/_app/hr.directory'
 import { Route as AppHrInvitationsRouteImport } from './routes/_app/hr.invitations'
+import { Route as AppInstructorIndexRouteImport } from './routes/_app/instructor.index'
+import { Route as AppSubmissionsIdRouteImport } from './routes/_app/submissions.$id'
+import { Route as AppSupervisorIndexRouteImport } from './routes/_app/supervisor.index'
+import { Route as AppSupervisorDraftsRouteImport } from './routes/_app/supervisor.drafts'
+import { Route as AppSupervisorInstructorsRouteImport } from './routes/_app/supervisor.instructors'
+import { Route as AppSupervisorInternsRouteImport } from './routes/_app/supervisor.interns'
 import { Route as AppHrInvitationsNewRouteImport } from './routes/_app/hr.invitations.new'
 
 const IndexRoute = IndexRouteImport.update({
@@ -33,14 +49,49 @@ const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ActivateRoute = ActivateRouteImport.update({
+  id: '/activate',
+  path: '/activate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppAssignmentsRoute = AppAssignmentsRouteImport.update({
+  id: '/assignments',
+  path: '/assignments',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClassesRoute = AppClassesRouteImport.update({
+  id: '/classes',
+  path: '/classes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDraftsRoute = AppDraftsRouteImport.update({
+  id: '/drafts',
+  path: '/drafts',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSubmissionsRoute = AppSubmissionsRouteImport.update({
+  id: '/submissions',
+  path: '/submissions',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
@@ -63,9 +114,24 @@ const AppAdminHrRoute = AppAdminHrRouteImport.update({
   path: '/admin/hr',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAdminSettingsRoute = AppAdminSettingsRouteImport.update({
+  id: '/admin/settings',
+  path: '/admin/settings',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAdminUsersRoute = AppAdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAssignmentsNewRoute = AppAssignmentsNewRouteImport.update({
+  id: '/assignments_/new',
+  path: '/assignments/new',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClassesNewRoute = AppClassesNewRouteImport.update({
+  id: '/classes_/new',
+  path: '/classes/new',
   getParentRoute: () => AppRoute,
 } as any)
 const AppHrIndexRoute = AppHrIndexRouteImport.update({
@@ -88,6 +154,37 @@ const AppHrInvitationsRoute = AppHrInvitationsRouteImport.update({
   path: '/hr/invitations',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInstructorIndexRoute = AppInstructorIndexRouteImport.update({
+  id: '/instructor/',
+  path: '/instructor/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSubmissionsIdRoute = AppSubmissionsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AppSubmissionsRoute,
+} as any)
+const AppSupervisorIndexRoute = AppSupervisorIndexRouteImport.update({
+  id: '/supervisor/',
+  path: '/supervisor/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSupervisorDraftsRoute = AppSupervisorDraftsRouteImport.update({
+  id: '/supervisor/drafts',
+  path: '/supervisor/drafts',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSupervisorInstructorsRoute =
+  AppSupervisorInstructorsRouteImport.update({
+    id: '/supervisor/instructors',
+    path: '/supervisor/instructors',
+    getParentRoute: () => AppRoute,
+  } as any)
+const AppSupervisorInternsRoute = AppSupervisorInternsRouteImport.update({
+  id: '/supervisor/interns',
+  path: '/supervisor/interns',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppHrInvitationsNewRoute = AppHrInvitationsNewRouteImport.update({
   id: '/new',
   path: '/new',
@@ -96,103 +193,202 @@ const AppHrInvitationsNewRoute = AppHrInvitationsNewRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/activate': typeof ActivateRoute
+  '/dashboard': typeof DashboardRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
+  '/assignments': typeof AppAssignmentsRoute
+  '/classes': typeof AppClassesRoute
+  '/drafts': typeof AppDraftsRoute
   '/settings': typeof AppSettingsRoute
+  '/submissions': typeof AppSubmissionsRouteWithChildren
   '/admin/activity': typeof AppAdminActivityRoute
   '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/hr': typeof AppAdminHrRoute
+  '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/users': typeof AppAdminUsersRoute
+  '/assignments/new': typeof AppAssignmentsNewRoute
+  '/classes/new': typeof AppClassesNewRoute
   '/hr/departments': typeof AppHrDepartmentsRoute
   '/hr/directory': typeof AppHrDirectoryRoute
   '/hr/invitations': typeof AppHrInvitationsRouteWithChildren
+  '/submissions/$id': typeof AppSubmissionsIdRoute
+  '/supervisor/drafts': typeof AppSupervisorDraftsRoute
+  '/supervisor/instructors': typeof AppSupervisorInstructorsRoute
+  '/supervisor/interns': typeof AppSupervisorInternsRoute
   '/admin/': typeof AppAdminIndexRoute
   '/hr/': typeof AppHrIndexRoute
+  '/instructor/': typeof AppInstructorIndexRoute
+  '/supervisor/': typeof AppSupervisorIndexRoute
   '/hr/invitations/new': typeof AppHrInvitationsNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/activate': typeof ActivateRoute
+  '/dashboard': typeof DashboardRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
+  '/assignments': typeof AppAssignmentsRoute
+  '/classes': typeof AppClassesRoute
+  '/drafts': typeof AppDraftsRoute
   '/settings': typeof AppSettingsRoute
+  '/submissions': typeof AppSubmissionsRouteWithChildren
   '/admin/activity': typeof AppAdminActivityRoute
   '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/hr': typeof AppAdminHrRoute
+  '/admin/settings': typeof AppAdminSettingsRoute
   '/admin/users': typeof AppAdminUsersRoute
+  '/assignments/new': typeof AppAssignmentsNewRoute
+  '/classes/new': typeof AppClassesNewRoute
   '/hr/departments': typeof AppHrDepartmentsRoute
   '/hr/directory': typeof AppHrDirectoryRoute
   '/hr/invitations': typeof AppHrInvitationsRouteWithChildren
+  '/submissions/$id': typeof AppSubmissionsIdRoute
+  '/supervisor/drafts': typeof AppSupervisorDraftsRoute
+  '/supervisor/instructors': typeof AppSupervisorInstructorsRoute
+  '/supervisor/interns': typeof AppSupervisorInternsRoute
   '/admin': typeof AppAdminIndexRoute
   '/hr': typeof AppHrIndexRoute
+  '/instructor': typeof AppInstructorIndexRoute
+  '/supervisor': typeof AppSupervisorIndexRoute
   '/hr/invitations/new': typeof AppHrInvitationsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/activate': typeof ActivateRoute
+  '/dashboard': typeof DashboardRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
+  '/_app/assignments': typeof AppAssignmentsRoute
+  '/_app/classes': typeof AppClassesRoute
+  '/_app/drafts': typeof AppDraftsRoute
   '/_app/settings': typeof AppSettingsRoute
+  '/_app/submissions': typeof AppSubmissionsRouteWithChildren
   '/_app/admin/activity': typeof AppAdminActivityRoute
   '/_app/admin/departments': typeof AppAdminDepartmentsRoute
   '/_app/admin/hr': typeof AppAdminHrRoute
+  '/_app/admin/settings': typeof AppAdminSettingsRoute
   '/_app/admin/users': typeof AppAdminUsersRoute
+  '/_app/assignments_/new': typeof AppAssignmentsNewRoute
+  '/_app/classes_/new': typeof AppClassesNewRoute
   '/_app/hr/departments': typeof AppHrDepartmentsRoute
   '/_app/hr/directory': typeof AppHrDirectoryRoute
   '/_app/hr/invitations': typeof AppHrInvitationsRouteWithChildren
+  '/_app/submissions/$id': typeof AppSubmissionsIdRoute
+  '/_app/supervisor/drafts': typeof AppSupervisorDraftsRoute
+  '/_app/supervisor/instructors': typeof AppSupervisorInstructorsRoute
+  '/_app/supervisor/interns': typeof AppSupervisorInternsRoute
   '/_app/admin/': typeof AppAdminIndexRoute
   '/_app/hr/': typeof AppHrIndexRoute
+  '/_app/instructor/': typeof AppInstructorIndexRoute
+  '/_app/supervisor/': typeof AppSupervisorIndexRoute
   '/_app/hr/invitations/new': typeof AppHrInvitationsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/activate'
+    | '/dashboard'
+    | '/reset-password'
     | '/sign-in'
+    | '/assignments'
+    | '/classes'
+    | '/drafts'
     | '/settings'
+    | '/submissions'
     | '/admin/activity'
     | '/admin/departments'
     | '/admin/hr'
+    | '/admin/settings'
     | '/admin/users'
+    | '/assignments/new'
+    | '/classes/new'
     | '/hr/departments'
     | '/hr/directory'
     | '/hr/invitations'
+    | '/submissions/$id'
+    | '/supervisor/drafts'
+    | '/supervisor/instructors'
+    | '/supervisor/interns'
     | '/admin/'
     | '/hr/'
+    | '/instructor/'
+    | '/supervisor/'
     | '/hr/invitations/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/activate'
+    | '/dashboard'
+    | '/reset-password'
     | '/sign-in'
+    | '/assignments'
+    | '/classes'
+    | '/drafts'
     | '/settings'
+    | '/submissions'
     | '/admin/activity'
     | '/admin/departments'
     | '/admin/hr'
+    | '/admin/settings'
     | '/admin/users'
+    | '/assignments/new'
+    | '/classes/new'
     | '/hr/departments'
     | '/hr/directory'
     | '/hr/invitations'
+    | '/submissions/$id'
+    | '/supervisor/drafts'
+    | '/supervisor/instructors'
+    | '/supervisor/interns'
     | '/admin'
     | '/hr'
+    | '/instructor'
+    | '/supervisor'
     | '/hr/invitations/new'
   id:
     | '__root__'
     | '/'
     | '/_app'
+    | '/activate'
+    | '/dashboard'
+    | '/reset-password'
     | '/sign-in'
+    | '/_app/assignments'
+    | '/_app/classes'
+    | '/_app/drafts'
     | '/_app/settings'
+    | '/_app/submissions'
     | '/_app/admin/activity'
     | '/_app/admin/departments'
     | '/_app/admin/hr'
+    | '/_app/admin/settings'
     | '/_app/admin/users'
+    | '/_app/assignments_/new'
+    | '/_app/classes_/new'
     | '/_app/hr/departments'
     | '/_app/hr/directory'
     | '/_app/hr/invitations'
+    | '/_app/submissions/$id'
+    | '/_app/supervisor/drafts'
+    | '/_app/supervisor/instructors'
+    | '/_app/supervisor/interns'
     | '/_app/admin/'
     | '/_app/hr/'
+    | '/_app/instructor/'
+    | '/_app/supervisor/'
     | '/_app/hr/invitations/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
+  ActivateRoute: typeof ActivateRoute
+  DashboardRoute: typeof DashboardRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SignInRoute: typeof SignInRoute
 }
 
@@ -212,6 +408,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/activate': {
+      id: '/activate'
+      path: '/activate'
+      fullPath: '/activate'
+      preLoaderRoute: typeof ActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sign-in': {
       id: '/sign-in'
       path: '/sign-in'
@@ -219,11 +436,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SignInRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/assignments': {
+      id: '/_app/assignments'
+      path: '/assignments'
+      fullPath: '/assignments'
+      preLoaderRoute: typeof AppAssignmentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/classes': {
+      id: '/_app/classes'
+      path: '/classes'
+      fullPath: '/classes'
+      preLoaderRoute: typeof AppClassesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/drafts': {
+      id: '/_app/drafts'
+      path: '/drafts'
+      fullPath: '/drafts'
+      preLoaderRoute: typeof AppDraftsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/submissions': {
+      id: '/_app/submissions'
+      path: '/submissions'
+      fullPath: '/submissions'
+      preLoaderRoute: typeof AppSubmissionsRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/': {
@@ -254,11 +499,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminHrRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/admin/settings': {
+      id: '/_app/admin/settings'
+      path: '/admin/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AppAdminSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin/users': {
       id: '/_app/admin/users'
       path: '/admin/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof AppAdminUsersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/assignments_/new': {
+      id: '/_app/assignments_/new'
+      path: '/assignments/new'
+      fullPath: '/assignments/new'
+      preLoaderRoute: typeof AppAssignmentsNewRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/classes_/new': {
+      id: '/_app/classes_/new'
+      path: '/classes/new'
+      fullPath: '/classes/new'
+      preLoaderRoute: typeof AppClassesNewRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/hr/': {
@@ -289,6 +555,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppHrInvitationsRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/instructor/': {
+      id: '/_app/instructor/'
+      path: '/instructor'
+      fullPath: '/instructor/'
+      preLoaderRoute: typeof AppInstructorIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/submissions/$id': {
+      id: '/_app/submissions/$id'
+      path: '/$id'
+      fullPath: '/submissions/$id'
+      preLoaderRoute: typeof AppSubmissionsIdRouteImport
+      parentRoute: typeof AppSubmissionsRoute
+    }
+    '/_app/supervisor/': {
+      id: '/_app/supervisor/'
+      path: '/supervisor'
+      fullPath: '/supervisor/'
+      preLoaderRoute: typeof AppSupervisorIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/supervisor/drafts': {
+      id: '/_app/supervisor/drafts'
+      path: '/supervisor/drafts'
+      fullPath: '/supervisor/drafts'
+      preLoaderRoute: typeof AppSupervisorDraftsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/supervisor/instructors': {
+      id: '/_app/supervisor/instructors'
+      path: '/supervisor/instructors'
+      fullPath: '/supervisor/instructors'
+      preLoaderRoute: typeof AppSupervisorInstructorsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/supervisor/interns': {
+      id: '/_app/supervisor/interns'
+      path: '/supervisor/interns'
+      fullPath: '/supervisor/interns'
+      preLoaderRoute: typeof AppSupervisorInternsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/hr/invitations/new': {
       id: '/_app/hr/invitations/new'
       path: '/new'
@@ -298,6 +606,18 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface AppSubmissionsRouteChildren {
+  AppSubmissionsIdRoute: typeof AppSubmissionsIdRoute
+}
+
+const AppSubmissionsRouteChildren: AppSubmissionsRouteChildren = {
+  AppSubmissionsIdRoute: AppSubmissionsIdRoute,
+}
+
+const AppSubmissionsRouteWithChildren = AppSubmissionsRoute._addFileChildren(
+  AppSubmissionsRouteChildren,
+)
 
 interface AppHrInvitationsRouteChildren {
   AppHrInvitationsNewRoute: typeof AppHrInvitationsNewRoute
@@ -311,29 +631,53 @@ const AppHrInvitationsRouteWithChildren =
   AppHrInvitationsRoute._addFileChildren(AppHrInvitationsRouteChildren)
 
 interface AppRouteChildren {
+  AppAssignmentsRoute: typeof AppAssignmentsRoute
+  AppClassesRoute: typeof AppClassesRoute
+  AppDraftsRoute: typeof AppDraftsRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppSubmissionsRoute: typeof AppSubmissionsRouteWithChildren
   AppAdminActivityRoute: typeof AppAdminActivityRoute
   AppAdminDepartmentsRoute: typeof AppAdminDepartmentsRoute
   AppAdminHrRoute: typeof AppAdminHrRoute
+  AppAdminSettingsRoute: typeof AppAdminSettingsRoute
   AppAdminUsersRoute: typeof AppAdminUsersRoute
+  AppAssignmentsNewRoute: typeof AppAssignmentsNewRoute
+  AppClassesNewRoute: typeof AppClassesNewRoute
   AppHrDepartmentsRoute: typeof AppHrDepartmentsRoute
   AppHrDirectoryRoute: typeof AppHrDirectoryRoute
   AppHrInvitationsRoute: typeof AppHrInvitationsRouteWithChildren
+  AppSupervisorDraftsRoute: typeof AppSupervisorDraftsRoute
+  AppSupervisorInstructorsRoute: typeof AppSupervisorInstructorsRoute
+  AppSupervisorInternsRoute: typeof AppSupervisorInternsRoute
   AppAdminIndexRoute: typeof AppAdminIndexRoute
   AppHrIndexRoute: typeof AppHrIndexRoute
+  AppInstructorIndexRoute: typeof AppInstructorIndexRoute
+  AppSupervisorIndexRoute: typeof AppSupervisorIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAssignmentsRoute: AppAssignmentsRoute,
+  AppClassesRoute: AppClassesRoute,
+  AppDraftsRoute: AppDraftsRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppSubmissionsRoute: AppSubmissionsRouteWithChildren,
   AppAdminActivityRoute: AppAdminActivityRoute,
   AppAdminDepartmentsRoute: AppAdminDepartmentsRoute,
   AppAdminHrRoute: AppAdminHrRoute,
+  AppAdminSettingsRoute: AppAdminSettingsRoute,
   AppAdminUsersRoute: AppAdminUsersRoute,
+  AppAssignmentsNewRoute: AppAssignmentsNewRoute,
+  AppClassesNewRoute: AppClassesNewRoute,
   AppHrDepartmentsRoute: AppHrDepartmentsRoute,
   AppHrDirectoryRoute: AppHrDirectoryRoute,
   AppHrInvitationsRoute: AppHrInvitationsRouteWithChildren,
+  AppSupervisorDraftsRoute: AppSupervisorDraftsRoute,
+  AppSupervisorInstructorsRoute: AppSupervisorInstructorsRoute,
+  AppSupervisorInternsRoute: AppSupervisorInternsRoute,
   AppAdminIndexRoute: AppAdminIndexRoute,
   AppHrIndexRoute: AppHrIndexRoute,
+  AppInstructorIndexRoute: AppInstructorIndexRoute,
+  AppSupervisorIndexRoute: AppSupervisorIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
@@ -341,6 +685,9 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
+  ActivateRoute: ActivateRoute,
+  DashboardRoute: DashboardRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SignInRoute: SignInRoute,
 }
 export const routeTree = rootRouteImport
