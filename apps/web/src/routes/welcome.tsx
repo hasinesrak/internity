@@ -64,13 +64,12 @@ function WelcomePage() {
           <Skeleton className="h-[26rem] w-full sm:h-[30rem]" />
         )}
         <Button
-          data-icon="inline-end"
           size="lg"
           className="w-full"
           onClick={() => void navigate({ to: "/dashboard", replace: true })}
         >
           Continue to dashboard
-          <ArrowRightIcon weight="duotone" />
+          <ArrowRightIcon data-icon="inline-end" weight="duotone" className="size-4" />
         </Button>
       </div>
     </AuthShell>
