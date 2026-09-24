@@ -182,7 +182,7 @@ export function Tooltip({
   useEffect(() => {
     if (!open) return;
     const onMove = () => place();
-    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("scroll", onMove, { capture: true, passive: true });
     window.addEventListener("resize", onMove);
     return () => {
       window.removeEventListener("scroll", onMove, true);

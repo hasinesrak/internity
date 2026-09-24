@@ -74,7 +74,7 @@ export function usePopoverPortalPosition<
     if (trigger) observer.observe(trigger);
     if (content) observer.observe(content);
 
-    window.addEventListener("scroll", update, true);
+    window.addEventListener("scroll", update, { capture: true, passive: true });
     window.addEventListener("resize", update);
     return () => {
       observer.disconnect();

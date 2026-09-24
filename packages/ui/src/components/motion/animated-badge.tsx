@@ -46,15 +46,17 @@ export interface AnimatedBadgeProps extends Omit<
 }
 
 // InternFlow palette: neutral surfaces plus one primary and one destructive.
-// Positive states read `primary`, attention and failure read `destructive`, and
-// every state also carries a distinct icon and label.
+// Positive states read `primary`, attention and failure read `destructive`,
+// and every state also carries a distinct icon and label. On dark surfaces
+// `primary` is a button fill first and too dark to read as text, so the label
+// lifts to `chart-1` — the same blue, lightened for dark surfaces.
 const STATUS_CLASS: Record<AnimatedBadgeStatus, string> = {
   neutral: "border-border bg-card text-muted-foreground",
-  info: "border-primary/30 bg-muted text-primary",
-  success: "border-primary/30 bg-primary/10 text-primary",
+  info: "border-primary/30 bg-muted text-primary dark:text-chart-1",
+  success: "border-primary/30 bg-primary/10 text-primary dark:text-chart-1",
   warning: "border-destructive/30 bg-muted text-destructive",
   danger: "border-destructive/30 bg-destructive/10 text-destructive",
-  loading: "border-primary/30 bg-muted text-primary",
+  loading: "border-primary/30 bg-muted text-primary dark:text-chart-1",
 };
 
 const SIZE_CLASS: Record<AnimatedBadgeSize, string> = {

@@ -89,6 +89,7 @@ export interface AISidebarProps {
   onActiveChange?: (id: string) => void;
   defaultExpandedIds?: string[];
   renderIcon?: (item: SidebarResource) => ReactNode;
+  /** Row actions menu. Omit it and the row renders no menu button at all. */
   renderMenu?: (
     item: SidebarResource,
     controls: SidebarResourceMenuControls,
@@ -551,7 +552,7 @@ function ResourceRow({
         <MarqueeLabel active={hovered || menuOpen}>{row.item.label}</MarqueeLabel>
       )}
 
-      {!renaming && !row.item.disabled ? (
+      {!renaming && !row.item.disabled && menu ? (
         <MorphPopover
           open={menuOpen}
           onOpenChange={onMenuOpenChange}

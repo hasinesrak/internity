@@ -109,7 +109,7 @@ function ColumnHandle<T>({
   onLeave: () => void;
 }) {
   useEffect(() => {
-    window.addEventListener("scroll", onLeave, true);
+    window.addEventListener("scroll", onLeave, { capture: true, passive: true });
     return () => window.removeEventListener("scroll", onLeave, true);
   }, [onLeave]);
 

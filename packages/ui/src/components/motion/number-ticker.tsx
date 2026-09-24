@@ -29,6 +29,7 @@ export interface NumberTickerProps {
 
 const DIGIT_HEIGHT_EM = 1.1;
 const DIGITS = Array.from({ length: 10 }, (_, n) => n);
+const DIGIT_RE = /\d/;
 
 export function NumberTicker({
   value,
@@ -91,7 +92,7 @@ export function NumberTicker({
       <span aria-hidden="true" className="inline-flex items-center">
         {prefix ? <span>{prefix}</span> : null}
         {glyphs.map(({ char, id }, i) => {
-          const isDigit = /\d/.test(char);
+          const isDigit = DIGIT_RE.test(char);
           if (!isDigit) {
             return (
               <span key={id} className="inline-block">

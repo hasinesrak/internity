@@ -7,6 +7,7 @@ import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import {
   
   useCallback,
+  useDeferredValue,
   useEffect,
   useId,
   useMemo,
@@ -73,6 +74,9 @@ export function CommandPalette({
   );
 
   const [query, setQuery] = useState("");
+  // The corpus search re-normalizes every item per keystroke; deferring keeps
+  // fast typing responsive while the list catches up within a frame or two.
+  const deferredQuery = useDeferredValue(query);
   // Portal target only exists client-side; render nothing during SSR/hydration.
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -81,6 +85,13 @@ export function CommandPalette({
   const canTouch = useTouchCapable();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // Read through a ref inside the global shortcut so the listener binds once
+  // instead of re-binding on every open/close. Written after commit, not
+  // during render (see use-row-cursor).
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -89,17 +100,17 @@ export function CommandPalette({
         e.key.toLowerCase() === shortcut.toLowerCase()
       ) {
         e.preventDefault();
-        setOpen(!open);
+        setOpen(!openRef.current);
         return;
       }
-      if (e.key === "Escape" && open) {
+      if (e.key === "Escape" && openRef.current) {
         e.preventDefault();
         setOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, shortcut, setOpen]);
+  }, [shortcut, setOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -114,7 +125,7 @@ export function CommandPalette({
     };
   }, [open]);
 
-  const filtered = useMemo(() => searchCommands(items, query), [items, query]);
+  const filtered = useMemo(() => searchCommands(items, deferredQuery), [items, deferredQuery]);
 
   // Reserve the icon column only when at least one item brings an icon, so
   // icon-less lists don't render a dead gap before every label.
@@ -136,8 +147,10 @@ export function CommandPalette({
   // "which row" — the highlight, the ids, Enter, the scroll — reads this one
   // array, so they cannot drift apart.
   const rows = useMemo(() => grouped.flatMap(([, list]) => list), [grouped]);
+  // O(1) row positions for render; `rows.indexOf` inside the row loop was O(n²).
+  const indexById = useMemo(() => new Map(rows.map((row, i) => [row.id, i])), [rows]);
 
-  const { activeIndex: active, moveTo, moveActive } = useRowCursor(rows, query);
+  const { activeIndex: active, moveTo, moveActive } = useRowCursor(rows, deferredQuery);
 
   // Clearing the query would drop the cursor on its own, but only if it had
   // changed; `moveTo(null)` covers reopening on an already-empty query.
@@ -291,7 +304,7 @@ export function CommandPalette({
                         </div>
                         {list.map((it) => {
                           // `rows` holds these very objects, in render order.
-                          const idx = rows.indexOf(it);
+                          const idx = indexById.get(it.id) ?? 0;
                           const isActive = idx === active;
                           const Icon = it.icon;
                           return (

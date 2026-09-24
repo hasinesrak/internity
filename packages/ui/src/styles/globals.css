@@ -63,10 +63,14 @@
     --secondary: oklch(0.967 0.001 286.375);
     --secondary-foreground: oklch(0.21 0.006 285.885);
     --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
+    /* Keeps muted text above 4.5:1 on `--muted` surfaces (kbd chips, hover
+       fills), not just on white. */
+    --muted-foreground: oklch(0.52 0 0);
     --accent: oklch(0.488 0.243 264.376);
     --accent-foreground: oklch(0.97 0.014 254.604);
-    --destructive: oklch(0.577 0.245 27.325);
+    /* Dark enough to read at 4.5:1 as small text on muted and tinted
+       surfaces, where red labels (chips, alerts) live. */
+    --destructive: oklch(0.536 0.21 27.325);
     --border: oklch(0.922 0 0);
     --input: oklch(0.922 0 0);
     --ring: oklch(0.708 0 0);

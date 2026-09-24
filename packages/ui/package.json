@@ -16,8 +16,10 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cn": "^0.3.2",
+    "date-fns": "^4.0.0",
     "motion": "^13.3.0",
     "react": "^19.2.6",
+    "react-day-picker": "^9.0.0",
     "react-dom": "^19.2.6",
     "recharts": "^3.3.0",
     "shadcn": "^4.21.0",
@@ -28,7 +30,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4",
-    "@tanstack/eslint-config": "latest",
+    "@tanstack/eslint-config": "0.4.0",
     "@turbo/gen": "^2.9.15",
     "@types/node": "^22",
     "@types/react": "^19",
@@ -43,7 +45,10 @@
       "./src/lib/*.ts",
       "./src/lib/*.tsx"
     ],
-    "./components/*": ["./src/components/*.tsx", "./src/components/*.ts"],
+    "./components/*": [
+      "./src/components/*.tsx",
+      "./src/components/*.ts"
+    ],
     "./hooks/*": [
       "./src/hooks/*.ts",
       "./src/hooks/*.tsx"

@@ -38,8 +38,19 @@ export default defineConfig(({ mode }) => {
   const host = setting("WEB_HOST", fileEnv, "0.0.0.0")
   const port = portSetting("WEB_PORT", fileEnv, "3000")
   return {
+    // The badge model ships as a binary asset; Lanyard imports it by URL.
+    assetsInclude: ["**/*.glb"],
     resolve: { tsconfigPaths: true },
-    server: { host, port, strictPort: true },
+    // A Windows file lock on a static asset (an editor or antivirus holding a
+    // PNG open) makes the watcher throw EBUSY and take the whole dev server
+    // down, so public/ stays unwatched. Assets there are served as-is; refresh
+    // the page after changing one.
+    server: {
+      host,
+      port,
+      strictPort: true,
+      watch: { ignored: ["**/public/**"] },
+    },
     preview: { host, port, strictPort: true },
     plugins: [devtools(), tailwindcss(), tanstackStart(), viteReact()],
   }

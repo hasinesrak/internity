@@ -8,6 +8,7 @@ import {
   
   useCallback,
   useContext,
+  useDeferredValue,
   useEffect,
   useId,
   useMemo,
@@ -207,13 +208,16 @@ export function Combobox({
   const [openQuery, setOpenQuery] = useState(query);
   if (open && openQuery !== query) setOpenQuery(query);
   const listQuery = open ? query : openQuery;
+  // Filtering walks every registered item per keystroke; deferring keeps fast
+  // typing responsive while the list catches up within a frame or two.
+  const deferredListQuery = useDeferredValue(listQuery);
 
   const visibleItems = useMemo(
     () =>
       Array.from(items.values()).filter((item) =>
-        filter(item.value, listQuery, [item.label, ...item.keywords]),
+        filter(item.value, deferredListQuery, [item.label, ...item.keywords]),
       ),
-    [filter, items, listQuery],
+    [filter, items, deferredListQuery],
   );
   const enabledVisibleItems = useMemo(
     () => visibleItems.filter((item) => !item.disabled),
@@ -230,7 +234,7 @@ export function Combobox({
 
   const { activeValue, setActiveValue, moveActive } = useActiveOption({
     open,
-    query: listQuery,
+    query: deferredListQuery,
     value,
     enabledItems: enabledVisibleItems,
   });
@@ -311,7 +315,7 @@ export function Combobox({
       unregisterItem,
       labelFor: (itemValue) =>
         itemValue === undefined ? undefined : items.get(itemValue)?.label,
-      isVisible: (itemValue) => !listQuery.trim() || visibleValues.has(itemValue),
+      isVisible: (itemValue) => !deferredListQuery.trim() || visibleValues.has(itemValue),
       hasVisibleItems: (groupId) => visibleGroupIds.has(groupId),
       visibleCount: visibleItems.length,
       activeItemId: activeItem?.id,
@@ -331,7 +335,7 @@ export function Combobox({
       baseId,
       disabled,
       items,
-      listQuery,
+      deferredListQuery,
       moveActive,
       open,
       query,

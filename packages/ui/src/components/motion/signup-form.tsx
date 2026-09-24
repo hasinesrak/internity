@@ -85,6 +85,8 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const MIN_PASSWORD_LENGTH = 8;
 
+const PASSWORD_CLASSES = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/];
+
 const STRENGTH_LABELS = ["Too short", "Weak", "Fair", "Good", "Strong"] as const;
 
 // InternFlow palette: neutral surfaces plus one primary and one destructive.
@@ -111,7 +113,7 @@ export function passwordStrength(password: string): number {
   if (password.length >= 12) score += 1;
   if (password.length >= 16) score += 1;
 
-  const classes = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((pattern) =>
+  const classes = PASSWORD_CLASSES.filter((pattern) =>
     pattern.test(password),
   ).length;
   if (classes >= 3) score += 1;

@@ -9,38 +9,209 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WelcomeRouteImport } from './routes/welcome'
+import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ActivateRouteImport } from './routes/activate'
+import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppFeedbackRouteImport } from './routes/_app/feedback'
+import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppClassesRouteImport } from './routes/_app/classes'
+import { Route as AppAssignmentsRouteImport } from './routes/_app/assignments'
+import { Route as AppAssignmentsIdRouteImport } from './routes/_app/assignments_.$id'
 
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ActivateRoute = ActivateRouteImport.update({
+  id: '/activate',
+  path: '/activate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFeedbackRoute = AppFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDashboardRoute = AppDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClassesRoute = AppClassesRouteImport.update({
+  id: '/classes',
+  path: '/classes',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAssignmentsRoute = AppAssignmentsRouteImport.update({
+  id: '/assignments',
+  path: '/assignments',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAssignmentsIdRoute = AppAssignmentsIdRouteImport.update({
+  id: '/assignments_/$id',
+  path: '/assignments/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/activate': typeof ActivateRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/sign-in': typeof SignInRoute
+  '/welcome': typeof WelcomeRoute
+  '/assignments': typeof AppAssignmentsRoute
+  '/classes': typeof AppClassesRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/feedback': typeof AppFeedbackRoute
+  '/settings': typeof AppSettingsRoute
+  '/assignments/$id': typeof AppAssignmentsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/activate': typeof ActivateRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/sign-in': typeof SignInRoute
+  '/welcome': typeof WelcomeRoute
+  '/assignments': typeof AppAssignmentsRoute
+  '/classes': typeof AppClassesRoute
+  '/dashboard': typeof AppDashboardRoute
+  '/feedback': typeof AppFeedbackRoute
+  '/settings': typeof AppSettingsRoute
+  '/assignments/$id': typeof AppAssignmentsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/activate': typeof ActivateRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/sign-in': typeof SignInRoute
+  '/welcome': typeof WelcomeRoute
+  '/_app/assignments': typeof AppAssignmentsRoute
+  '/_app/classes': typeof AppClassesRoute
+  '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/feedback': typeof AppFeedbackRoute
+  '/_app/settings': typeof AppSettingsRoute
+  '/_app/assignments_/$id': typeof AppAssignmentsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/activate'
+    | '/reset-password'
+    | '/sign-in'
+    | '/welcome'
+    | '/assignments'
+    | '/classes'
+    | '/dashboard'
+    | '/feedback'
+    | '/settings'
+    | '/assignments/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/activate'
+    | '/reset-password'
+    | '/sign-in'
+    | '/welcome'
+    | '/assignments'
+    | '/classes'
+    | '/dashboard'
+    | '/feedback'
+    | '/settings'
+    | '/assignments/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/activate'
+    | '/reset-password'
+    | '/sign-in'
+    | '/welcome'
+    | '/_app/assignments'
+    | '/_app/classes'
+    | '/_app/dashboard'
+    | '/_app/feedback'
+    | '/_app/settings'
+    | '/_app/assignments_/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  ActivateRoute: typeof ActivateRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  SignInRoute: typeof SignInRoute
+  WelcomeRoute: typeof WelcomeRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/activate': {
+      id: '/activate'
+      path: '/activate'
+      fullPath: '/activate'
+      preLoaderRoute: typeof ActivateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +219,78 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/feedback': {
+      id: '/_app/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof AppFeedbackRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/dashboard': {
+      id: '/_app/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/classes': {
+      id: '/_app/classes'
+      path: '/classes'
+      fullPath: '/classes'
+      preLoaderRoute: typeof AppClassesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/assignments': {
+      id: '/_app/assignments'
+      path: '/assignments'
+      fullPath: '/assignments'
+      preLoaderRoute: typeof AppAssignmentsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/assignments_/$id': {
+      id: '/_app/assignments_/$id'
+      path: '/assignments/$id'
+      fullPath: '/assignments/$id'
+      preLoaderRoute: typeof AppAssignmentsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
+interface AppRouteChildren {
+  AppAssignmentsRoute: typeof AppAssignmentsRoute
+  AppClassesRoute: typeof AppClassesRoute
+  AppDashboardRoute: typeof AppDashboardRoute
+  AppFeedbackRoute: typeof AppFeedbackRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppAssignmentsIdRoute: typeof AppAssignmentsIdRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppAssignmentsRoute: AppAssignmentsRoute,
+  AppClassesRoute: AppClassesRoute,
+  AppDashboardRoute: AppDashboardRoute,
+  AppFeedbackRoute: AppFeedbackRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppAssignmentsIdRoute: AppAssignmentsIdRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  ActivateRoute: ActivateRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  SignInRoute: SignInRoute,
+  WelcomeRoute: WelcomeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

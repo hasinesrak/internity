@@ -1,17 +1,40 @@
+// The landing page: the intern app's public face — a header and the intern
+// hero, nothing else. It serves signed-out interns (sign in) and
+// signed-in ones (open the dashboard) alike, so the front door is always
+// there and nothing bounces through a redirect splash first.
+import { useEffect, useState } from "react"
 import { createFileRoute } from "@tanstack/react-router"
 
-import { apiUrl } from "@/lib/api"
+import { LandingHeader } from "@/components/landing-header"
+import { LandingHero } from "@/components/landing-hero"
+import { currentUserSync } from "@/lib/data"
 
-export const Route = createFileRoute("/")({ component: App })
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "InternFlow — everything for your internship, in one place" },
+      {
+        name: "description",
+        content:
+          "InternFlow keeps your class schedule, assignments, submissions, and feedback in one place. Sign in to get started.",
+      },
+    ],
+  }),
+  component: IndexPage,
+})
 
-function App() {
+function IndexPage() {
+  // Read after mount: the cached session exists only in the browser, so the
+  // server render and the first client render agree on the signed-out state.
+  const [signedIn, setSignedIn] = useState(false)
+  useEffect(() => {
+    setSignedIn(Boolean(currentUserSync()))
+  }, [])
+
   return (
-    <main className="flex min-h-svh p-6">
-      <div className="flex max-w-md min-w-0 flex-col gap-2 text-sm leading-relaxed">
-        <h1 className="text-lg font-medium">InternFlow</h1>
-        <p>Classes, assignments, and feedback for your internship.</p>
-        <p className="text-muted-foreground">API {apiUrl()}</p>
-      </div>
-    </main>
+    <div className="flex min-h-svh flex-col bg-background">
+      <LandingHeader signedIn={signedIn} />
+      <LandingHero signedIn={signedIn} />
+    </div>
   )
 }

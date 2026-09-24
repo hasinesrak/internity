@@ -159,7 +159,7 @@ export function ContextMenu({
 
     window.addEventListener("pointerdown", onPointerDown);
     window.addEventListener("resize", onWindowChange);
-    window.addEventListener("scroll", onWindowChange);
+    window.addEventListener("scroll", onWindowChange, { passive: true });
     return () => {
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("resize", onWindowChange);
