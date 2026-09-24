@@ -1,16 +1,19 @@
-// Admin people: filter tabs over every account, a dense table, and a detail
-// drawer for recovery and archive.
+// Admin people: filter tabs over every account, a dense table, a staff
+// composer for supervisors and instructors, and a detail drawer for
+// recovery and archive.
 import { useState } from "react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { MagnifyingGlassIcon, UsersIcon } from "@phosphor-icons/react"
 import { Table } from "@workspace/ui/components/motion/table/index"
 import type { TableColumn } from "@workspace/ui/components/motion/table/types"
+import { Button } from "@workspace/ui/components/motion/button/base"
 import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/motion/tabs"
 import { Input } from "@workspace/ui/components/motion/input"
 import { Reveal } from "@workspace/ui/components/reveal"
 
 import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/data-states"
 import { PageHeader } from "@/components/page-header"
+import { StaffAccountDialog } from "@/components/staff-account-dialog"
 import {
   NameCell,
   RowActionsMenu,
@@ -40,7 +43,7 @@ const TABS = [
 
 type TabId = (typeof TABS)[number]["id"]
 
-type UserSearch = { status?: string; search?: string }
+type UserSearch = { status?: string; search?: string; compose?: string }
 
 export const Route = createFileRoute("/_app/admin/users")({
   beforeLoad: () => {
@@ -49,6 +52,7 @@ export const Route = createFileRoute("/_app/admin/users")({
   validateSearch: (search: Record<string, unknown>): UserSearch => ({
     status: typeof search.status === "string" ? search.status : undefined,
     search: typeof search.search === "string" ? search.search : undefined,
+    compose: typeof search.compose === "string" ? search.compose : undefined,
   }),
   component: AdminUsersPage,
 })
@@ -63,6 +67,7 @@ function AdminUsersPage() {
     ? (search.status as TabId)
     : "all"
   const query = search.search ?? ""
+  const composing = search.compose === "new"
 
   const users = useResource(
     () =>
@@ -78,7 +83,18 @@ function AdminUsersPage() {
   const setTab = (next: string) =>
     void navigate({
       to: "/admin/users",
-      search: { status: next === "all" ? undefined : next, search: query || undefined },
+      search: {
+        status: next === "all" ? undefined : next,
+        search: query || undefined,
+        compose: search.compose,
+      },
+      replace: true,
+    })
+
+  const closeComposer = () =>
+    void navigate({
+      to: "/admin/users",
+      search: { status: search.status, search: search.search },
       replace: true,
     })
 
@@ -229,6 +245,24 @@ function AdminUsersPage() {
         <PageHeader
           title="All users"
           description="Every account on the platform, with role, department, and status."
+          actions={
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() =>
+                void navigate({
+                  to: "/admin/users",
+                  search: {
+                    status: search.status,
+                    search: search.search,
+                    compose: "new",
+                  },
+                })
+              }
+            >
+              Add staff account
+            </Button>
+          }
         />
       </Reveal>
 
@@ -251,7 +285,11 @@ function AdminUsersPage() {
               onChange={(next) =>
                 void navigate({
                   to: "/admin/users",
-                  search: { status: search.status, search: next || undefined },
+                  search: {
+                    status: search.status,
+                    search: next || undefined,
+                    compose: search.compose,
+                  },
                   replace: true,
                 })
               }
@@ -287,7 +325,7 @@ function AdminUsersPage() {
                   onClick={() =>
                     void navigate({
                       to: "/admin/users",
-                      search: { status: search.status },
+                      search: { status: search.status, compose: search.compose },
                       replace: true,
                     })
                   }
@@ -295,7 +333,24 @@ function AdminUsersPage() {
                 >
                   Clear filters
                 </button>
-              ) : undefined
+              ) : (
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() =>
+                    void navigate({
+                      to: "/admin/users",
+                      search: {
+                        status: search.status,
+                        search: search.search,
+                        compose: "new",
+                      },
+                    })
+                  }
+                >
+                  Add staff account
+                </Button>
+              )
             }
           />
         ) : (
@@ -318,6 +373,16 @@ function AdminUsersPage() {
         onOpenChange={setDrawerOpen}
         onChanged={onChanged}
       />
+
+      {composing ? (
+        <StaffAccountDialog
+          onClose={closeComposer}
+          onSaved={() => {
+            closeComposer()
+            users.refetch()
+          }}
+        />
+      ) : null}
     </div>
   )
 }
