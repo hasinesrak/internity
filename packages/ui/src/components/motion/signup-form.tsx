@@ -294,7 +294,7 @@ export function SignUpForm({
         <Input
           label="Name"
           autoComplete="name"
-          placeholder="Ada Lovelace"
+          placeholder="Enter your name"
           leftIcon={<UserIcon weight="duotone" />}
           disabled={isSubmitting}
           value={values.name}
@@ -310,7 +310,7 @@ export function SignUpForm({
           type="email"
           inputMode="email"
           autoComplete="email"
-          placeholder="you@example.com"
+          placeholder="Enter your email"
           leftIcon={<EnvelopeSimpleIcon weight="duotone" />}
           disabled={isSubmitting}
           value={values.email}
@@ -326,7 +326,7 @@ export function SignUpForm({
             label="Password"
             type={revealPassword ? "text" : "password"}
             autoComplete="new-password"
-            placeholder="At least 8 characters"
+            placeholder="Enter your password"
             leftIcon={<LockIcon weight="duotone" />}
             rightIcon={
               <button
@@ -395,7 +395,7 @@ export function SignUpForm({
           label="Confirm password"
           type={revealPassword ? "text" : "password"}
           autoComplete="new-password"
-          placeholder="Re-enter your password"
+          placeholder="Enter your password again"
           leftIcon={<LockIcon weight="duotone" />}
           disabled={isSubmitting}
           value={values.confirmPassword}

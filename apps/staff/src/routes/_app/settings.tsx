@@ -155,6 +155,7 @@ function PasswordCard() {
               label=""
               type="password"
               autoComplete="current-password"
+              placeholder="Enter your current password"
               leftIcon={<LockIcon weight="duotone" />}
               value={current}
               onChange={setCurrent}
@@ -171,7 +172,7 @@ function PasswordCard() {
               label=""
               type="password"
               autoComplete="new-password"
-              placeholder="At least 8 characters"
+              placeholder="Enter your new password"
               leftIcon={<LockIcon weight="duotone" />}
               value={next}
               onChange={setNext}
@@ -188,6 +189,7 @@ function PasswordCard() {
               label=""
               type="password"
               autoComplete="new-password"
+              placeholder="Enter your password again"
               leftIcon={<LockIcon weight="duotone" />}
               value={confirm}
               onChange={setConfirm}

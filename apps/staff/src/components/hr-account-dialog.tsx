@@ -38,7 +38,7 @@ export function HrAccountDialog({ onClose, onSaved }: HrAccountDialogProps) {
   const submit = async () => {
     const found: typeof errors = {}
     if (name.trim().length < 2) found.name = "Enter their full name."
-    if (!email.trim()) found.email = "Enter their school email."
+    if (!email.trim()) found.email = "Enter their email."
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       found.email = "That does not look like an email address."
     }
@@ -99,7 +99,7 @@ export function HrAccountDialog({ onClose, onSaved }: HrAccountDialogProps) {
               id="hr-name"
               label=""
               autoComplete="name"
-              placeholder="Leila Karim"
+              placeholder="Enter your name"
               leftIcon={<UserIcon weight="duotone" />}
               value={name}
               onChange={setName}
@@ -111,14 +111,14 @@ export function HrAccountDialog({ onClose, onSaved }: HrAccountDialogProps) {
           </Field>
 
           <Field data-invalid={errors.email ? true : undefined}>
-            <FieldLabel htmlFor="hr-email">School email</FieldLabel>
+            <FieldLabel htmlFor="hr-email">Email</FieldLabel>
             <Input
               id="hr-email"
               label=""
               type="email"
               inputMode="email"
               autoComplete="email"
-              placeholder="name@school.edu"
+              placeholder="Enter your email"
               leftIcon={<EnvelopeSimpleIcon weight="duotone" />}
               value={email}
               onChange={setEmail}
@@ -136,7 +136,7 @@ export function HrAccountDialog({ onClose, onSaved }: HrAccountDialogProps) {
               label=""
               type="password"
               autoComplete="new-password"
-              placeholder="At least 8 characters"
+              placeholder="Enter your temporary password"
               leftIcon={<LockIcon weight="duotone" />}
               value={password}
               onChange={setPassword}

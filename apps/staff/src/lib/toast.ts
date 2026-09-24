@@ -1,5 +1,5 @@
 // Transient confirmations. Every mutation reports its result here, naming the
-// exact object it acted on ("Invitation sent to sam@school.edu").
+// exact object it acted on ("Invitation sent to sam@example.com").
 import { create } from "zustand"
 
 import type { ToastInput } from "@workspace/ui/components/motion/animated-toast-stack"
@@ -43,7 +43,7 @@ export const useToastStore = create<ToastState>((set) => ({
   clear: () => set({ toasts: [] }),
 }))
 
-/** Call from anywhere: `toast.success("Invitation sent to sam@school.edu"). */
+/** Call from anywhere: `toast.success("Invitation sent to sam@example.com"). */
 export const toast = {
   show: (input: ToastInput) => useToastStore.getState().show(input),
   success: (title: string, description?: string) =>

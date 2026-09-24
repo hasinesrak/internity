@@ -59,7 +59,7 @@ export function AddInstructorDialog({
     if (!picked) {
       const found: typeof errors = {}
       if (!name.trim()) found.name = "Enter their name."
-      if (!email.trim()) found.email = "Enter their school email."
+      if (!email.trim()) found.email = "Enter their email."
       else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
         found.email = "That does not look like an email address."
       }
@@ -153,7 +153,7 @@ export function AddInstructorDialog({
               label=""
               value={picked ? picked.name : name}
               onChange={setName}
-              placeholder="Meryem Kaya"
+              placeholder="Enter your name"
               leftIcon={<UserCircleIcon weight="duotone" />}
               error={errors.name}
               reserveErrorLine
@@ -163,7 +163,7 @@ export function AddInstructorDialog({
           </Field>
 
           <Field data-invalid={errors.email ? true : undefined}>
-            <FieldLabel htmlFor="instructor-email">School email</FieldLabel>
+            <FieldLabel htmlFor="instructor-email">Email</FieldLabel>
             <Input
               id="instructor-email"
               label=""
@@ -172,7 +172,7 @@ export function AddInstructorDialog({
               autoComplete="email"
               value={picked ? picked.email : email}
               onChange={setEmail}
-              placeholder="name@school.edu"
+              placeholder="Enter your email"
               leftIcon={<EnvelopeSimpleIcon weight="duotone" />}
               error={errors.email}
               reserveErrorLine

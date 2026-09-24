@@ -8,10 +8,9 @@ export type Theme = "light" | "dark";
 const STORAGE_KEY = "internity-theme";
 
 function systemTheme(): Theme {
-  if (typeof window === "undefined") return "light";
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  // Dark is the product default. The OS preference is intentionally ignored
+  // on first run so new visitors land in dark unless they stored light.
+  return "dark";
 }
 
 function readStored(): Theme | null {
@@ -67,7 +66,7 @@ export interface ThemeState {
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  theme: typeof document === "undefined" ? "light" : (readStored() ?? systemTheme()),
+  theme: typeof document === "undefined" ? "dark" : (readStored() ?? systemTheme()),
   setTheme: (theme) => {
     store(theme);
     applyTheme(theme);

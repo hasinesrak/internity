@@ -364,6 +364,7 @@ function PasswordSection() {
               label=""
               type="password"
               autoComplete="current-password"
+              placeholder="Enter your current password"
               value={current}
               onChange={setCurrent}
               error={errors.current}
@@ -380,7 +381,7 @@ function PasswordSection() {
               label=""
               type="password"
               autoComplete="new-password"
-              placeholder="At least 8 characters"
+              placeholder="Enter your new password"
               value={next}
               onChange={setNext}
               error={errors.next}
@@ -399,6 +400,7 @@ function PasswordSection() {
               label=""
               type="password"
               autoComplete="new-password"
+              placeholder="Enter your password again"
               value={confirm}
               onChange={setConfirm}
               error={errors.confirm}

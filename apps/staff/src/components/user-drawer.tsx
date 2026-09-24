@@ -147,7 +147,7 @@ export function UserDrawer({
                     label=""
                     type="password"
                     autoComplete="new-password"
-                    placeholder="At least 8 characters"
+                    placeholder="Enter your temporary password"
                     leftIcon={<KeyIcon weight="duotone" />}
                     value={password}
                     onChange={setPassword}

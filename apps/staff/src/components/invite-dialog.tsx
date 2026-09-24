@@ -45,7 +45,7 @@ export function InviteDialog({ departments, onClose, onSent }: InviteDialogProps
 
   const submit = async () => {
     const found: typeof errors = {}
-    if (!email.trim()) found.email = "Enter their school email."
+    if (!email.trim()) found.email = "Enter their email."
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       found.email = "That does not look like an email address."
     }
@@ -93,14 +93,14 @@ export function InviteDialog({ departments, onClose, onSent }: InviteDialogProps
 
         <FieldGroup>
           <Field data-invalid={errors.email ? true : undefined}>
-            <FieldLabel htmlFor="invite-email">School email</FieldLabel>
+            <FieldLabel htmlFor="invite-email">Email</FieldLabel>
             <Input
               id="invite-email"
               label=""
               type="email"
               inputMode="email"
               autoComplete="email"
-              placeholder="name@school.edu"
+              placeholder="Enter your email"
               leftIcon={<EnvelopeSimpleIcon weight="duotone" />}
               value={email}
               onChange={setEmail}

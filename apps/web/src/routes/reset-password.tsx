@@ -100,7 +100,7 @@ function ResetPasswordPage() {
               type="password"
               autoComplete="new-password"
               autoFocus
-              placeholder="At least 8 characters"
+              placeholder="Enter your new password"
               leftIcon={<LockIcon weight="duotone" />}
               value={password}
               onChange={(next) => {
@@ -122,6 +122,7 @@ function ResetPasswordPage() {
               label=""
               type="password"
               autoComplete="new-password"
+              placeholder="Enter your password again"
               leftIcon={<LockIcon weight="duotone" />}
               value={confirm}
               onChange={(next) => {
