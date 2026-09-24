@@ -1,5 +1,5 @@
-// Add an HR account. With a password the account is active straight away;
-// without one the person receives an invitation to set their own.
+// Add an HR account. HR accounts are organization-wide and sign in directly,
+// so a temporary password is always required.
 import { useState } from "react"
 import { EnvelopeSimpleIcon, LockIcon, UserIcon } from "@phosphor-icons/react"
 import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field"
@@ -8,6 +8,7 @@ import { StatefulButton } from "@workspace/ui/components/motion/button/stateful"
 import { Input } from "@workspace/ui/components/motion/input"
 import { MorphingModal } from "@workspace/ui/components/motion/morphing-modal"
 
+import { ApiError } from "@/lib/api"
 import { createUser } from "@/lib/data"
 import type { CreateUserResult } from "@/lib/data"
 import { toast } from "@/lib/toast"
@@ -42,8 +43,17 @@ export function HrAccountDialog({ onClose, onSaved }: HrAccountDialogProps) {
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       found.email = "That does not look like an email address."
     }
-    if (password && password.length < 8) {
+    // Matches the backend passwordSchema: at least 8 characters with a
+    // letter and a number. HR accounts always sign in directly, so the
+    // password is required here.
+    if (!password) {
+      found.password = "Set a temporary password for this account."
+    } else if (password.length < 8) {
       found.password = "Choose a password with at least 8 characters."
+    } else if (!/[A-Za-z]/.test(password)) {
+      found.password = "Include a letter."
+    } else if (!/\d/.test(password)) {
+      found.password = "Include a number."
     }
     setErrors(found)
     if (found.name || found.email || found.password) {
@@ -57,22 +67,30 @@ export function HrAccountDialog({ onClose, onSaved }: HrAccountDialogProps) {
         name: name.trim(),
         email: email.trim(),
         role: "hr",
-        password: password || undefined,
+        password,
       })
       setState("success")
-      toast.success(
-        result.invitation
-          ? `Invitation sent to ${email.trim()}`
-          : `HR account created for ${name.trim()}`,
-      )
+      toast.success(`HR account created for ${name.trim()}`)
       setViewId(null)
       window.setTimeout(() => onSaved(result), 220)
     } catch (error) {
       setState("error")
-      setErrors({
-        email:
-          error instanceof Error ? error.message : "The account could not be created.",
-      })
+      if (error instanceof ApiError) {
+        const next: typeof errors = {
+          name: error.issueFor("name"),
+          email: error.issueFor("email"),
+          password: error.issueFor("password"),
+        }
+        if (!next.name && !next.email && !next.password) {
+          next.email = error.message || "The account could not be created."
+        }
+        setErrors(next)
+      } else {
+        setErrors({
+          email:
+            error instanceof Error ? error.message : "The account could not be created.",
+        })
+      }
     }
   }
 
@@ -88,7 +106,7 @@ export function HrAccountDialog({ onClose, onSaved }: HrAccountDialogProps) {
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-medium tracking-tight">Add an HR account</h2>
           <p className="text-sm text-muted-foreground">
-            Leave the password empty and the person receives an invitation instead.
+            HR accounts sign in directly, so set a temporary password now.
           </p>
         </div>
 
@@ -155,7 +173,7 @@ export function HrAccountDialog({ onClose, onSaved }: HrAccountDialogProps) {
               successText="Done"
               errorText="Try again"
             >
-              {password ? "Create HR account" : "Send invitation"}
+              Create HR account
             </StatefulButton>
             <Button variant="ghost" size="md" onClick={close} type="button">
               Cancel

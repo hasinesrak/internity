@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router"
 import { IconContext } from "@phosphor-icons/react"
 import { NotFoundGlitch } from "@workspace/ui/components/motion/not-found/glitch"
-import appCss from "@workspace/ui/globals.css?url"
+import "@workspace/ui/globals.css"
 import { initTheme } from "@workspace/ui/lib/theme-store"
 
 // Reads the stored theme before first paint so the page never flashes the
@@ -18,7 +18,6 @@ export const Route = createRootRoute({
       { title: "Internity" },
     ],
     links: [
-      { rel: "stylesheet", href: appCss },
       // The brand logo doubles as the app icon: a theme-aware SVG favicon
       // first, then raster fallbacks for browsers that cannot theme one.
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },

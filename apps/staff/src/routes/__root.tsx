@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router"
 import { IconContext } from "@phosphor-icons/react"
 import { NotFoundGlitch } from "@workspace/ui/components/motion/not-found/glitch"
-import appCss from "@workspace/ui/globals.css?url"
+import "@workspace/ui/globals.css"
 import { initTheme } from "@workspace/ui/lib/theme-store"
 
 // Reads the stored theme before first paint so the page never flashes the
@@ -17,7 +17,6 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Internity staff" },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
   }),
   notFoundComponent: () => (
     <main className="flex min-h-svh items-center justify-center bg-background p-6">
