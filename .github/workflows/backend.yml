@@ -184,24 +184,8 @@ jobs:
         run: |
           tag="sha-${SHA}"
           file=infra/k8s/overlays/production/kustomization.yaml
-          python3 - "$file" "$DOCKERHUB_USERNAME" "$tag" <<'PY'
-          import pathlib, sys
-          path, username, tag = sys.argv[1:4]
-          lines = pathlib.Path(path).read_text().splitlines(keepends=True)
-          out, current = [], None
-          for line in lines:
-              stripped = line.strip()
-              if stripped.startswith("- name:"):
-                  current = stripped.split(":", 1)[1].strip()
-              if "newName:" in line and "docker.io/" in line and current == "internity-backend":
-                  repo = line.rsplit("/", 1)[-1].strip()
-                  line = f"    newName: docker.io/{username}/{repo}\n"
-              if stripped.startswith("newTag:") and current == "internity-backend":
-                  indent = line[: len(line) - len(line.lstrip())]
-                  line = f"{indent}newTag: {tag}\n"
-              out.append(line)
-          pathlib.Path(path).write_text("".join(out))
-          PY
+          sed -i -e "/- name: internity-backend/,/newTag:/ s|newName: .*|newName: docker.io/${DOCKERHUB_USERNAME}/internity-backend|" "$file"
+          sed -i -e "/- name: internity-backend/,/newTag:/ s|newTag: .*|newTag: ${tag}|" "$file"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$file"
