@@ -105,7 +105,7 @@ function SignInPage() {
 
   return (
     <AuthShell
-      title="Sign in to InternFlow"
+      title="Sign in to Internity"
       description="Classes, assignments, and feedback for your internship."
     >
       <form

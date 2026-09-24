@@ -107,7 +107,7 @@ export function getMe(): Promise<PublicUser> {
 export async function getOrganization(): Promise<OrganizationBrief> {
   const user = await getMe()
   return {
-    name: user.profile.institution || "InternFlow",
+    name: user.profile.institution || "Internity",
     logoUrl: null,
   }
 }

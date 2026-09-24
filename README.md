@@ -1,62 +1,397 @@
-# InternFlow
+# Internity — Intern Management System
 
-InternFlow is an intern management app. This repository is a pnpm workspace with one API in `apps/backend`, the intern app in `apps/web`, and the staff app in `apps/staff`.
+Internity is a role-based intern management platform for onboarding interns, organizing departments, scheduling classes, publishing assignments, collecting submissions, and reviewing intern work.
 
-## API
+One monorepo contains the full system: an **intern web app** (`apps/web`), a **staff web app** (`apps/staff`), a shared **design system** (`packages/ui`), and a single **API codebase** (`apps/backend`) that runs as two isolated surfaces (public + staff) against one MongoDB database.
 
-The API is a Hono service with MongoDB. It signs in with an HTTP-only cookie named `internity_session`. The same image runs twice:
+**Roles:** Admin · HR · Supervisor · Instructor · Intern
 
-- `API_SURFACE=public` on `PUBLIC_API_PORT`. Interns, account activation, and department reads. Admin, HR, supervisor, and instructor routes are not registered. Staff accounts cannot sign in here.
-- `API_SURFACE=staff` on `STAFF_API_PORT`. Every route. Staff sign-in works only from `STAFF_ALLOWED_IPS`, the office address. Leave that list empty in development to allow this computer only. Production will not start the staff process until the office address is set.
+---
 
-Both processes use the same `MONGODB_URI` and `JWT_SECRET`. Intern mail uses `APP_URL`. Staff mail uses `STAFF_APP_URL`.
+## Table of Contents
 
-Ports, bind addresses, and the office address come from the environment. Copy `env.example` to `.env` and set them there. `PUBLIC_API_BIND` and `PUBLIC_API_PORT` publish the intern API. `STAFF_API_BIND` and `STAFF_API_PORT` publish the staff API. `STAFF_ALLOWED_IPS` is the office address.
+1. [Features](#1-features)
+2. [Tech Stack](#2-tech-stack)
+3. [Architecture](#3-architecture)
+4. [Repository Structure](#4-repository-structure)
+5. [Prerequisites](#5-prerequisites)
+6. [Run Locally](#6-run-locally)
+7. [Environment Variables](#7-environment-variables)
+8. [Seed Data and Demo Accounts](#8-seed-data-and-demo-accounts)
+9. [Scripts Reference](#9-scripts-reference)
+10. [Testing, Linting, and Typechecking](#10-testing-linting-and-typechecking)
+11. [Security Model](#11-security-model)
+12. [Troubleshooting](#12-troubleshooting)
+13. [Deployment Overview](#13-deployment-overview)
+14. [Further Documentation](#14-further-documentation)
+
+---
+
+## 1. Features
+
+- **Role-based access** — Admin, HR, Supervisor, Instructor, and Intern, enforced on the backend.
+- **Department management** — Create/archive departments, assign supervisors and instructors.
+- **Invitation onboarding** — HR invites interns by email; interns activate via expiring token link.
+- **Class scheduling** — Instructors and supervisors schedule classes with external meeting links.
+- **Assignments and submissions** — Publish assignments, collect external submission links, review with score + feedback.
+- **AI drafting assistance** — Supervisors and instructors can draft assignment text, rubrics, and class agendas via Groq (optional, backend-only).
+- **Department scoping** — Supervisors and instructors operate strictly inside their assigned department.
+- **Activity logging** — Admin-visible audit trail of key actions.
+
+---
+
+## 2. Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Monorepo | pnpm workspaces + Turborepo |
+| Intern frontend (`apps/web`) | TanStack Start, TanStack Router, React 19, Tailwind CSS v4, Zustand |
+| Staff frontend (`apps/staff`) | TanStack Start, TanStack Router, React 19, Tailwind CSS v4, Zustand |
+| Shared UI (`packages/ui`) | shadcn-style components on Base UI primitives, beUI motion blocks (installed as source), Phosphor Icons (duotone), Manrope |
+| Backend (`apps/backend`) | Hono.js, TypeScript, Mongoose, Zod, `jose` (JWT), `bcryptjs` |
+| AI drafting (optional) | Groq API + Vercel AI SDK (`ai`, `@ai-sdk/groq`), model `qwen/qwen3.8-27b` |
+| Database | MongoDB 7.x |
+| Local runtime | Docker + Docker Compose |
+| Production | Docker Hub → GitHub Actions → Argo CD → K3s |
+
+Package manager is **pnpm** (`10.33.4`). Node `>= 20` is required. Dependency versions are held one week behind release (`minimumReleaseAge` in `pnpm-workspace.yaml`) to reduce supply-chain risk.
+
+---
+
+## 3. Architecture
+
+### 3.1 High-level request flow
+
+```text
+Intern browser ──► apps/web (:3000) ──► Backend API_SURFACE=public (:4000) ──┐
+                                                                              ├─► MongoDB 7.x (:27017)
+Staff browser ──► apps/staff (:3001) ──► Backend API_SURFACE=staff (:4001) ───┘
+                        (office IP or VPN only)
+```
+
+There are **two frontends and two API processes**, but **one backend image and one database**:
+
+- `apps/web` (intern site) talks only to the **public API**. Reachable from any address.
+- `apps/staff` (staff site) talks only to the **staff API**. Published on loopback / office range and additionally gated by `STAFF_ALLOWED_IPS`.
+- Both API processes share `MONGODB_URI` and `JWT_SECRET`. Session cookie (`internity_session`) works against both.
+
+### 3.2 Dual-surface backend (the core isolation mechanism)
+
+`apps/backend/src/app.ts:createApp` selects routes by `API_SURFACE`:
+
+| Surface | `API_SURFACE` | Registered routes | Purpose |
+|---|---|---|---|
+| Public | `public` | `GET /health`, `/api/auth` (intern only), `/api/intern`, `/api/departments` (read) | Intern traffic. Staff routes are **not registered** — the URLs do not exist here. Staff sign-in is refused. |
+| Staff | `staff` | Everything above **plus** `/api/admin`, `/api/hr`, `/api/supervisor`, `/api/instructor` | All staff operations. Staff sign-in additionally requires the client IP to be in `STAFF_ALLOWED_IPS` (or loopback in dev). |
+
+Isolation is by **route absence**, not just role checks: an attacker on the public address cannot reach staff handlers because they are never mounted. Role and department checks still run on every mounted route as defense in depth (`apps/backend/src/app.ts:51-72`).
+
+Route groups (`apps/backend/src/routes/`):
+
+- `/health` — liveness (`GET /health`) and readiness (`GET /health/ready`)
+- `/api/auth` — sign-in/out, activation, password reset
+- `/api/admin` — users, HR accounts, departments override, settings, activity log
+- `/api/hr` — departments, supervisor assignment, invitations, directory
+- `/api/supervisor` — instructor roster within own department (+ instructor-level actions there)
+- `/api/instructor` — classes, assignments, submission review; `POST /api/instructor/ai/*` drafting endpoints
+- `/api/intern` — own department view, classes/assignments, submission links, feedback
+- `/api/departments` — department reads
+
+### 3.3 Backend layering
+
+```text
+apps/backend/src/
+  config/       env loading and validation (all behavior is env-driven)
+  db/           Mongoose connection lifecycle
+  middleware/   auth (JWT verify), requireRole, department scope, error handler,
+                client-IP extraction, rate limiting
+  models/       Mongoose schemas: User, Department, Invitation,
+                ClassSession, Assignment, Submission, Review, ActivityLog
+  routes/       one module per group above; thin handlers
+  services/     business logic (invitations, mail, AI drafting)
+  validators/   Zod request/response contracts
+  lib/          shared helpers (IP matching, rate-limit store, Groq client)
+```
+
+Key design decisions:
+
+- **Stateless JWT sessions** in a secure, HTTP-only cookie (`internity_session`). No long-lived tokens in `localStorage`. Short lifetime (`JWT_EXPIRES_IN`, default `8h`).
+- **Backend is the authorization source of truth.** Frontend route guards exist for UX only; every permission (active status, valid JWT, role, department membership, resource-department match, intern submission ownership) is re-checked server-side.
+- **Department scoping** is enforced in middleware + service queries, so supervisors/instructors cannot cross into other departments even with valid IDs.
+- **AI drafting is assistive, not authoritative.** The backend loads department context itself (never trusts a department ID from the browser), calls Groq with a Zod-validated `Output.object` schema, and returns an editable draft. Nothing is persisted until the user submits the normal create/update action. Empty `GROQ_API_KEY` disables drafting; the rest of the API keeps running.
+
+### 3.4 Frontend architecture
+
+Both apps are TanStack Start applications sharing one design system:
+
+- **Shell:** one dashboard shell per role — topbar (department switcher, ⌘K command menu, theme toggle, user menu), left navigation (`@beui/ai-sidebar` adapted with Phosphor duotone icons; icon rail when collapsed; bottom-sheet under 768 px), content template (page header → KPI row → panels), drawers/bottom-sheets for detail, toast stack for feedback.
+- **Data:** route loaders call the API client; pure UI state (sidebar, drawers, table filters) lives in Zustand stores. No business rules live in the client.
+- **Design system (`packages/ui`):** shadcn-style components on Base UI primitives for forms/buttons/dialogs, beUI source blocks for motion and composed surfaces (tables, badges, KPI numbers, drawers, modals, toasts). Both apps import through `@workspace/ui/*` and share one theme (shadcn semantic tokens, Manrope). Full inventory: `docs/design-system.md`; screen composition: `docs/dashboard-design.md`.
+
+### 3.5 Data model (simplified)
+
+```text
+Department 1──* User (role, status, departmentId)
+Department 1──* Invitation (email, role, tokenHash, expiresAt)
+Department 1──* ClassSession (title, agenda, meetingUrl, schedule)
+Department 1──* Assignment (title, instructions, rubric, deadline, status)
+Assignment 1──* Submission (internId, url, notes, status, score, feedback)
+User *──* ActivityLog (who, what, when)
+```
+
+Submissions are **external links + notes** (no file hosting in MVP).
+
+---
+
+## 4. Repository Structure
+
+```text
+internity/
+  apps/
+    web/            # Intern TanStack Start app (public)
+    staff/          # Staff TanStack Start app (office/VPN)
+    backend/        # Hono API — one image, API_SURFACE=public|staff
+      src/          # config, db, middleware, models, routes, services, validators, lib
+      Dockerfile
+      env.example
+  packages/
+    ui/             # Design system (shadcn + Base UI + beUI source)
+  infra/
+    k8s/            # base + overlays/production manifests
+    argocd/         # Argo CD Application definitions
+  docs/             # plan, architecture, requirements, design-system,
+                    # dashboard-design, deployment, CD
+  .github/workflows/# validation + Docker build/publish
+  docker-compose.yml# mongo + 2 APIs + 2 sites (local)
+  env.example       # root compose env template
+  turbo.json        # Turborepo task graph
+  pnpm-workspace.yaml
+```
+
+---
+
+## 5. Prerequisites
+
+- **Node.js** `>= 20`
+- **pnpm** `10.33.4` (`corepack enable && corepack prepare pnpm@10.33.4 --activate`)
+- **Docker + Docker Compose** (for the recommended full-stack run)
+- **Local MongoDB optional** — only needed for the manual (non-Docker) path; Compose provides `mongo:7.0` automatically.
+- Optional: `RESEND_API_KEY` (real invitation emails), `GROQ_API_KEY` (AI drafting). Both can stay empty for local development.
+
+Verify:
 
 ```powershell
+node --version; pnpm --version; docker --version; docker compose version
+```
+
+```bash
+node --version && pnpm --version && docker --version && docker compose version
+```
+
+---
+
+## 6. Run Locally
+
+Two supported paths. **Option A (Docker Compose)** is recommended — it starts MongoDB, both APIs, and both sites with correct wiring. **Option B (manual)** is for frontend/backend iteration with hot reload.
+
+### Option A — Full stack via Docker Compose (recommended)
+
+```powershell
+# 1. Root env (ports, URLs, secrets)
 copy env.example .env
-docker compose up -d mongo backend-public backend-staff
-copy apps\backend\env.example apps\backend\.env
+
+# 2. Build and start everything in the background
+docker compose up -d --build
+
+# 3. Install deps and seed demo accounts (first run only)
 pnpm install
 pnpm --filter backend seed
 ```
 
-`pnpm --filter backend dev` starts one process. Development defaults that process to `API_SURFACE=staff` on `PORT` from `apps/backend/.env`. Set `API_SURFACE=public` to run the public copy yourself. `HOST` is the address that process listens on.
+```bash
+# 1. Root env
+cp env.example .env
 
-Health checks are `GET /health` and `GET /health/ready`.
+# 2. Build and start everything
+docker compose up -d --build
 
-Demo accounts use the password `Password123!`:
+# 3. Install deps and seed demo accounts (first run only)
+pnpm install
+pnpm --filter backend seed
+```
 
-- `admin@internity.local`
-- `hr@internity.local`
-- `supervisor@internity.local`
-- `instructor@internity.local`
-- `intern@internity.local`
+Open:
 
-`pnpm --filter backend test` runs the API tests against `mongodb://127.0.0.1:27017/internity_test`.
+| Service | URL | Notes |
+|---|---|---|
+| Intern site | http://localhost:3000 | Sign in as intern |
+| Staff site | http://localhost:3001 | Sign in as admin/HR/supervisor/instructor |
+| Public API | http://localhost:4000 | `GET /health`, `GET /health/ready` |
+| Staff API | http://localhost:4001 | Staff routes live here only |
+| MongoDB | mongodb://127.0.0.1:27017/internity | Data volume `internity_mongo` |
 
-### Access
+Useful Compose commands:
 
-Admin manages users, departments, settings, and the activity log. HR manages departments, the directory, and invitations. Supervisors manage the instructor roster in their department and can schedule classes, publish assignments, and review submissions there. Instructors do that same teaching work. Interns view their department, submit links, and read feedback.
+```powershell
+docker compose ps
+docker compose logs -f backend-public backend-staff
+docker compose down        # stop (keep data)
+docker compose down -v     # stop and delete DB data
+```
 
-Leave `RESEND_API_KEY` empty to have invitation and reset links returned to the caller and written to the server log. Leave `GROQ_API_KEY` empty to keep drafting off. Drafts are not saved; the normal class and assignment actions save them. The model id starts as `qwen/qwen3.8-27b`. An admin changes it with `PATCH /api/admin/settings` and `{ "groqModel": "model-id" }`. The installed Groq provider documents `qwen/qwen3.6-27b` for this reasoning mode.
+> Compose sets `STAFF_ALLOW_PRIVATE=true` so staff sign-in works from your machine through the Docker bridge. Never set `STAFF_ALLOW_PRIVATE` in production.
 
-`STAFF_ALLOWED_IPS` is the office address. Admin, HR, supervisor, and instructor sign-in on the staff process works only from those addresses. From anywhere else, connect to the office VPN so the request leaves through that address. Leave the list empty in development to allow this computer only. Production will not start the staff process until the address is set. The public process refuses those accounts either way. Interns are not limited. Set `TRUST_PROXY=true` only behind a proxy that replaces `X-Forwarded-For` with the client address it observed. The staff site reads the same `STAFF_ALLOWED_IPS` value.
+### Option B — Manual dev with hot reload
 
-### Route groups
+Run MongoDB (via Compose's mongo service or your own), then each app in its own terminal:
 
-- `/api/auth`
-- `/api/admin`
-- `/api/hr`
-- `/api/supervisor`
-- `/api/instructor`
-- `/api/intern`
-- `/api/departments`
+```powershell
+# Terminal 1 — MongoDB only
+docker compose up -d mongo
 
-Instructor drafting routes are `POST /api/instructor/ai/assignment-draft` and `POST /api/instructor/ai/class-agenda-draft`.
+# Terminal 2 — backend (defaults to API_SURFACE=staff; see note below)
+copy apps\backend\env.example apps\backend\.env
+pnpm install
+pnpm --filter backend seed
+pnpm --filter backend dev
 
-## Web
+# Terminal 3 — intern site
+copy apps\web\env.example apps\web\.env
+pnpm --filter web dev      # http://localhost:3000
 
-The intern app lives in `apps/web`. Copy `apps/web/env.example` to `apps/web/.env`. `WEB_HOST` and `WEB_PORT` are where it listens. `VITE_API_URL` is the public API. Run it with `pnpm --filter web dev`.
+# Terminal 4 — staff site
+copy apps\staff\env.example apps\staff\.env
+pnpm --filter staff dev    # http://localhost:3001
+```
 
-The staff app lives in `apps/staff`. Copy `apps/staff/env.example` to `apps/staff/.env`. `STAFF_HOST` and `STAFF_PORT` are where it listens. `VITE_API_URL` is the staff API. `STAFF_ALLOWED_IPS` is the office address. Run it with `pnpm --filter staff dev`.
+```bash
+docker compose up -d mongo
+
+cp apps/backend/env.example apps/backend/.env
+pnpm install
+pnpm --filter backend seed
+pnpm --filter backend dev
+
+cp apps/web/env.example apps/web/.env
+pnpm --filter web dev
+
+cp apps/staff/env.example apps/staff/.env
+pnpm --filter staff dev
+```
+
+Or start everything at once (after env files exist):
+
+```powershell
+pnpm dev
+```
+
+**Backend surface note:** `pnpm --filter backend dev` runs a single process defaulting to `API_SURFACE=staff` (reads `PORT`/`HOST` from `apps/backend/.env`). To run the public copy manually, set `API_SURFACE=public` in that file or env. In Compose you get both automatically.
+
+---
+
+## 7. Environment Variables
+
+| File | Purpose | Key values |
+|---|---|---|
+| `.env` (root) | Docker Compose wiring | `PUBLIC_API_PORT` (4000), `STAFF_API_PORT` (4001), `WEB_PORT` (3000), `STAFF_PORT` (3001), `APP_URL`, `STAFF_APP_URL`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, `TRUST_PROXY`, `RESEND_API_KEY`, `GROQ_API_KEY`, `GROQ_MODEL`, `ADMIN_*` bootstrap |
+| `apps/backend/.env` | Manual `pnpm --filter backend dev` | `HOST`, `PORT`, `MONGODB_URI`, `CORS_ORIGIN`, `API_SURFACE=staff\|public`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, mail + Groq keys |
+| `apps/web/.env` | Intern site | `WEB_HOST`, `WEB_PORT`, `VITE_API_URL=http://localhost:4000` (public API) |
+| `apps/staff/.env` | Staff site | `STAFF_HOST`, `STAFF_PORT`, `VITE_API_URL=http://localhost:4001` (staff API), `STAFF_ALLOWED_IPS` mirror |
+
+Rules that matter:
+
+- `JWT_SECRET` and `MONGODB_URI` must be identical across both API processes.
+- `APP_URL` builds intern links; `STAFF_APP_URL` builds staff links — keep them aligned with the site ports.
+- `STAFF_ALLOWED_IPS` is the office egress list. Empty = loopback only (dev). **Production staff API refuses to start until it is set.**
+- `VITE_API_URL` is baked at build time — the Docker `web`/`staff` images take it from `VITE_PUBLIC_API_URL` / `VITE_STAFF_API_URL` build args.
+- Set `TRUST_PROXY=true` only behind a proxy that overwrites `X-Forwarded-For` with the observed client IP.
+- Never commit any `.env`. Templates are `env.example` / `apps/*/[env.example]`.
+
+---
+
+## 8. Seed Data and Demo Accounts
+
+`pnpm --filter backend seed` creates the bootstrap organization, departments, and demo users (idempotent — safe to re-run). Default password for HR/supervisor/instructor/intern is `123456`; the admin password is `Admin123456` unless overridden by `ADMIN_*` env.
+
+| Email | Password | Role | Where to sign in |
+|---|---|---|---|
+| `admin@ba-sys.com` | `Admin123456` | Admin | Staff site `:3001` |
+| `hr@ba-sys.com` | `123456` | HR | Staff site `:3001` |
+| `supervisor@ba-sys.com` | `123456` | Supervisor | Staff site `:3001` |
+| `instructor@ba-sys.com` | `123456` | Instructor | Staff site `:3001` |
+| `intern@ba-sys.com` | `123456` | Intern | Intern site `:3000` |
+
+Staff accounts are rejected on the intern site / public API, and the intern account is rejected on the staff surface — this is expected.
+
+---
+
+## 9. Scripts Reference
+
+Root (`package.json`, Turborepo-orchestrated):
+
+| Command | Effect |
+|---|---|
+| `pnpm dev` | `turbo dev` — all apps in dev mode |
+| `pnpm dev:web` / `dev:staff` / `dev:backend` | Single app in dev mode |
+| `pnpm build` | Build all apps |
+| `pnpm seed` | Seed demo data via backend |
+| `pnpm test` / `lint` / `typecheck` / `format` | Quality gates across the workspace |
+
+Backend (`pnpm --filter backend <script>`): `dev` (watch), `build` → `dist/`, `start` (`node dist/index.js`), `seed`, `test`, `lint`, `typecheck`.
+
+Frontends (`pnpm --filter web|staff <script>`): `dev`, `build`, `start` (prod server), `preview`, `lint`, `typecheck`.
+
+---
+
+## 10. Testing, Linting, and Typechecking
+
+```powershell
+pnpm --filter backend test   # API tests vs mongodb://127.0.0.1:27017/internity_test (needs local Mongo)
+pnpm typecheck
+pnpm lint
+```
+
+---
+
+## 11. Security Model
+
+- **HTTP-only session cookie** (`internity_session`); no JWT in `localStorage`.
+- **Dual-surface isolation** — staff handlers absent from the public process.
+- **IP gating** — staff sign-in restricted to `STAFF_ALLOWED_IPS` (+ loopback in dev); off-site staff must use the office VPN. Public process refuses staff accounts unconditionally.
+- **RBAC + department scope on every route** — frontend guards are cosmetic.
+- **Secrets hygiene** — `JWT_SECRET`, `GROQ_API_KEY`, `RESEND_API_KEY`, `ADMIN_PASSWORD` via env/secrets only. `GROQ_API_KEY` never enters the frontend bundle.
+- **Mail fallback** — with `RESEND_API_KEY` empty, invitation/reset links are returned to the caller and written to the server log (dev-friendly, no silent failures).
+
+---
+
+## 12. Troubleshooting
+
+| Symptom | Likely cause → fix |
+|---|---|
+| Staff sign-in rejected locally (non-Docker) | `STAFF_ALLOWED_IPS` set or accessed via non-loopback → clear it in dev, use `http://localhost:3001`, or add your IP |
+| Staff sign-in rejected in Compose | `STAFF_ALLOW_PRIVATE` unset → set `STAFF_ALLOW_PRIVATE=true` in root `.env` (local only) |
+| Staff API exits in production | `STAFF_ALLOWED_IPS` empty → set the office egress IPs/CIDRs |
+| Frontend calls wrong API | Stale `VITE_API_URL` baked at build → rebuild after changing it; check `apps/web/.env` vs `apps/staff/.env` |
+| `pnpm --filter backend test` fails to connect | No Mongo on `127.0.0.1:27017` → `docker compose up -d mongo` first |
+| Seed does nothing / login fails | Seeded a different DB than the API reads → compare `MONGODB_URI` in `apps/backend/.env` vs Compose |
+| Port already in use | Another service on 3000/3001/4000/4001/27017 → change the `*_PORT` in `.env` or stop the conflict |
+| Wrong client IP behind proxy | `TRUST_PROXY` misconfigured → enable only behind a proxy that sanitizes `X-Forwarded-For` |
+
+Health probes: `GET /health` (liveness), `GET /health/ready` (readiness incl. DB).
+
+---
+
+## 13. Deployment Overview
+
+Production path is GitOps: **GitHub Actions** builds and pushes immutable images to **Docker Hub** → manifests under `infra/k8s` (base + `overlays/production`) reference the new tags → **Argo CD** (`infra/argocd`) syncs into **K3s**. Separate Deployments exist for the intern site, staff site (ingress limited to office range), public API, and staff API (same image, different `API_SURFACE`; staff ingress limited to office range). MongoDB is external managed (preferred) or a StatefulSet with a documented backup plan. Details: `docs/deployment.md`, `docs/CD.md`.
+
+---
+
+## 14. Further Documentation
+
+- `docs/plan.md` — product scope, phases, success criteria
+- `docs/architecture.md` — authoritative architecture reference
+- `docs/requirements.md` — functional requirements
+- `docs/design-system.md` — tokens, icons, components
+- `docs/dashboard-design.md` — dashboard shell and layouts
+- `docs/deployment.md`, `docs/CD.md` — production deployment and pipeline

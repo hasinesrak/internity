@@ -139,7 +139,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <BottomSheet
         open={mobileNavOpen && isMobile}
         onOpenChange={setMobileNavOpen}
-        title="InternFlow"
+        title="Internity"
         description="Intern sections"
         snapPoints={[0.7]}
       >

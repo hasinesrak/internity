@@ -12,7 +12,7 @@ export interface PlatformSettingsShape {
 const platformSettingsSchema = new Schema<PlatformSettingsShape>(
   {
     key: { type: String, required: true, unique: true, default: "default" },
-    organizationName: { type: String, required: true, default: "InternFlow" },
+    organizationName: { type: String, required: true, default: "Internity" },
     invitationTtlHours: { type: Number, required: true, default: 168 },
     groqModel: {
       type: String,

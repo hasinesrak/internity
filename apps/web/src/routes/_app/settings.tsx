@@ -263,7 +263,7 @@ function NotificationSection() {
       <CardHeader>
         <h2 className="text-base font-medium tracking-tight">Notifications</h2>
         <p className="text-sm text-muted-foreground">
-          What InternFlow emails you about.
+          What Internity emails you about.
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">

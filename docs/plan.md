@@ -1,12 +1,12 @@
 # Project Plan
 
-Project name: **InternFlow**
+Project name: **Internity**
 
-InternFlow is a lightweight intern management platform for onboarding interns, organizing departments, scheduling classes, assigning tasks, collecting submissions, and reviewing intern work. It is designed as a modern web application with a simple monorepo, Docker-first development, and GitOps deployment to a Linux VM running K3s.
+Internity is a lightweight intern management platform for onboarding interns, organizing departments, scheduling classes, assigning tasks, collecting submissions, and reviewing intern work. It is designed as a modern web application with a simple monorepo, Docker-first development, and GitOps deployment to a Linux VM running K3s.
 
 ## Recommended Name
 
-Use **InternFlow**.
+Use **Internity**.
 
 Why this name fits:
 
@@ -17,12 +17,12 @@ Why this name fits:
 
 Suggested repository slug:
 
-- `internflow`
+- `internity`
 
 Suggested Docker image names:
 
-- `dockerhub-username/internflow-frontend`
-- `dockerhub-username/internflow-backend`
+- `dockerhub-username/internity-frontend`
+- `dockerhub-username/internity-backend`
 
 Other possible names:
 
@@ -34,7 +34,7 @@ Other possible names:
 
 ## Product Overview
 
-InternFlow will support five roles:
+Internity will support five roles:
 
 - Admin
 - HR
@@ -151,9 +151,9 @@ The detailed notes mention dedicated frontend and backend repositories. That can
 
 If the project grows, split into three repositories later:
 
-- `internflow-frontend`
-- `internflow-backend`
-- `internflow-gitops`
+- `internity-frontend`
+- `internity-backend`
+- `internity-gitops`
 
 ## Monorepo Structure
 
@@ -463,7 +463,7 @@ Exit criteria:
 
 ## Dashboard UX Direction
 
-InternFlow should feel like a practical operations dashboard, not a marketing site. The full specification lives in `docs/dashboard-design.md`. Tokens, icons, motion, and the component inventory live in `docs/design-system.md`.
+Internity should feel like a practical operations dashboard, not a marketing site. The full specification lives in `docs/dashboard-design.md`. Tokens, icons, motion, and the component inventory live in `docs/design-system.md`.
 
 One shell serves all five roles:
 
@@ -506,11 +506,10 @@ The project is successful when:
 
 ## Immediate Next Steps
 
-1. Confirm the name **InternFlow**.
+1. Confirm the name **Internity**.
 2. Install the design system: beUI slugs, Phosphor duotone icon pass, token check in `packages/ui`.
 3. Build the dashboard shell from `@beui/ai-sidebar` per `docs/dashboard-design.md`.
 4. Implement auth and role boundaries first.
 5. Add the intern invitation workflow.
 6. Build the role screens from the beUI block lists in `docs/dashboard-design.md`.
 7. After the assignment editor and class scheduler exist, add the two Groq drafting routes and their draft surfaces.
-

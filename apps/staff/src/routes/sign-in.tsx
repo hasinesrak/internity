@@ -102,7 +102,7 @@ function SignInPage() {
 
   return (
     <AuthShell
-      title="Sign in to InternFlow staff"
+      title="Sign in to Internity staff"
       description="Admin, HR, supervisor, and instructor accounts sign in here."
     >
       <form

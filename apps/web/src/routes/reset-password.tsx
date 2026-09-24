@@ -87,7 +87,7 @@ function ResetPasswordPage() {
   return (
     <AuthShell
       title="Choose a new password"
-      description="This replaces the password on your InternFlow account."
+      description="This replaces the password on your Internity account."
     >
       <form noValidate onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
         <FieldGroup>

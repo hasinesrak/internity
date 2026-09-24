@@ -17,7 +17,7 @@ export async function getSettings(): Promise<PublicSettings> {
     {
       $setOnInsert: {
         key: "default",
-        organizationName: "InternFlow",
+        organizationName: "Internity",
         invitationTtlHours: 168,
         groqModel: fallbackModel,
       },
@@ -33,7 +33,7 @@ export async function getSettings(): Promise<PublicSettings> {
       )
   if (!settings) {
     return {
-      organizationName: "InternFlow",
+      organizationName: "Internity",
       invitationTtlHours: 168,
       groqModel: fallbackModel,
     }

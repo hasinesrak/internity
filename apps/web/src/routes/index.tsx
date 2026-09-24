@@ -12,11 +12,11 @@ import { currentUserSync } from "@/lib/data"
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "InternFlow — everything for your internship, in one place" },
+      { title: "Internity — everything for your internship, in one place" },
       {
         name: "description",
         content:
-          "InternFlow keeps your class schedule, assignments, submissions, and feedback in one place. Sign in to get started.",
+          "Internity keeps your class schedule, assignments, submissions, and feedback in one place. Sign in to get started.",
       },
     ],
   }),

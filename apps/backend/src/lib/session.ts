@@ -15,8 +15,8 @@ export async function signSession(user: {
   return new SignJWT({ ver: user.tokenVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
-    .setIssuer("internflow")
-    .setAudience("internflow-api")
+    .setIssuer("internity")
+    .setAudience("internity-api")
     .setIssuedAt()
     .setExpirationTime(`${env.jwtMaxAgeSeconds}s`)
     .sign(secret())
@@ -29,8 +29,8 @@ export async function readSession(token: string): Promise<{
   try {
     const { payload } = await jwtVerify(token, secret(), {
       algorithms: ["HS256"],
-      issuer: "internflow",
-      audience: "internflow-api",
+      issuer: "internity",
+      audience: "internity-api",
     })
     if (!payload.sub || typeof payload.ver !== "number") {
       throw new Error("incomplete session")

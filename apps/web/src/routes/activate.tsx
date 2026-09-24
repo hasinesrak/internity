@@ -151,8 +151,8 @@ function ActivatePage() {
       title="Activate your account"
       description={
         invitation.data?.departmentName
-          ? `Set a name and password for your InternFlow account in ${invitation.data.departmentName}.`
-          : "Set a name and password for your InternFlow account."
+          ? `Set a name and password for your Internity account in ${invitation.data.departmentName}.`
+          : "Set a name and password for your Internity account."
       }
     >
       <SignUpForm

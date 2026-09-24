@@ -1,8 +1,8 @@
 # Architecture
 
-Project name: **InternFlow**
+Project name: **Internity**
 
-InternFlow is a role-based intern management system. The architecture stays as one backend codebase, one MongoDB database, and two frontends. The backend image runs twice: a public process for interns and a staff process for admin, HR, supervisor, and instructor routes. Docker images stay split by app, and GitOps deployment goes into K3s through Argo CD.
+Internity is a role-based intern management system. The architecture stays as one backend codebase, one MongoDB database, and two frontends. The backend image runs twice: a public process for interns and a staff process for admin, HR, supervisor, and instructor routes. Docker images stay split by app, and GitOps deployment goes into K3s through Argo CD.
 
 ## Architecture Goals
 
@@ -495,4 +495,3 @@ Reason: one icon language across beUI source and app screens keeps optical weigh
 Decision 8: Run one backend image as two processes.
 
 Reason: The public process does not register admin, HR, supervisor, or instructor routes, so those URLs are absent from the intern address. The staff process registers every route and keeps the role checks and `STAFF_ALLOWED_IPS` gate. Both processes use one database and one session secret. A second frontend puts staff pages on the restricted address. The route split, not the second frontend, is what keeps staff APIs off the public address.
-

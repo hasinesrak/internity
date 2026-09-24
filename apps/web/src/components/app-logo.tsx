@@ -31,7 +31,7 @@ export function AppLogo({
         className={cn(markClassName, "hidden dark:block")}
       />
       {withWordmark ? (
-        <span className="text-sm font-medium tracking-tight">InternFlow</span>
+        <span className="text-sm font-medium tracking-tight">Internity</span>
       ) : null}
     </span>
   )

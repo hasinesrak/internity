@@ -32,7 +32,7 @@ function DashboardRedirect() {
 
   return (
     <main className="flex min-h-svh items-center justify-center bg-background">
-      <p className="text-sm text-muted-foreground">Opening InternFlow staff…</p>
+      <p className="text-sm text-muted-foreground">Opening Internity staff…</p>
     </main>
   )
 }

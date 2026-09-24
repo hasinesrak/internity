@@ -147,7 +147,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <BottomSheet
         open={mobileNavOpen && isMobile}
         onOpenChange={setMobileNavOpen}
-        title="InternFlow staff"
+        title="Internity staff"
         description="Staff sections"
         snapPoints={[0.7]}
       >

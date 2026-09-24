@@ -61,9 +61,39 @@ services:
       API_SURFACE: staff
       CORS_ORIGIN: ${STAFF_CORS_ORIGIN:-http://localhost:3001}
       STAFF_ALLOWED_IPS: ${STAFF_ALLOWED_IPS:-}
+      STAFF_ALLOW_PRIVATE: ${STAFF_ALLOW_PRIVATE:-true}
     depends_on:
       mongo:
         condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_PUBLIC_API_URL:-http://localhost:4000}
+    ports:
+      - "${WEB_HOST:-0.0.0.0}:${WEB_PORT:-3000}:3000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3000"
+      NODE_ENV: production
+
+  staff:
+    build:
+      context: .
+      dockerfile: apps/staff/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_STAFF_API_URL:-http://localhost:4001}
+    ports:
+      - "${STAFF_HOST:-127.0.0.1}:${STAFF_PORT:-3001}:3001"
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3001"
+      NODE_ENV: production
+      STAFF_ALLOWED_IPS: ${STAFF_ALLOWED_IPS:-}
+      STAFF_ALLOW_PRIVATE: ${STAFF_ALLOW_PRIVATE:-true}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
 
 volumes:
   internity_mongo:

@@ -1,8 +1,8 @@
 # Deployment Plan
 
-Project name: **InternFlow**
+Project name: **Internity**
 
-InternFlow will deploy to a Linux virtual machine running K3s. Docker images will be built by GitHub Actions, pushed to Docker Hub, and deployed through Argo CD using a GitOps workflow.
+Internity will deploy to a Linux virtual machine running K3s. Docker images will be built by GitHub Actions, pushed to Docker Hub, and deployed through Argo CD using a GitOps workflow.
 
 ## Deployment Goal
 
@@ -30,7 +30,7 @@ Production target:
 Recommended namespaces:
 
 - `argocd`
-- `internflow`
+- `internity`
 - `monitoring` later if observability is added
 
 ## Production Components
@@ -67,7 +67,7 @@ GitOps:
 For the first real deployment:
 
 - deploy frontend and backend to K3s
-- use one namespace: `internflow`
+- use one namespace: `internity`
 - use one domain if available
 - use simple rolling updates
 - create secrets manually in the cluster
@@ -80,8 +80,8 @@ Do not begin with advanced Kubernetes patterns. First make the app run.
 
 Option A: one domain
 
-- frontend: `https://internflow.example.com`
-- backend API: `https://internflow.example.com/api`
+- frontend: `https://internity.example.com`
+- backend API: `https://internity.example.com/api`
 
 Option B: two subdomains
 
@@ -94,8 +94,8 @@ Recommended first choice: Option A. It is easier for CORS, cookies, and early de
 
 Docker Hub repositories:
 
-- `dockerhub-username/internflow-frontend`
-- `dockerhub-username/internflow-backend`
+- `dockerhub-username/internity-frontend`
+- `dockerhub-username/internity-backend`
 
 Image tags:
 
@@ -179,9 +179,9 @@ Recommended learning path:
 
 Start with these applications:
 
-- `internflow-frontend`
-- `internflow-backend`
-- `internflow-mongodb` only if MongoDB is managed inside K3s
+- `internity-frontend`
+- `internity-backend`
+- `internity-mongodb` only if MongoDB is managed inside K3s
 
 Recommended sync settings at first:
 
@@ -271,7 +271,7 @@ If this app stores important real intern records, use a managed MongoDB service 
 - K3s is installed.
 - `kubectl` works on the VM.
 - Argo CD is installed.
-- `internflow` namespace exists.
+- `internity` namespace exists.
 - Docker Hub repositories exist.
 - GitHub repository secrets are configured.
 - Frontend image can be pulled by K3s.
@@ -306,4 +306,3 @@ If this app stores important real intern records, use a managed MongoDB service 
 - running MongoDB in K3s without backups
 - exposing backend admin routes without role middleware
 - trusting frontend route guards as security
-

@@ -1,8 +1,8 @@
 # Design System
 
-Product name: **InternFlow**
+Product name: **Internity**
 
-InternFlow's interface is assembled from three layers that already exist in this repo: shadcn-style components built on Base UI primitives in `packages/ui`, beUI components copied in as source, and screen composition in `apps/web`. This document defines the color scheme, typography, icons, motion, and component inventory so every dashboard screen reads as one product.
+Internity's interface is assembled from three layers that already exist in this repo: shadcn-style components built on Base UI primitives in `packages/ui`, beUI components copied in as source, and screen composition in `apps/web`. This document defines the color scheme, typography, icons, motion, and component inventory so every dashboard screen reads as one product.
 
 Companion document: `docs/dashboard-design.md` defines the dashboard shell and the per-role layouts.
 
@@ -22,7 +22,7 @@ Companion document: `docs/dashboard-design.md` defines the dashboard shell and t
 
 Standing rules:
 
-- beUI ships no runtime package and no brand palette. Its source calls shadcn semantic color utilities, so it inherits the InternFlow theme with no change. Do not introduce beUI-specific color variables.
+- beUI ships no runtime package and no brand palette. Its source calls shadcn semantic color utilities, so it inherits the Internity theme with no change. Do not introduce beUI-specific color variables.
 - shadcn and Base UI own form controls, layout, and structural components. beUI owns motion and composed blocks. Do not hand-roll a motion widget that a beUI install slug already covers.
 - One icon library per surface (Phosphor) and one animation library per surface (`motion`).
 

@@ -163,11 +163,11 @@ export async function requestPasswordReset(
   )
   const sent = await sendMail({
     to: user.email,
-    subject: "Reset your InternFlow password",
+    subject: "Reset your Internity password",
     text: [
       `Hello ${user.name},`,
       "",
-      "A password reset was requested for your InternFlow account.",
+      "A password reset was requested for your Internity account.",
       "",
       "Set a new password:",
       url,

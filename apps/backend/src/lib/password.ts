@@ -7,7 +7,7 @@ const dummyHashes = new Map<number, Promise<string>>()
 function dummyHash(rounds: number): Promise<string> {
   const existing = dummyHashes.get(rounds)
   if (existing) return existing
-  const created = bcrypt.hash("internflow-timing-pad", rounds)
+  const created = bcrypt.hash("internity-timing-pad", rounds)
   dummyHashes.set(rounds, created)
   return created
 }

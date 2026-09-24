@@ -89,7 +89,7 @@ const PASSWORD_CLASSES = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/];
 
 const STRENGTH_LABELS = ["Too short", "Weak", "Fair", "Good", "Strong"] as const;
 
-// InternFlow palette: neutral surfaces plus one primary and one destructive.
+// Internity palette: neutral surfaces plus one primary and one destructive.
 // A weak password reads destructive, a fair one neutral, a strong one primary.
 const STRENGTH_COLORS = [
   "bg-destructive",

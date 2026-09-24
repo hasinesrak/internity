@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: staff
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: staff
+  template:
+    metadata:
+      labels:
+        app: staff
+    spec:
+      containers:
+        - name: staff
+          image: internity-staff
+          ports:
+            - name: http
+              containerPort: 3001
+          env:
+            - name: HOST
+              value: 0.0.0.0
+            - name: PORT
+              value: "3001"
+            - name: TRUST_PROXY
+              valueFrom:
+                configMapKeyRef:
+                  name: internity-config
+                  key: TRUST_PROXY
+            - name: STAFF_ALLOWED_IPS
+              valueFrom:
+                secretKeyRef:
+                  name: internity-secrets
+                  key: STAFF_ALLOWED_IPS
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 20

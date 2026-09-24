@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: internity
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - mongo-service.yaml
+  - mongo-statefulset.yaml
+  - backend-public-service.yaml
+  - backend-public-deployment.yaml
+  - backend-staff-service.yaml
+  - backend-staff-deployment.yaml
+  - web-service.yaml
+  - web-deployment.yaml
+  - staff-service.yaml
+  - staff-deployment.yaml
+  - ingress.yaml

@@ -1,8 +1,8 @@
 # CI/CD Plan
 
-Project name: **InternFlow**
+Project name: **Internity**
 
-This document describes the CI/CD plan for the InternFlow monorepo. GitHub Actions will validate the code, build Docker images, push images to Docker Hub, and update GitOps deployment manifests. Argo CD will handle deployment into K3s.
+This document describes the CI/CD plan for the Internity monorepo. GitHub Actions will validate the code, build Docker images, push images to Docker Hub, and update GitOps deployment manifests. Argo CD will handle deployment into K3s.
 
 ## CI/CD Goal
 
@@ -101,8 +101,8 @@ Shared package checks if used:
 
 Use separate repositories:
 
-- `dockerhub-username/internflow-frontend`
-- `dockerhub-username/internflow-backend`
+- `dockerhub-username/internity-frontend`
+- `dockerhub-username/internity-backend`
 
 Recommended tags:
 
@@ -248,4 +248,3 @@ This keeps deployment history clear.
 - Docker Hub should store immutable build artifacts.
 - Git should store desired deployment state.
 - K3s should run the desired state.
-

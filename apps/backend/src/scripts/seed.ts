@@ -78,7 +78,7 @@ async function main(): Promise<void> {
     {
       $setOnInsert: {
         key: "default",
-        organizationName: "InternFlow",
+        organizationName: "Internity",
         invitationTtlHours: 168,
         groqModel: env.groqModel,
       },
@@ -171,7 +171,7 @@ async function main(): Promise<void> {
       title: "Welcome session",
       agenda:
         "Meet the team, review the internship goals, and walk through the first assignment.",
-      meetingUrl: "https://meet.example.com/internflow-welcome",
+      meetingUrl: "https://meet.example.com/internity-welcome",
       scheduledStart: start,
       scheduledEnd: finish,
       createdBy: instructor._id,

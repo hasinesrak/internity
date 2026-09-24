@@ -84,7 +84,7 @@ export function Topbar({
       </Button>
 
       <div className="flex min-w-0 items-center gap-2">
-        <span className="text-sm font-medium tracking-tight">InternFlow</span>
+        <span className="text-sm font-medium tracking-tight">Internity</span>
         {user ? <RoleChip role={user.role} /> : null}
       </div>
 

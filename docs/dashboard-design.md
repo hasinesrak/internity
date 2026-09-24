@@ -1,8 +1,8 @@
 # Dashboard Design And Layouts
 
-Product name: **InternFlow**
+Product name: **Internity**
 
-InternFlow is an operations dashboard. Every role signs in to the same shell and sees the work scoped to them. This document defines that shell, the navigation built on beUI's `ai-sidebar`, and the layout of every role's screens. Tokens, icons, motion, and the component inventory live in `docs/design-system.md`.
+Internity is an operations dashboard. Every role signs in to the same shell and sees the work scoped to them. This document defines that shell, the navigation built on beUI's `ai-sidebar`, and the layout of every role's screens. Tokens, icons, motion, and the component inventory live in `docs/design-system.md`.
 
 ## Dashboard Shell
 
@@ -24,7 +24,7 @@ InternFlow is an operations dashboard. Every role signs in to the same shell and
 ```
 
 - Sidebar: 264px expanded, 64px collapsed icon rail. Persisted per user in a Zustand store.
-- Topbar: 56px, sticky. Holds the department switcher (only when the user has more than one department), the ⌘K command entry, the theme toggle, and the user menu.
+- Topbar: 56px, sticky. Holds the department switcher (only when the user has more than one department), the ⌘K command entry, the theme toggle, and the user menu. Staff roles also carry the signed-in role chip (`@beui/animated-badge`) beside the product name — Admin, HR, Supervisor, or Instructor — so the capacity you are signed in as stays visible; the intern shell omits it.
 - Content: max width 1440px, `p-6` desktop, `p-4` mobile, 24px grid gap.
 - KPI row: 4 columns desktop, 2 tablet, 1 mobile.
 - Below 768px the sidebar becomes a `@beui/bottom-sheet` opened from the topbar; detail drawers become bottom sheets.

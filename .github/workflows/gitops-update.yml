@@ -1,0 +1,34 @@
+name: Update image tags
+
+on:
+  workflow_run:
+    workflows: ["Publish images"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  manifests:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Point production at the published images
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          short="${SHA:0:7}"
+          tag="sha-${SHA}"
+          file=infra/k8s/overlays/production/kustomization.yaml
+          sed -i "s|docker.io/internity/|docker.io/${DOCKERHUB_USERNAME}/|g" "$file"
+          sed -i "s/newTag: .*/newTag: ${tag}/" "$file"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$file"
+          git diff --cached --quiet && exit 0
+          git commit -m "Publish images ${short}"
+          git push

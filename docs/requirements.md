@@ -1,12 +1,12 @@
 # Requirements
 
-Project name: **InternFlow**
+Project name: **Internity**
 
 This document captures the product requirements from the core intern management system plan.
 
 ## Scope
 
-InternFlow is a lightweight management platform for:
+Internity is a lightweight management platform for:
 
 - intern onboarding
 - department scoping
@@ -329,4 +329,3 @@ Assignment submission:
 - stored passwords must be hashed
 - sensitive config must stay out of Git
 - frontend route guards must not be treated as security
-

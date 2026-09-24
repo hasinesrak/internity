@@ -77,7 +77,7 @@ export function LandingHero({ signedIn }: LandingHeroProps) {
           {...enter(2)}
           className="max-w-xl text-base text-balance text-muted-foreground sm:text-lg"
         >
-          InternFlow keeps your class schedule, assignments, submissions, and
+          Internity keeps your class schedule, assignments, submissions, and
           feedback together, so you always know what is due and how you are
           doing.
         </motion.p>

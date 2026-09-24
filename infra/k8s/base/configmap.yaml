@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: internity-config
+data:
+  NODE_ENV: production
+  APP_URL: https://internity.example.com
+  STAFF_APP_URL: https://staff.internity.example.com
+  PUBLIC_CORS_ORIGIN: https://internity.example.com
+  STAFF_CORS_ORIGIN: https://staff.internity.example.com
+  JWT_EXPIRES_IN: 8h
+  COOKIE_SECURE: "true"
+  TRUST_PROXY: "true"
+  GROQ_MODEL: qwen/qwen3.8-27b
+  MONGODB_URI: mongodb://mongo:27017/internity

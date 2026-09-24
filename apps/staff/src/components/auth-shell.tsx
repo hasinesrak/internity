@@ -35,7 +35,7 @@ export function AuthShell({ title, description, children, footer }: AuthShellPro
       >
         <div className="flex flex-col gap-1.5">
           <p className="text-sm font-medium tracking-tight text-primary dark:text-chart-2">
-            InternFlow staff
+            Internity staff
           </p>
           <h1 className="text-xl font-medium tracking-tight text-balance">{title}</h1>
           <p className="text-sm text-muted-foreground text-balance">{description}</p>

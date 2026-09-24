@@ -45,7 +45,7 @@ export interface AnimatedBadgeProps extends Omit<
   contentKey?: string | number;
 }
 
-// InternFlow palette: neutral surfaces plus one primary and one destructive.
+// Internity palette: neutral surfaces plus one primary and one destructive.
 // Positive states read `primary`, attention and failure read `destructive`,
 // and every state also carries a distinct icon and label. On dark surfaces
 // `primary` is a button fill first and too dark to read as text, so the label
