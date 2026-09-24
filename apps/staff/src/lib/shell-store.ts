@@ -10,7 +10,6 @@ interface ShellState {
   pinnedIds: string[]
   toggleSidebar: () => void
   setMobileNavOpen: (open: boolean) => void
-  togglePinned: (id: string) => void
 }
 
 export const useShellStore = create<ShellState>()(
@@ -22,15 +21,19 @@ export const useShellStore = create<ShellState>()(
       toggleSidebar: () =>
         set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
       setMobileNavOpen: (open) => set({ mobileNavOpen: open }),
-      togglePinned: (id) =>
-        set((state) => ({
-          pinnedIds: state.pinnedIds.includes(id)
-            ? state.pinnedIds.filter((pinned) => pinned !== id)
-            : [...state.pinnedIds, id],
-        })),
     }),
     {
       name: "internity-staff-shell",
+      version: 1,
+      migrate: (persisted) => {
+        const saved = (persisted ?? {}) as Partial<ShellState>
+        return {
+          sidebarCollapsed: saved.sidebarCollapsed === true,
+          pinnedIds: Array.isArray(saved.pinnedIds)
+            ? saved.pinnedIds.filter((id): id is string => typeof id === "string")
+            : [],
+        }
+      },
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,
         pinnedIds: state.pinnedIds,

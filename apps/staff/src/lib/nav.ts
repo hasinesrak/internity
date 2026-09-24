@@ -5,12 +5,21 @@ import type { Icon } from "@phosphor-icons/react"
 import {
   ArchiveIcon,
   BuildingsIcon,
+  CalendarBlankIcon,
   ChartLineUpIcon,
+  ChalkboardTeacherIcon,
+  CheckIcon,
+  ClipboardTextIcon,
   ClockIcon,
   EnvelopeSimpleIcon,
   GearIcon,
+  GraduationCapIcon,
   HouseIcon,
   IdentificationCardIcon,
+  LinkSimpleIcon,
+  PencilSimpleIcon,
+  SlidersHorizontalIcon,
+  SparkleIcon,
   UsersIcon,
   UsersThreeIcon,
   WrenchIcon,
@@ -46,6 +55,20 @@ const NAV_SETTINGS: NavLeaf = {
   path: "/settings",
 }
 
+const NAV_DRAFTS_SUPERVISOR: NavLeaf = {
+  id: "drafts",
+  label: "Drafts",
+  icon: SparkleIcon,
+  path: "/supervisor/drafts",
+}
+
+const NAV_DRAFTS_INSTRUCTOR: NavLeaf = {
+  id: "drafts",
+  label: "Drafts",
+  icon: SparkleIcon,
+  path: "/drafts",
+}
+
 const ADMIN_LEAVES: NavLeaf[] = [
   { id: "overview", label: "Overview", icon: HouseIcon, path: "/admin" },
   { id: "all-users", label: "All users", icon: UsersIcon, path: "/admin/users" },
@@ -70,6 +93,12 @@ const ADMIN_LEAVES: NavLeaf[] = [
     view: "overrides",
   },
   { id: "activity", label: "Activity", icon: ChartLineUpIcon, path: "/admin/activity" },
+  {
+    id: "platform",
+    label: "Platform",
+    icon: SlidersHorizontalIcon,
+    path: "/admin/settings",
+  },
   NAV_SETTINGS,
 ]
 
@@ -125,6 +154,7 @@ const ADMIN_TREE: NavEntry[] = [
   },
   { kind: "leaf", ...ADMIN_LEAVES[5] },
   { kind: "leaf", ...ADMIN_LEAVES[6] },
+  { kind: "leaf", ...ADMIN_LEAVES[7] },
 ]
 
 const HR_TREE: NavEntry[] = [
@@ -153,18 +183,174 @@ const HR_TREE: NavEntry[] = [
   { kind: "leaf", ...HR_LEAVES[6] },
 ]
 
+const SUPERVISOR_LEAVES: NavLeaf[] = [
+  { id: "overview", label: "Overview", icon: HouseIcon, path: "/supervisor" },
+  {
+    id: "instructors",
+    label: "Instructors",
+    icon: ChalkboardTeacherIcon,
+    path: "/supervisor/instructors",
+  },
+  {
+    id: "department-interns",
+    label: "Interns",
+    icon: GraduationCapIcon,
+    path: "/supervisor/interns",
+  },
+  {
+    id: "department-classes",
+    label: "Classes",
+    icon: CalendarBlankIcon,
+    path: "/classes",
+    view: "upcoming",
+  },
+  {
+    id: "department-assignments",
+    label: "Assignments",
+    icon: ClipboardTextIcon,
+    path: "/assignments",
+    view: "published",
+  },
+  {
+    id: "department-submissions",
+    label: "Submissions",
+    icon: LinkSimpleIcon,
+    path: "/submissions",
+    view: "review",
+  },
+  NAV_DRAFTS_SUPERVISOR,
+  NAV_SETTINGS,
+]
+
+const INSTRUCTOR_LEAVES: NavLeaf[] = [
+  { id: "overview", label: "Overview", icon: HouseIcon, path: "/instructor" },
+  {
+    id: "classes-upcoming",
+    label: "Upcoming",
+    icon: CalendarBlankIcon,
+    path: "/classes",
+    view: "upcoming",
+  },
+  {
+    id: "classes-past",
+    label: "Past",
+    icon: ClockIcon,
+    path: "/classes",
+    view: "past",
+  },
+  {
+    id: "assignments-drafts",
+    label: "Drafts",
+    icon: PencilSimpleIcon,
+    path: "/assignments",
+    view: "drafts",
+  },
+  {
+    id: "assignments-published",
+    label: "Published",
+    icon: ClipboardTextIcon,
+    path: "/assignments",
+    view: "published",
+  },
+  {
+    id: "assignments-closed",
+    label: "Closed",
+    icon: ArchiveIcon,
+    path: "/assignments",
+    view: "closed",
+  },
+  {
+    id: "submissions-review",
+    label: "To review",
+    icon: LinkSimpleIcon,
+    path: "/submissions",
+    view: "review",
+  },
+  {
+    id: "submissions-reviewed",
+    label: "Reviewed",
+    icon: CheckIcon,
+    path: "/submissions",
+    view: "reviewed",
+  },
+  NAV_DRAFTS_INSTRUCTOR,
+  NAV_SETTINGS,
+]
+
+const SUPERVISOR_TREE: NavEntry[] = [
+  { kind: "leaf", ...SUPERVISOR_LEAVES[0] },
+  { kind: "leaf", ...SUPERVISOR_LEAVES[1] },
+  {
+    kind: "group",
+    id: "department",
+    label: "Department",
+    icon: BuildingsIcon,
+    children: SUPERVISOR_LEAVES.slice(2, 6),
+  },
+  { kind: "leaf", ...SUPERVISOR_LEAVES[6] },
+  { kind: "leaf", ...SUPERVISOR_LEAVES[7] },
+]
+
+const INSTRUCTOR_TREE: NavEntry[] = [
+  { kind: "leaf", ...INSTRUCTOR_LEAVES[0] },
+  {
+    kind: "group",
+    id: "classes",
+    label: "Classes",
+    icon: CalendarBlankIcon,
+    children: INSTRUCTOR_LEAVES.slice(1, 3),
+  },
+  {
+    kind: "group",
+    id: "assignments",
+    label: "Assignments",
+    icon: ClipboardTextIcon,
+    children: INSTRUCTOR_LEAVES.slice(3, 6),
+  },
+  {
+    kind: "group",
+    id: "submissions",
+    label: "Submissions",
+    icon: LinkSimpleIcon,
+    children: INSTRUCTOR_LEAVES.slice(6, 8),
+  },
+  { kind: "leaf", ...INSTRUCTOR_LEAVES[8] },
+  { kind: "leaf", ...INSTRUCTOR_LEAVES[9] },
+]
+
+const TREES: Record<StaffRole, NavEntry[]> = {
+  admin: ADMIN_TREE,
+  hr: HR_TREE,
+  supervisor: SUPERVISOR_TREE,
+  instructor: INSTRUCTOR_TREE,
+}
+
+const LEAVES: Record<StaffRole, NavLeaf[]> = {
+  admin: ADMIN_LEAVES,
+  hr: HR_LEAVES,
+  supervisor: SUPERVISOR_LEAVES,
+  instructor: INSTRUCTOR_LEAVES,
+}
+
+const HOMES: Record<StaffRole, string> = {
+  admin: "/admin",
+  hr: "/hr",
+  supervisor: "/supervisor",
+  instructor: "/instructor",
+}
+
 export function navLeaves(role: StaffRole): NavLeaf[] {
-  return role === "hr" ? HR_LEAVES : ADMIN_LEAVES
+  return LEAVES[role]
 }
 
 export function navTree(role: StaffRole): NavEntry[] {
-  return role === "hr" ? HR_TREE : ADMIN_TREE
+  return TREES[role]
 }
 
 /** The route a tree row opens, search params included. */
 export function navPath(id: string, role: StaffRole): string {
   const leaf = navLeaves(role).find((item) => item.id === id)
-  if (!leaf) return role === "hr" ? "/hr" : "/admin"
+  if (!leaf) return HOMES[role]
   return leaf.view ? `${leaf.path}?view=${leaf.view}` : leaf.path
 }
 

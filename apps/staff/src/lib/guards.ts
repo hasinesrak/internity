@@ -4,10 +4,15 @@
 import { redirect } from "@tanstack/react-router"
 
 import { currentUserSync } from "./data"
-import type { PublicUser, StaffRole } from "./types"
+import type { Role, StaffRole } from "./types"
 
-export function staffHome(role: PublicUser["role"] | undefined): "/admin" | "/hr" {
-  return role === "hr" ? "/hr" : "/admin"
+export function staffHome(
+  role: Role | undefined,
+): "/admin" | "/hr" | "/supervisor" | "/instructor" {
+  if (role === "hr") return "/hr"
+  if (role === "supervisor") return "/supervisor"
+  if (role === "instructor") return "/instructor"
+  return "/admin"
 }
 
 export function requireSession(): void {
@@ -16,8 +21,15 @@ export function requireSession(): void {
 }
 
 export function requireRole(role: StaffRole): void {
+  requireAnyRole(role)
+}
+
+/** Shared screens: any of the listed staff roles may open them. */
+export function requireAnyRole(...roles: StaffRole[]): void {
   if (typeof window === "undefined") return
   const user = currentUserSync()
   if (!user) throw redirect({ to: "/sign-in" })
-  if (user.role !== role) throw redirect({ to: staffHome(user.role) })
+  if (!roles.includes(user.role as StaffRole)) {
+    throw redirect({ to: staffHome(user.role) })
+  }
 }

@@ -22,7 +22,8 @@ function headerValue(value: string | string[] | undefined): string | undefined {
 function officeGate(
   allowlist: string[],
   trustProxy: boolean,
-  loopbackWhenUnset: boolean
+  loopbackWhenUnset: boolean,
+  privateWhenUnset: boolean
 ): Plugin {
   const gate: Connect.NextHandleFunction = (req, res, next) => {
     const allowed = officeAddressAllowed(
@@ -33,7 +34,8 @@ function officeGate(
         trustProxy,
       }),
       allowlist,
-      loopbackWhenUnset
+      loopbackWhenUnset,
+      privateWhenUnset
     )
     if (allowed) {
       next()
@@ -98,13 +100,25 @@ export default defineConfig(({ mode }) => {
   )
   return {
     resolve: { tsconfigPaths: true },
-    server: { host, port, strictPort: true },
+    // A Windows file lock on a static asset (an editor or antivirus holding a
+    // PNG open) makes the watcher throw EBUSY and take the whole dev server
+    // down, so public/ stays unwatched. Assets there are served as-is; refresh
+    // the page after changing one.
+    server: {
+      host,
+      port,
+      strictPort: true,
+      watch: { ignored: ["**/public/**"] },
+    },
     preview: { host, port, strictPort: true },
     plugins: [
       officeGate(
         readAllowlist(process.env.STAFF_ALLOWED_IPS),
         trustProxy,
-        mode !== "production"
+        mode !== "production",
+        ["true", "1"].includes(
+          setting("STAFF_ALLOW_PRIVATE", fileEnv, "false").toLowerCase()
+        )
       ),
       devtools(),
       tailwindcss(),

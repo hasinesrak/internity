@@ -16,11 +16,11 @@ import {
 } from "@/components/nav-sidebar"
 import { Topbar } from "@/components/topbar"
 import { ErrorPanel, InlineLoader } from "@/components/data-states"
-import type { PublicUser } from "@/lib/types"
+import type { PublicUser, StaffRole } from "@/lib/types"
 import { roleLabel } from "@/lib/types"
-import { getUsers, getMe, signOut } from "@/lib/data"
+import { getShellAssignments, getShellPeople, getMe, signOut } from "@/lib/data"
 import { useIsMobile, useShellStore } from "@/lib/shell-store"
-import { toast, useToastStore } from "@/lib/toast"
+import { useToastStore } from "@/lib/toast"
 import { useResource } from "@/lib/use-resource"
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -33,25 +33,25 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pinnedIds = useShellStore((state) => state.pinnedIds)
   const toggleSidebar = useShellStore((state) => state.toggleSidebar)
   const setMobileNavOpen = useShellStore((state) => state.setMobileNavOpen)
-  const togglePinned = useShellStore((state) => state.togglePinned)
 
   const [commandOpen, setCommandOpen] = useState(false)
 
   // The account and a page of people feed the chrome: the user menu and the
-  // ⌘K people search. Screens load their own data.
+  // ⌘K search. Screens load their own data.
   const shell = useResource(
     async () => {
-      const [user, people] = await Promise.all([
+      const [user, people, assignments] = await Promise.all([
         getMe(),
-        getUsers({ pageSize: 20, includeArchived: false }),
+        getShellPeople(),
+        getShellAssignments(),
       ])
-      return { user, people: people.data }
+      return { user, people, assignments }
     },
     [],
   )
 
   const user: PublicUser | undefined = shell.data?.user
-  const role = user?.role === "hr" ? "hr" : "admin"
+  const role = (user?.role ?? "admin") as StaffRole
   const users = shell.data?.people ?? []
   const navigateToNav = useNavigateToNav(role)
   const activeId = useActiveNavId(role)
@@ -62,9 +62,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const onSignOut = () => {
+    // Sign-out leaves with a full reload: no signed-in state survives in
+    // memory, and the address bar and the screen can never disagree.
     void signOut().finally(() => {
-      toast.success("Signed out")
-      void navigate({ to: "/sign-in" })
+      window.location.replace("/sign-in")
     })
   }
 
@@ -72,7 +73,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-svh flex-col bg-background">
       <Topbar
         user={user}
+        sidebarCollapsed={sidebarCollapsed}
         onOpenNav={() => setMobileNavOpen(true)}
+        onToggleSidebar={toggleSidebar}
         onOpenCommand={() => setCommandOpen(true)}
         onNavigate={(to) =>
           void navigate({
@@ -95,7 +98,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               <NavTree
                 role={role}
                 pinnedIds={pinnedIds}
-                onTogglePin={togglePinned}
                 onNavigate={onNavigate}
                 className="group-data-[state=collapsed]/sidebar:hidden"
               />
@@ -152,7 +154,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         <NavTree
           role={role}
           pinnedIds={pinnedIds}
-          onTogglePin={togglePinned}
           onNavigate={onNavigate}
         />
       </BottomSheet>
@@ -162,6 +163,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         onOpenChange={setCommandOpen}
         role={role}
         users={users}
+        assignments={shell.data?.assignments ?? []}
       />
 
       <AnimatedToastStack

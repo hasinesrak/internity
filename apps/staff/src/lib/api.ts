@@ -22,11 +22,6 @@ export class ApiError extends Error {
   }
 }
 
-/** True when the request never reached the API - used to fall back to seed data. */
-export function isNetworkError(error: unknown): boolean {
-  return error instanceof TypeError
-}
-
 function apiBase(): string {
   const configured = import.meta.env.VITE_API_URL?.trim()
   if (configured) return configured.replace(/\/$/, "")
@@ -45,8 +40,17 @@ interface ErrorEnvelope {
   error?: { code?: string; message?: string; details?: ApiIssue[] }
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(apiUrl(path), {
+// Short-lived GET cache with in-flight dedup. The shell and the active screen
+// mount together and ask for overlapping reads (e.g. the account, the
+// assignment list); concurrent identical GETs share one request, and a fresh
+// success is reused for a few seconds. Any mutation clears the cache, so a
+// write is always followed by a refetch. Callers treat results as read-only.
+const GET_TTL_MS = 5000
+const inflight = new Map<string, Promise<unknown>>()
+const getCache = new Map<string, { at: number; data: unknown }>()
+
+async function fetchBody<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
     credentials: "include",
     headers: { "content-type": "application/json", ...init?.headers },
     ...init,
@@ -67,4 +71,32 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   }
 
   return body
+}
+
+export function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = init?.method?.toUpperCase() ?? "GET"
+  const url = apiUrl(path)
+  if (method !== "GET" || init?.body != null) {
+    return fetchBody<T>(url, init).then((body) => {
+      getCache.clear()
+      return body
+    })
+  }
+  const key = `GET ${url}`
+  const cached = getCache.get(key)
+  if (cached && Date.now() - cached.at < GET_TTL_MS) {
+    return Promise.resolve(cached.data as T)
+  }
+  const running = inflight.get(key)
+  if (running) return running as Promise<T>
+  const task = fetchBody<T>(url, init)
+    .then((body) => {
+      getCache.set(key, { at: Date.now(), data: body })
+      return body
+    })
+    .finally(() => {
+      if (inflight.get(key) === task) inflight.delete(key)
+    })
+  inflight.set(key, task)
+  return task
 }

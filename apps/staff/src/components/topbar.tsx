@@ -1,8 +1,11 @@
-// Topbar from docs/dashboard-design.md: the ⌘K command entry, the theme toggle
-// and the user menu. 56px and sticky. Admin and HR are organization-wide, so
-// there is no department switcher here.
+// Topbar from docs/dashboard-design.md: the signed-in role chip, the sidebar
+// toggle, the ⌘K command entry, the theme toggle and the user menu. 56px and
+// sticky. Admin and HR are organization-wide, so there is no department
+// switcher here.
 import {
   MagnifyingGlassIcon,
+  SidebarIcon,
+  SidebarSimpleIcon,
   UserCircleIcon,
 } from "@phosphor-icons/react"
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar"
@@ -16,18 +19,20 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
 import { Skeleton } from "@workspace/ui/components/skeleton"
+import { ActionSwapIcon } from "@workspace/ui/components/motion/action-swap"
 import { Button } from "@workspace/ui/components/motion/button/base"
 import { ThemeToggle } from "@workspace/ui/components/motion/theme-toggle"
 import { Tooltip } from "@workspace/ui/components/motion/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { StatusChip } from "@/components/status-chip"
+import { RoleChip } from "@/components/status-chip"
 import type { PublicUser } from "@/lib/types"
-import { roleLabel } from "@/lib/types"
 
 export interface TopbarProps {
   user?: PublicUser
+  sidebarCollapsed: boolean
   onOpenNav: () => void
+  onToggleSidebar: () => void
   onOpenCommand: () => void
   onNavigate: (to: "settings" | "password") => void
   onSignOut: () => void
@@ -35,7 +40,9 @@ export interface TopbarProps {
 
 export function Topbar({
   user,
+  sidebarCollapsed,
   onOpenNav,
+  onToggleSidebar,
   onOpenCommand,
   onNavigate,
   onSignOut,
@@ -56,11 +63,29 @@ export function Topbar({
         </span>
       </Button>
 
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        onClick={onToggleSidebar}
+        className="hidden md:inline-flex"
+      >
+        <ActionSwapIcon
+          value={sidebarCollapsed ? "collapsed" : "expanded"}
+          animation="blur"
+          className="size-4"
+        >
+          {sidebarCollapsed ? (
+            <SidebarSimpleIcon weight="duotone" className="size-4" aria-hidden="true" />
+          ) : (
+            <SidebarIcon weight="duotone" className="size-4" aria-hidden="true" />
+          )}
+        </ActionSwapIcon>
+      </Button>
+
       <div className="flex min-w-0 items-center gap-2">
         <span className="text-sm font-medium tracking-tight">InternFlow</span>
-        <span className="flex min-w-0 items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground">
-          <span className="truncate">Staff</span>
-        </span>
+        {user ? <RoleChip role={user.role} /> : null}
       </div>
 
       <div className="flex-1" />
@@ -93,14 +118,12 @@ export function Topbar({
         </Button>
       </Tooltip>
 
-      <Tooltip content="Switch theme">
-        <ThemeToggle
-          variant="rectangle"
-          start="bottom-up"
-          className="grid size-9 place-items-center rounded-xl text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          iconClassName="size-4"
-        />
-      </Tooltip>
+      <ThemeToggle
+        variant="rectangle"
+        start="bottom-up"
+        className="grid size-9 place-items-center rounded-xl text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        iconClassName="size-4"
+      />
 
       <UserMenu user={user} onNavigate={onNavigate} onSignOut={onSignOut} />
     </header>
@@ -138,7 +161,7 @@ function UserMenu({
                   {user.email}
                 </span>
                 <span className="pt-0.5">
-                  <StatusChip tone="positive" label={roleLabel(user.role)} />
+                  <RoleChip role={user.role} />
                 </span>
               </>
             ) : (

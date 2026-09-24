@@ -13,12 +13,11 @@ import { Input } from "@workspace/ui/components/motion/input"
 
 import { ConfirmRow, HoldConfirm } from "@/components/confirm"
 import { DetailPanel } from "@/components/detail-panel"
-import { StatusChip, UserStatusChip } from "@/components/status-chip"
+import { RoleChip, UserStatusChip } from "@/components/status-chip"
 import { archiveUser, resetPassword, revokeUser, updateUser } from "@/lib/data"
 import { copyText } from "@/lib/clipboard"
 import { formatDate, relativeTime } from "@/lib/format"
 import type { PublicUser, StaffRole } from "@/lib/types"
-import { roleLabel } from "@/lib/types"
 import { toast } from "@/lib/toast"
 
 export interface UserDrawerProps {
@@ -95,7 +94,7 @@ export function UserDrawer({
           </span>
           <div className="flex min-w-0 flex-col gap-1">
             <div className="flex items-center gap-2">
-              <StatusChip tone="positive" label={roleLabel(user.role)} />
+              <RoleChip role={user.role} />
               <UserStatusChip status={user.status} />
             </div>
             <span className="text-xs text-muted-foreground">

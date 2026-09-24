@@ -43,7 +43,9 @@ function RootDocument({ children }: { children: ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
         <HeadContent />
       </head>
-      <body>
+      {/* Browser extensions (e.g. Grammarly) add attributes to <body> before
+          React hydrates. suppressHydrationWarning keeps those from warning. */}
+      <body suppressHydrationWarning>
         <IconContext.Provider value={{ weight: "duotone" }}>
           {children}
         </IconContext.Provider>

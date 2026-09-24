@@ -3,24 +3,44 @@
 // attention and failure read `destructive`, neutral reads `muted`, and quiet
 // states sit on `muted` at reduced opacity.
 import {
+  BinocularsIcon,
   BuildingsIcon,
+  ChalkboardTeacherIcon,
   CheckIcon,
   CircleIcon,
   ClockIcon,
   EnvelopeSimpleIcon,
+  GraduationCapIcon,
   KeyIcon,
+  ShieldCheckIcon,
+  UsersThreeIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react"
 import { AnimatedBadge } from "@workspace/ui/components/motion/animated-badge"
 import { cn } from "@workspace/ui/lib/utils"
 
 import type {
+  AssignmentStatus,
   DepartmentStatus,
+  DraftStatus,
   InvitationStatus,
+  Role,
+  RosterStatus,
   StatusTone,
   UserStatus,
 } from "@/lib/types"
-import { departmentTone, invitationTone, userTone } from "@/lib/types"
+import {
+  assignmentLabel,
+  assignmentTone,
+  departmentTone,
+  draftLabel,
+  draftTone,
+  invitationTone,
+  roleLabel,
+  submissionLabel,
+  submissionTone,
+  userTone,
+} from "@/lib/types"
 
 const TONE = {
   positive: "success",
@@ -52,15 +72,53 @@ export function StatusChip({
   contentKey,
 }: StatusChipProps) {
   const Icon = TONE_ICON[tone]
+  // Quiet is the dimmed icon only — dimming the whole chip drops the label
+  // below the contrast floor.
   return (
     <AnimatedBadge
       status={TONE[tone]}
       size={size}
       contentKey={contentKey ?? label}
-      icon={<Icon className={size === "sm" ? "size-3" : "size-3.5"} />}
-      className={cn(tone === "quiet" && "opacity-60", className)}
+      icon={
+        <Icon
+          className={cn(size === "sm" ? "size-3" : "size-3.5", tone === "quiet" && "opacity-60")}
+        />
+      }
+      className={className}
     >
       {label}
+    </AnimatedBadge>
+  )
+}
+
+const ROLE_ICON = {
+  admin: ShieldCheckIcon,
+  hr: UsersThreeIcon,
+  supervisor: BinocularsIcon,
+  instructor: ChalkboardTeacherIcon,
+  intern: GraduationCapIcon,
+} as const
+
+/**
+ * Who someone is signed in as. Roles keep the identity-badge tone and carry
+ * their own icon, so the role never rests on the label alone.
+ */
+export function RoleChip({
+  role,
+  size = "sm",
+}: {
+  role: Role
+  size?: "sm" | "md"
+}) {
+  const Icon = ROLE_ICON[role]
+  return (
+    <AnimatedBadge
+      status="success"
+      size={size}
+      contentKey={role}
+      icon={<Icon className={size === "sm" ? "size-3" : "size-3.5"} />}
+    >
+      {roleLabel(role)}
     </AnimatedBadge>
   )
 }
@@ -123,6 +181,50 @@ export function InvitationStatusChip({
       label={INVITATION_LABEL[status]}
       size={size}
     />
+  )
+}
+
+export function AssignmentStatusChip({
+  status,
+  size,
+}: {
+  status: AssignmentStatus
+  size?: "sm" | "md"
+}) {
+  return (
+    <StatusChip
+      tone={assignmentTone(status)}
+      label={assignmentLabel(status)}
+      size={size}
+    />
+  )
+}
+
+export function SubmissionStatusChip({
+  status,
+  size,
+}: {
+  status: RosterStatus
+  size?: "sm" | "md"
+}) {
+  return (
+    <StatusChip
+      tone={submissionTone(status)}
+      label={submissionLabel(status)}
+      size={size}
+    />
+  )
+}
+
+export function DraftStatusChip({
+  status,
+  size,
+}: {
+  status: DraftStatus
+  size?: "sm" | "md"
+}) {
+  return (
+    <StatusChip tone={draftTone(status)} label={draftLabel(status)} size={size} />
   )
 }
 

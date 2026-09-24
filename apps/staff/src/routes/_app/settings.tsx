@@ -10,10 +10,9 @@ import { Reveal } from "@workspace/ui/components/reveal"
 
 import { ErrorPanel, LoadingPanel } from "@/components/data-states"
 import { PageHeader } from "@/components/page-header"
-import { StatusChip } from "@/components/status-chip"
+import { RoleChip } from "@/components/status-chip"
 import { changePassword, getMe } from "@/lib/data"
 import { requireSession } from "@/lib/guards"
-import { roleLabel } from "@/lib/types"
 import { useResource } from "@/lib/use-resource"
 import { toast } from "@/lib/toast"
 
@@ -59,9 +58,7 @@ function SettingsPage() {
                   <div className="flex flex-col gap-1">
                     <span className="text-sm font-medium">{me.data?.name}</span>
                     <span>
-                      {me.data ? (
-                        <StatusChip tone="positive" label={roleLabel(me.data.role)} />
-                      ) : null}
+                      {me.data ? <RoleChip role={me.data.role} /> : null}
                     </span>
                   </div>
                 </div>

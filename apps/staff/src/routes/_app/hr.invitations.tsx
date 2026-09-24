@@ -1,6 +1,6 @@
 // HR invitations: the pending list and its history, paged as the table scrolls.
 // `/hr/invitations/new` opens the invite form over this list.
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import type { ReactNode } from "react"
 import { createFileRoute, useNavigate, Outlet  } from "@tanstack/react-router"
 import { CopyIcon, EnvelopeSimpleIcon } from "@phosphor-icons/react"
@@ -116,11 +116,8 @@ function InvitationsTable({ view }: { view: "pending" | "history" }) {
     "idle" | "loading" | "success" | "error"
   >("idle")
 
-  useEffect(() => {
-    setExtra([])
-    setPage(2)
-  }, [view])
-
+  // The table remounts per view (`key={view}` above), so page state starts
+  // fresh without an effect.
   const raw = [...(first.data?.data ?? []), ...extra]
   const rows =
     view === "pending"

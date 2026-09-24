@@ -1,3 +1,5 @@
+import type { ActivityDay } from "./types"
+
 const MINUTE = 60_000
 const HOUR = 3_600_000
 const DAY = 86_400_000
@@ -73,4 +75,29 @@ export function expiresWithin(value: string | number | Date, days: number): bool
 
 export function formatCount(value: number): string {
   return value.toLocaleString("en-GB")
+}
+
+/** `values[week][day]` intensities for the heat calendar, Monday first. */
+export function heatValues(days: ActivityDay[], weeks: number): number[][] {
+  const max = Math.max(1, ...days.map((day) => day.count))
+  const values: number[][] = Array.from({ length: weeks }, () =>
+    Array.from({ length: 7 }, () => 0),
+  )
+  const end = new Date()
+  const monday = new Date(
+    Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()),
+  )
+  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7))
+  const first = new Date(monday)
+  first.setUTCDate(first.getUTCDate() - (weeks - 1) * 7)
+
+  for (const day of days) {
+    const stamp = Date.parse(`${day.date}T00:00:00Z`)
+    const offset = Math.round((stamp - first.getTime()) / 86_400_000)
+    const week = Math.floor(offset / 7)
+    const weekday = offset % 7
+    if (week < 0 || week >= weeks || weekday < 0 || weekday > 6) continue
+    values[week][weekday] = day.count / max
+  }
+  return values
 }

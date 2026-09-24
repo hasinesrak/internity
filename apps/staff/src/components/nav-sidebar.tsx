@@ -1,19 +1,16 @@
 // The dashboard navigation: beUI's `ai-sidebar` composed as a static nav tree.
-// Icons come from one Phosphor duotone map, the row menu carries navigation
-// actions only, and no mutation callbacks are passed - so rows get no drag
-// affordance and no rename input.
+// Icons come from one Phosphor duotone map. Rows carry no menu and no mutation
+// callbacks - they only navigate, so there is no drag affordance and no rename
+// input either.
 import { useCallback, useMemo } from "react"
 import { useNavigate, useRouterState } from "@tanstack/react-router"
-import type { Icon } from "@phosphor-icons/react"
-import { CopyIcon, LinkSimpleIcon, PushPinIcon } from "@phosphor-icons/react"
 import type { SidebarResource } from "@workspace/ui/components/agents/ai-sidebar"
 import { AISidebar } from "@workspace/ui/components/agents/ai-sidebar"
 import { Tooltip } from "@workspace/ui/components/motion/tooltip"
 
 import type { NavPin } from "@/lib/nav"
-import { navIcon, navPath, navResources, pinnedResources, resolvePins } from "@/lib/nav"
+import { navIcon, navResources, pinnedResources, resolvePins } from "@/lib/nav"
 import type { StaffRole } from "@/lib/types"
-import { copyText } from "@/lib/clipboard"
 
 export function useNavPins(pinnedIds: string[], role: StaffRole): NavPin[] {
   return useMemo(() => resolvePins(pinnedIds, role), [pinnedIds, role])
@@ -29,7 +26,16 @@ export function useNavigateToNav(role: StaffRole) {
         : id
       switch (destination) {
         case "overview":
-          void navigate({ to: role === "hr" ? "/hr" : "/admin" })
+          void navigate({
+            to:
+              role === "hr"
+                ? "/hr"
+                : role === "supervisor"
+                  ? "/supervisor"
+                  : role === "instructor"
+                    ? "/instructor"
+                    : "/admin",
+          })
           return
         case "all-users":
           void navigate({ to: "/admin/users" })
@@ -52,6 +58,9 @@ export function useNavigateToNav(role: StaffRole) {
         case "activity":
           void navigate({ to: "/admin/activity" })
           return
+        case "platform":
+          void navigate({ to: "/admin/settings" })
+          return
         case "directory":
           void navigate({ to: "/hr/directory" })
           return
@@ -60,6 +69,45 @@ export function useNavigateToNav(role: StaffRole) {
           return
         case "invitations-history":
           void navigate({ to: "/hr/invitations", search: { view: "history" } })
+          return
+        case "instructors":
+          void navigate({ to: "/supervisor/instructors" })
+          return
+        case "department-interns":
+          void navigate({ to: "/supervisor/interns" })
+          return
+        case "department-classes":
+          void navigate({ to: "/classes", search: { view: "upcoming" } })
+          return
+        case "department-assignments":
+          void navigate({ to: "/assignments", search: { view: "published" } })
+          return
+        case "department-submissions":
+          void navigate({ to: "/submissions", search: { view: "review" } })
+          return
+        case "classes-upcoming":
+          void navigate({ to: "/classes", search: { view: "upcoming" } })
+          return
+        case "classes-past":
+          void navigate({ to: "/classes", search: { view: "past" } })
+          return
+        case "assignments-drafts":
+          void navigate({ to: "/assignments", search: { view: "drafts" } })
+          return
+        case "assignments-published":
+          void navigate({ to: "/assignments", search: { view: "published" } })
+          return
+        case "assignments-closed":
+          void navigate({ to: "/assignments", search: { view: "closed" } })
+          return
+        case "submissions-review":
+          void navigate({ to: "/submissions", search: { view: "review" } })
+          return
+        case "submissions-reviewed":
+          void navigate({ to: "/submissions", search: { view: "reviewed" } })
+          return
+        case "drafts":
+          void navigate({ to: role === "supervisor" ? "/supervisor/drafts" : "/drafts" })
           return
         case "settings":
           void navigate({ to: "/settings" })
@@ -90,6 +138,31 @@ export function useActiveNavId(role: StaffRole): string | null {
       }
       return null
     }
+    if (role === "supervisor") {
+      if (pathname === "/supervisor" || pathname === "/") return "overview"
+      if (pathname === "/supervisor/instructors") return "instructors"
+      if (pathname === "/supervisor/interns") return "department-interns"
+      if (pathname === "/supervisor/drafts" || pathname === "/drafts") return "drafts"
+      if (pathname.startsWith("/classes")) return "department-classes"
+      if (pathname.startsWith("/assignments")) return "department-assignments"
+      if (pathname.startsWith("/submissions")) return "department-submissions"
+      return null
+    }
+    if (role === "instructor") {
+      if (pathname === "/instructor" || pathname === "/") return "overview"
+      if (pathname === "/drafts" || pathname === "/supervisor/drafts") return "drafts"
+      if (pathname.startsWith("/classes")) {
+        return view === "past" ? "classes-past" : "classes-upcoming"
+      }
+      if (pathname.startsWith("/assignments")) {
+        if (view === "closed") return "assignments-closed"
+        return view === "drafts" ? "assignments-drafts" : "assignments-published"
+      }
+      if (pathname.startsWith("/submissions")) {
+        return view === "reviewed" ? "submissions-reviewed" : "submissions-review"
+      }
+      return null
+    }
     if (pathname === "/admin" || pathname === "/") return "overview"
     if (pathname === "/admin/users") return "all-users"
     if (pathname === "/admin/hr") return "hr-accounts"
@@ -97,35 +170,14 @@ export function useActiveNavId(role: StaffRole): string | null {
       return view === "overrides" ? "departments-overrides" : "departments-all"
     }
     if (pathname === "/admin/activity") return "activity"
+    if (pathname === "/admin/settings") return "platform"
     return null
   }, [location, role])
-}
-
-function NavMenuItem({
-  onSelect,
-  icon: Icon,
-  children,
-}: {
-  onSelect: () => void
-  icon: Icon
-  children: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className="flex h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs text-foreground outline-none transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <Icon aria-hidden="true" weight="duotone" className="size-3.5 shrink-0" />
-      <span className="min-w-0 truncate">{children}</span>
-    </button>
-  )
 }
 
 export interface NavTreeProps {
   role: StaffRole
   pinnedIds: string[]
-  onTogglePin: (id: string) => void
   onNavigate: (id: string) => void
   className?: string
 }
@@ -133,7 +185,6 @@ export interface NavTreeProps {
 export function NavTree({
   role,
   pinnedIds,
-  onTogglePin,
   onNavigate,
   className,
 }: NavTreeProps) {
@@ -150,50 +201,20 @@ export function NavTree({
       items={items}
       activeId={activeId}
       onActiveChange={onNavigate}
-      defaultExpandedIds={["people", "departments", "invitations"]}
+      defaultExpandedIds={[
+        "people",
+        "departments",
+        "invitations",
+        "department",
+        "classes",
+        "assignments",
+        "submissions",
+      ]}
       ariaLabel="Staff sections"
       className={className}
       renderIcon={(item) => {
         const Icon = navIcon(item.id, role)
         return <Icon weight="duotone" className="size-4" />
-      }}
-      renderMenu={(item, controls) => {
-        const pinned = item.id.startsWith("destination:")
-        const pinId = pinned ? item.id : `destination:${item.id}`
-
-        return (
-          <>
-            <NavMenuItem
-              icon={PushPinIcon}
-              onSelect={() => {
-                controls.close()
-                onTogglePin(pinId)
-              }}
-            >
-              {pinned ? "Unpin" : "Pin to top"}
-            </NavMenuItem>
-            <NavMenuItem
-              icon={CopyIcon}
-              onSelect={() => {
-                controls.close()
-                void copyText(
-                  new URL(navPath(item.id, role), window.location.origin).href,
-                )
-              }}
-            >
-              Copy link
-            </NavMenuItem>
-            <NavMenuItem
-              icon={LinkSimpleIcon}
-              onSelect={() => {
-                controls.close()
-                onNavigate(item.id)
-              }}
-            >
-              Open
-            </NavMenuItem>
-          </>
-        )
       }}
     />
   )
