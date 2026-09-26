@@ -192,7 +192,10 @@ export const supervisorInstructorSchema = z.union([
 
 export const loginSchema = z.object({
   email: emailSchema,
-  password: z.string().min(1, "Enter a password."),
+  password: z
+    .string()
+    .min(1, "Enter a password.")
+    .max(128, "Use at most 128 characters."),
 })
 
 export const activateSchema = z.object({
@@ -207,7 +210,10 @@ export const resetSchema = z.object({
 })
 
 export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, "Enter your current password."),
+  currentPassword: z
+    .string()
+    .min(1, "Enter your current password.")
+    .max(128, "Use at most 128 characters."),
   newPassword: passwordSchema,
 })
 

@@ -12,6 +12,16 @@ export async function sendMail(input: {
 }): Promise<{ delivery: "sent" | "logged" }> {
   const env = getEnv()
   if (!env.resendApiKey) {
+    if (env.nodeEnv === "production") {
+      console.error(
+        JSON.stringify({ level: "error", msg: "email_unconfigured" })
+      )
+      throw new AppError(
+        503,
+        "EMAIL_UNAVAILABLE",
+        "Email is not configured. An administrator needs to set it up before this can be sent."
+      )
+    }
     console.info(
       JSON.stringify({
         level: "info",
@@ -44,21 +54,52 @@ export async function sendMail(input: {
     console.error(
       JSON.stringify({ level: "error", msg: "email_failed", reason: "network" })
     )
-    throw new AppError(
-      502,
-      "EMAIL_FAILED",
-      "Unable to send the email. Try again in a moment."
+    if (env.nodeEnv === "production") {
+      throw new AppError(
+        502,
+        "EMAIL_FAILED",
+        "Unable to send the email. Try again in a moment."
+      )
+    }
+    console.info(
+      JSON.stringify({
+        level: "info",
+        msg: "email_logged",
+        reason: "network_fallback",
+        to: input.to,
+        subject: input.subject,
+        text: input.text,
+      })
     )
+    return { delivery: "logged" }
   }
 
   if (!response.ok) {
+    const body = await response.text().catch(() => "")
     console.error(
       JSON.stringify({
         level: "error",
         msg: "email_failed",
         status: response.status,
+        body: body.slice(0, 300),
       })
     )
+    // Local/dogfood: Resend often 422s (unverified domain/from). Keep invite flow
+    // usable by logging the message instead of hard-failing + rolling back.
+    if (env.nodeEnv !== "production") {
+      console.info(
+        JSON.stringify({
+          level: "info",
+          msg: "email_logged",
+          reason: "resend_fallback",
+          status: response.status,
+          to: input.to,
+          subject: input.subject,
+          text: input.text,
+        })
+      )
+      return { delivery: "logged" }
+    }
     throw new AppError(
       502,
       "EMAIL_FAILED",

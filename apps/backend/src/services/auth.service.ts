@@ -8,7 +8,7 @@ import { RESET_TTL_HOURS, isStaffRole } from "../config/constants.js"
 import { denyStaff } from "../lib/staff-access.js"
 import { AppError, notFound } from "../lib/errors.js"
 import { hashPassword, verifyPassword } from "../lib/password.js"
-import { signSession } from "../lib/session.js"
+import { readSession, signSession } from "../lib/session.js"
 import { createSecretToken, hashToken } from "../lib/tokens.js"
 import { User } from "../models/user.js"
 import type { SessionUser } from "../types.js"
@@ -49,6 +49,14 @@ export async function login(
       entityId: user._id.toString(),
       departmentId: user.departmentId ? user.departmentId.toString() : null,
     })
+    // The public process must not confirm that a staff password was correct.
+    if (denial.code === "STAFF_SURFACE") {
+      throw new AppError(
+        401,
+        "INVALID_CREDENTIALS",
+        "Check the email and password and try again."
+      )
+    }
     throw denial
   }
   const lastLoginAt = new Date()
@@ -74,6 +82,20 @@ export async function login(
         ? (briefs.get(user.departmentId.toString()) ?? null)
         : null
     ),
+  }
+}
+
+export async function endSession(token: string | undefined): Promise<void> {
+  if (!token) return
+  try {
+    const session = await readSession(token)
+    await User.updateOne(
+      { _id: session.userId, tokenVersion: session.tokenVersion },
+      { $inc: { tokenVersion: 1 } }
+    )
+  } catch (error) {
+    if (error instanceof AppError) return
+    throw error
   }
 }
 

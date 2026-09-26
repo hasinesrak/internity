@@ -27,6 +27,9 @@ services:
       - "27017:27017"
     volumes:
       - ./data/db:/data/db
+      # The mongo image also declares VOLUME /data/configdb. Leave that path
+      # unmounted and every container recreate keeps a new anonymous volume.
+      - mongo-config:/data/configdb
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 5s
@@ -104,3 +107,5 @@ services:
 volumes:
   uploads-data:
     name: internity-uploads-data
+  mongo-config:
+    name: internity-mongo-config

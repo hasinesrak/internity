@@ -35,6 +35,26 @@ export function uploadMaxBytes(): number {
   return getEnv().uploadMaxMb * 1024 * 1024
 }
 
+/** Room for the multipart boundary and headers around the file itself. */
+const UPLOAD_ENVELOPE_BYTES = 64 * 1024
+
+export function uploadRequestMaxBytes(): number {
+  return uploadMaxBytes() + UPLOAD_ENVELOPE_BYTES
+}
+
+export function downloadHeaders(
+  mimeType: string,
+  originalName: string,
+  byteLength: number
+): Record<string, string> {
+  return {
+    "Content-Type": mimeType,
+    "Content-Length": String(byteLength),
+    "Content-Disposition": `attachment; filename="${encodeURIComponent(originalName)}"`,
+    "Cache-Control": "private, max-age=3600",
+  }
+}
+
 export function isAllowedMime(mimeType: string): boolean {
   return ALLOWED_MIME_TYPES.has(mimeType.toLowerCase())
 }

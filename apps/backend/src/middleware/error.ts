@@ -16,6 +16,9 @@ function isDuplicateKey(error: unknown): boolean {
 
 export const handleError: ErrorHandler<AppEnv> = (error, c) => {
   if (error instanceof AppError) {
+    if (error.retryAfterSeconds && error.retryAfterSeconds > 0) {
+      c.header("Retry-After", String(error.retryAfterSeconds))
+    }
     return c.json(
       {
         error: {

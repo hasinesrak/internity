@@ -30,8 +30,15 @@ import {
   deleteUpload,
   readUploadBytes,
 } from "../services/upload.service.js"
-import { AppError } from "../lib/errors.js"
-import { parseBody, parseQuery, readJson, requireId } from "../lib/http.js"
+import {
+  parseBody,
+  parseQuery,
+  readJson,
+  readUploadedFormFile,
+  requireId,
+} from "../lib/http.js"
+import { enforceLimit, takeAiDraft, takeUpload } from "../lib/rate-limit.js"
+import { downloadHeaders } from "../lib/uploads.js"
 import {
   assignmentDraftSchema,
   assignmentListSchema,
@@ -149,17 +156,8 @@ instructorRoutes.post("/submissions/:id/review", async (c) => {
 // ---------------------------------------------------------------------------
 
 instructorRoutes.post("/uploads", async (c) => {
-  const form = await c.req.parseBody().catch(() => null)
-  const raw =
-    form && typeof form === "object"
-      ? (form["file"] as File | File[] | undefined)
-      : undefined
-  const file = Array.isArray(raw) ? raw[0] : raw
-  if (!file || typeof file === "string" || !("arrayBuffer" in file)) {
-    throw new AppError(422, "VALIDATION_ERROR", "Choose a file to upload.", [
-      { path: "file", message: "Choose a file to upload." },
-    ])
-  }
+  enforceLimit(takeUpload(c.get("user").id), "uploads")
+  const file = await readUploadedFormFile(c)
   const bytes = new Uint8Array(await file.arrayBuffer())
   const attachment = await createUpload(c.get("user"), {
     bytes,
@@ -171,13 +169,11 @@ instructorRoutes.post("/uploads", async (c) => {
 
 instructorRoutes.get("/uploads/:id/file", async (c) => {
   const { upload, bytes } = await readUploadBytes(c.get("user"), requireId(c))
-  const headers: Record<string, string> = {
-    "Content-Type": upload.mimeType,
-    "Content-Length": String(bytes.length),
-    "Content-Disposition": `inline; filename="${encodeURIComponent(upload.originalName)}"`,
-    "Cache-Control": "private, max-age=3600",
-  }
-  return c.body(new Uint8Array(bytes) as unknown as string, 200, headers)
+  return c.body(
+    new Uint8Array(bytes) as unknown as string,
+    200,
+    downloadHeaders(upload.mimeType, upload.originalName, bytes.length)
+  )
 })
 
 instructorRoutes.delete("/uploads/:id", async (c) => {
@@ -187,6 +183,7 @@ instructorRoutes.delete("/uploads/:id", async (c) => {
 
 instructorRoutes.post("/ai/assignment-draft", async (c) => {
   const body = parseBody(assignmentDraftSchema, await readJson(c))
+  enforceLimit(takeAiDraft(c.get("user").id), "drafts")
   return c.json({
     draft: await draftAssignment(c.get("user"), body.learningGoal),
   })
@@ -194,5 +191,6 @@ instructorRoutes.post("/ai/assignment-draft", async (c) => {
 
 instructorRoutes.post("/ai/class-agenda-draft", async (c) => {
   const body = parseBody(classAgendaDraftSchema, await readJson(c))
+  enforceLimit(takeAiDraft(c.get("user").id), "drafts")
   return c.json({ draft: await draftClassAgenda(c.get("user"), body) })
 })

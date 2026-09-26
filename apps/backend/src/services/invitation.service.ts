@@ -23,6 +23,7 @@ import {
   rolePhrase,
   type InvitationRole,
 } from "../config/constants.js"
+import { enforceLimit, takeMailSend } from "../lib/rate-limit.js"
 import { denyStaff } from "../lib/staff-access.js"
 import { AppError, forbidden, notFound } from "../lib/errors.js"
 import { hashPassword } from "../lib/password.js"
@@ -205,6 +206,8 @@ export async function invitePerson(
     )
   }
 
+  enforceLimit(takeMailSend(actor.id), "invitation emails")
+
   let user = existing
   let createdUser = false
   if (!user) {
@@ -324,6 +327,7 @@ export async function resendInvitation(
   const department = await requireActiveDepartment(
     current.departmentId.toString()
   )
+  enforceLimit(takeMailSend(actor.id), "invitation emails")
   const sent = await deliverInvitation({
     actor,
     user,

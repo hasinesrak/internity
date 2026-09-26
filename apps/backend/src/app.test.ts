@@ -6,7 +6,9 @@ import mongoose from "mongoose"
 
 import { createApp } from "./app.js"
 import { connectDb } from "./db/connect.js"
+import { JSON_MAX_BYTES } from "./lib/http.js"
 import { hashPassword } from "./lib/password.js"
+import { resetRateLimits } from "./lib/rate-limit.js"
 import { hashToken } from "./lib/tokens.js"
 import { Assignment } from "./models/assignment.js"
 import { Department } from "./models/department.js"
@@ -124,6 +126,7 @@ after(async () => {
 })
 
 beforeEach(async () => {
+  resetRateLimits()
   process.env.GROQ_API_KEY = ""
   process.env.STAFF_ALLOWED_IPS = ""
   process.env.TRUST_PROXY = "false"
@@ -681,11 +684,15 @@ describe("api surface", () => {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ email: hr.email, password: hr.password }),
       })
-      assert.equal(rejected.status, 403)
+      assert.equal(rejected.status, 401)
       const rejectedBody = (await json(rejected)) as {
-        error: { code: string }
+        error: { code: string; message: string }
       }
-      assert.equal(rejectedBody.error.code, "STAFF_SURFACE")
+      assert.equal(rejectedBody.error.code, "INVALID_CREDENTIALS")
+      assert.equal(
+        rejectedBody.error.message,
+        "Check the email and password and try again."
+      )
 
       const replay = await publicApp.request("/api/auth/me", {
         headers: { cookie: staffCookie },
@@ -714,5 +721,86 @@ describe("api surface", () => {
     } finally {
       process.env.API_SURFACE = "staff"
     }
+  })
+})
+
+describe("abuse limits", () => {
+  test("pauses sign-in after repeated wrong passwords", async () => {
+    const intern = await makeUser({ role: "intern" })
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const response = await app.request("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: intern.email,
+          password: "wrong-password-1",
+        }),
+      })
+      assert.equal(response.status, 401)
+    }
+    const blocked = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: intern.email,
+        password: intern.password,
+      }),
+    })
+    assert.equal(blocked.status, 429)
+    assert.ok(Number(blocked.headers.get("retry-after")) > 0)
+    const body = (await json(blocked)) as {
+      error: { code: string; message: string }
+    }
+    assert.equal(body.error.code, "TOO_MANY_ATTEMPTS")
+    assert.match(body.error.message, /Too many sign-in attempts for this account/)
+  })
+
+  test("sign-out retires the session cookie", async () => {
+    const intern = await makeUser({ role: "intern" })
+    const login = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: intern.email, password: intern.password }),
+    })
+    assert.equal(login.status, 200)
+    const cookie = login.headers.get("set-cookie")?.split(";")[0]
+    assert.ok(cookie)
+    const logout = await app.request("/api/auth/logout", {
+      method: "POST",
+      headers: { cookie },
+    })
+    assert.equal(logout.status, 204)
+    const replay = await app.request("/api/auth/me", { headers: { cookie } })
+    assert.equal(replay.status, 401)
+    const again = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: intern.email, password: intern.password }),
+    })
+    assert.equal(again.status, 200)
+  })
+
+  test("rejects a json body past the size cap", async () => {
+    const response = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "person@example.com",
+        password: "x".repeat(JSON_MAX_BYTES),
+      }),
+    })
+    assert.equal(response.status, 413)
+  })
+
+  test("rejects a sign-in password past 128 characters", async () => {
+    const response = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "person@example.com",
+        password: "a".repeat(129),
+      }),
+    })
+    assert.equal(response.status, 422)
   })
 })

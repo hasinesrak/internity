@@ -4,6 +4,7 @@ export type ErrorStatus =
   | 403
   | 404
   | 409
+  | 413
   | 422
   | 429
   | 500
@@ -19,6 +20,7 @@ export class AppError extends Error {
   readonly status: ErrorStatus
   readonly code: string
   readonly details?: FieldIssue[]
+  retryAfterSeconds?: number
 
   constructor(
     status: ErrorStatus,
@@ -46,4 +48,19 @@ export function forbidden(
 
 export function validation(message: string, path = ""): AppError {
   return new AppError(422, "VALIDATION_ERROR", message, [{ path, message }])
+}
+
+export function payloadTooLarge(
+  message = "That request is too large."
+): AppError {
+  return new AppError(413, "PAYLOAD_TOO_LARGE", message)
+}
+
+export function tooManyAttempts(
+  message: string,
+  retryAfterSeconds: number
+): AppError {
+  const error = new AppError(429, "TOO_MANY_ATTEMPTS", message)
+  error.retryAfterSeconds = retryAfterSeconds
+  return error
 }

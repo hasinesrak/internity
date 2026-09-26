@@ -91,6 +91,9 @@ export function getEnv(): AppEnvConfig {
   if (jwtSecret.length < 16) {
     throw new Error("JWT_SECRET must be at least 16 characters")
   }
+  if (nodeEnv === "production" && jwtSecret.length < 32) {
+    throw new Error("JWT_SECRET must be at least 32 characters in production")
+  }
   if (nodeEnv === "development" && !jwtFromEnv && !warnedAboutDevSecret) {
     warnedAboutDevSecret = true
     console.warn(
