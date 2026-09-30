@@ -5,11 +5,11 @@ resources:
 # CI rewrites newName and newTag after a publish. sha-dev is the image imported on the VM until then.
 images:
   - name: internity-backend
-    newName: docker.io/internity/internity-backend
-    newTag: sha-dev
+    newName: docker.io/1cryptic/internity-backend
+    newTag: sha-465263d6331d1a2fc908e9f790fb6390ea434430
   - name: internity-web
-    newName: docker.io/internity/internity-web
-    newTag: sha-dev
+    newName: docker.io/1cryptic/internity-web
+    newTag: sha-465263d6331d1a2fc908e9f790fb6390ea434430
   - name: internity-staff
-    newName: docker.io/internity/internity-staff
-    newTag: sha-dev
+    newName: docker.io/1cryptic/internity-staff
+    newTag: sha-465263d6331d1a2fc908e9f790fb6390ea434430
