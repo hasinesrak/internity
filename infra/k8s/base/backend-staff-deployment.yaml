@@ -81,6 +81,12 @@ spec:
                   name: internity-secrets
                   key: RESEND_API_KEY
                   optional: true
+            - name: RESEND_FROM_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: internity-secrets
+                  key: RESEND_FROM_EMAIL
+                  optional: true
             - name: GROQ_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -92,6 +98,12 @@ spec:
                 configMapKeyRef:
                   name: internity-config
                   key: GROQ_MODEL
+            - name: ADMIN_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: internity-secrets
+                  key: ADMIN_NAME
+                  optional: true
             - name: ADMIN_EMAIL
               valueFrom:
                 secretKeyRef:

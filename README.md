@@ -126,7 +126,7 @@ Both apps are TanStack Start applications sharing one design system:
 
 - **Shell:** one dashboard shell per role — topbar (department switcher, ⌘K command menu, theme toggle, user menu), left navigation (`@beui/ai-sidebar` adapted with Phosphor duotone icons; icon rail when collapsed; bottom-sheet under 768 px), content template (page header → KPI row → panels), drawers/bottom-sheets for detail, toast stack for feedback.
 - **Data:** route loaders call the API client; pure UI state (sidebar, drawers, table filters) lives in Zustand stores. No business rules live in the client.
-- **Design system (`packages/ui`):** shadcn-style components on Base UI primitives for forms/buttons/dialogs, beUI source blocks for motion and composed surfaces (tables, badges, KPI numbers, drawers, modals, toasts). Both apps import through `@workspace/ui/*` and share one theme (shadcn semantic tokens, Manrope). Full inventory: `docs/design-system.md`; screen composition: `docs/dashboard-design.md`.
+- **Design system (`packages/ui`):** shadcn-style components on Base UI primitives for forms/buttons/dialogs, beUI source blocks for motion and composed surfaces (tables, badges, KPI numbers, drawers, modals, toasts). Both apps import through `@workspace/ui/*` and share one theme (shadcn semantic tokens, Manrope).
 
 ### 3.5 Data model (simplified)
 
@@ -159,8 +159,7 @@ internity/
   infra/
     k8s/            # base + overlays/production manifests
     argocd/         # Argo CD Application definitions
-  docs/             # plan, architecture, requirements, design-system,
-                    # dashboard-design, deployment, CD
+  docs/             # ubuntu-vm.md, how to run on the VM
   .github/workflows/# validation + Docker build/publish
   docker-compose.yml# mongo + 2 APIs + 2 sites (local)
   env.example       # root compose env template
@@ -383,15 +382,10 @@ Health probes: `GET /health` (liveness), `GET /health/ready` (readiness incl. DB
 
 ## 13. Deployment Overview
 
-Production path is GitOps: **GitHub Actions** builds and pushes immutable images to **Docker Hub** → manifests under `infra/k8s` (base + `overlays/production`) reference the new tags → **Argo CD** (`infra/argocd`) syncs into **K3s**. Separate Deployments exist for the intern site, staff site (ingress limited to office range), public API, and staff API (same image, different `API_SURFACE`; staff ingress limited to office range). MongoDB is external managed (preferred) or a StatefulSet with a documented backup plan. Details: `docs/deployment.md`, `docs/CD.md`.
+Production path is GitOps: **GitHub Actions** builds and pushes immutable images to **Docker Hub** → manifests under `infra/k8s` (base + `overlays/production`) reference the new tags → **Argo CD** (`infra/argocd`) syncs into **K3s**. Separate Deployments exist for the intern site, staff site (ingress limited to office range), public API, and staff API (same image, different `API_SURFACE`; staff ingress limited to office range). MongoDB is external managed (preferred) or a StatefulSet with a documented backup plan. How to start it on the VM: `docs/ubuntu-vm.md`.
 
 ---
 
 ## 14. Further Documentation
 
-- `docs/plan.md` — product scope, phases, success criteria
-- `docs/architecture.md` — authoritative architecture reference
-- `docs/requirements.md` — functional requirements
-- `docs/design-system.md` — tokens, icons, components
-- `docs/dashboard-design.md` — dashboard shell and layouts
-- `docs/deployment.md`, `docs/CD.md` — production deployment and pipeline
+- `docs/ubuntu-vm.md` — run Internity on the Ubuntu VM with Argo CD
