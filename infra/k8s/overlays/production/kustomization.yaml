@@ -2,6 +2,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../base
+# CI rewrites newName and newTag after a publish. sha-dev is the image imported on the VM until then.
 images:
   - name: internity-backend
     newName: docker.io/internity/internity-backend

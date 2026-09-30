@@ -3,7 +3,8 @@ kind: PersistentVolumeClaim
 metadata:
   name: uploads-data
 spec:
-  accessModes: ["ReadWriteMany"]
+  # k3s local-path cannot provision ReadWriteMany. Both API pods are on this one node.
+  accessModes: ["ReadWriteOnce"]
   resources:
     requests:
       storage: 5Gi

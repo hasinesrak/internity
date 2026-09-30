@@ -4,6 +4,7 @@ metadata:
   name: staff
 spec:
   replicas: 1
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: staff
@@ -12,9 +13,23 @@ spec:
       labels:
         app: staff
     spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 25
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: staff
           image: internity-staff
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           ports:
             - name: http
               containerPort: 3001
@@ -23,6 +38,8 @@ spec:
               value: 0.0.0.0
             - name: PORT
               value: "3001"
+            - name: HOME
+              value: /tmp
             - name: TRUST_PROXY
               valueFrom:
                 configMapKeyRef:
@@ -33,13 +50,40 @@ spec:
                 secretKeyRef:
                   name: internity-secrets
                   key: STAFF_ALLOWED_IPS
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          lifecycle:
+            preStop:
+              exec:
+                command: ["node", "-e", "setTimeout(() => process.exit(0), 5000)"]
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
           readinessProbe:
             httpGet:
               path: /health
               port: http
             periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /health
               port: http
             periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: tmp
+          emptyDir: {}

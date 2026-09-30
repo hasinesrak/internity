@@ -4,14 +4,13 @@ metadata:
   name: internity-config
 data:
   NODE_ENV: production
-  APP_URL: https://internity.example.com
-  STAFF_APP_URL: https://staff.internity.example.com
-  PUBLIC_CORS_ORIGIN: https://internity.example.com
-  STAFF_CORS_ORIGIN: https://staff.internity.example.com
+  APP_URL: http://internity.192.168.0.103.sslip.io
+  STAFF_APP_URL: http://staff.192.168.0.103.sslip.io
+  PUBLIC_CORS_ORIGIN: http://internity.192.168.0.103.sslip.io
+  STAFF_CORS_ORIGIN: http://staff.192.168.0.103.sslip.io
   JWT_EXPIRES_IN: 8h
-  COOKIE_SECURE: "true"
+  COOKIE_SECURE: "false"
   TRUST_PROXY: "true"
   GROQ_MODEL: qwen/qwen3.8-27b
-  MONGODB_URI: mongodb://mongo:27017/internity
   UPLOAD_DIR: /data/uploads
   UPLOAD_MAX_MB: "10"

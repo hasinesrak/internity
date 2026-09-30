@@ -382,7 +382,7 @@ Health probes: `GET /health` (liveness), `GET /health/ready` (readiness incl. DB
 
 ## 13. Deployment Overview
 
-Production path is GitOps: **GitHub Actions** builds and pushes immutable images to **Docker Hub** → manifests under `infra/k8s` (base + `overlays/production`) reference the new tags → **Argo CD** (`infra/argocd`) syncs into **K3s**. Separate Deployments exist for the intern site, staff site (ingress limited to office range), public API, and staff API (same image, different `API_SURFACE`; staff ingress limited to office range). MongoDB is external managed (preferred) or a StatefulSet with a documented backup plan. How to start it on the VM: `docs/ubuntu-vm.md`.
+Production path is GitOps. `.github/workflows/ci.yml` runs on `master`: it tests, pushes immutable `sha-<commit>` images to Docker Hub, and commits those tags into `infra/k8s/overlays/production`. Argo CD (`infra/argocd/internity.yaml`) syncs that overlay into k3s when you press Sync. Separate Deployments run the intern site, the staff site, the public API, and the staff API. Both APIs are the same image with a different `API_SURFACE`. Staff access is enforced in the app from `STAFF_ALLOWED_IPS`, not by the ingress. On the VM, MongoDB is the `mongo` StatefulSet. How to start it: `docs/ubuntu-vm.md`.
 
 ---
 

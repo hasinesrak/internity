@@ -1,0 +1,149 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  WEB_API_URL: ${{ vars.WEB_API_URL != '' && vars.WEB_API_URL || 'http://api.192.168.0.103.sslip.io' }}
+  STAFF_API_URL: ${{ vars.STAFF_API_URL != '' && vars.STAFF_API_URL || 'http://staff-api.192.168.0.103.sslip.io' }}
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      mongo:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Check baked API URLs
+        run: |
+          case "$WEB_API_URL" in
+            *localhost*|*127.0.0.1*)
+              echo "WEB_API_URL must be the address the intern browser calls."
+              exit 1
+              ;;
+          esac
+          case "$STAFF_API_URL" in
+            *localhost*|*127.0.0.1*)
+              echo "STAFF_API_URL must be the address the staff browser calls."
+              exit 1
+              ;;
+          esac
+          test -n "$WEB_API_URL"
+          test -n "$STAFF_API_URL"
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm --filter backend test
+      - run: pnpm --filter backend build
+      - run: pnpm --filter web build
+        env:
+          VITE_API_URL: ${{ env.WEB_API_URL }}
+      - run: pnpm --filter staff build
+        env:
+          VITE_API_URL: ${{ env.STAFF_API_URL }}
+
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: check
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: internity-backend
+            file: apps/backend/Dockerfile
+          - name: internity-web
+            file: apps/web/Dockerfile
+          - name: internity-staff
+            file: apps/staff/Dockerfile
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check registry credentials
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          test -n "$DOCKERHUB_USERNAME" || { echo "Set the DOCKERHUB_USERNAME secret."; exit 1; }
+          test -n "$DOCKERHUB_TOKEN" || { echo "Set the DOCKERHUB_TOKEN secret."; exit 1; }
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          push: true
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          build-args: ${{ matrix.name == 'internity-web' && format('VITE_API_URL={0}', env.WEB_API_URL) || matrix.name == 'internity-staff' && format('VITE_API_URL={0}', env.STAFF_API_URL) || '' }}
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.name }}:sha-${{ github.sha }}
+
+  gitops:
+    name: gitops
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: publish
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+      - name: Record the published image tags
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        run: |
+          test -n "$DOCKERHUB_USERNAME"
+          python3 infra/scripts/set-image-tags.py \
+            "$DOCKERHUB_USERNAME" \
+            "sha-${GITHUB_SHA}" \
+            infra/k8s/overlays/production/kustomization.yaml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add infra/k8s/overlays/production/kustomization.yaml
+          if git diff --cached --quiet; then
+            echo "Production image tags already match this commit."
+            exit 0
+          fi
+          git commit -m "Publish images ${GITHUB_SHA::7}"
+          for attempt in 1 2 3 4 5; do
+            if git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              exit 0
+            fi
+            sleep $((attempt * 2))
+          done
+          exit 1

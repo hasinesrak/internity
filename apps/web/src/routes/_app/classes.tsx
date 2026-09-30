@@ -173,7 +173,7 @@ function ClassCard({ session, isPast }: { session: PublicClass; isPast: boolean 
             description: (
               <span className="flex flex-col gap-3">
                 <span>{session.agenda}</span>
-                {(session.attachments?.length ?? 0) > 0 ? (
+                {session.attachments.length > 0 ? (
                   <span className="flex flex-col gap-2">
                     <span className="text-xs text-muted-foreground">
                       Materials · {session.attachments.length}

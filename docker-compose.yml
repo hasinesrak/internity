@@ -2,6 +2,7 @@ name: internity
 
 x-backend-environment: &backend-environment
   NODE_ENV: development
+  HOME: /tmp
   MONGODB_URI: mongodb://mongo:27017/internity
   APP_URL: ${APP_URL:-http://localhost:3000}
   STAFF_APP_URL: ${STAFF_APP_URL:-http://localhost:3001}
@@ -19,12 +20,25 @@ x-backend-environment: &backend-environment
   UPLOAD_DIR: /data/uploads
   UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-10}
 
+x-app-hardening: &app-hardening
+  init: true
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+
 services:
   mongo:
     image: mongo:7.0
     container_name: internity-mongo
+    init: true
+    restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "${MONGO_BIND:-127.0.0.1}:${MONGO_PORT:-27017}:27017"
     volumes:
       - ./data/db:/data/db
       # The mongo image also declares VOLUME /data/configdb. Leave that path
@@ -37,6 +51,7 @@ services:
       retries: 20
 
   backend-public:
+    <<: *app-hardening
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
@@ -54,8 +69,21 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
 
   backend-staff:
+    <<: *app-hardening
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
@@ -74,8 +102,21 @@ services:
     depends_on:
       mongo:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
 
   web:
+    <<: *app-hardening
     build:
       context: .
       dockerfile: apps/web/Dockerfile
@@ -86,9 +127,23 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: "3000"
+      HOME: /tmp
       NODE_ENV: production
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
 
   staff:
+    <<: *app-hardening
     build:
       context: .
       dockerfile: apps/staff/Dockerfile
@@ -99,10 +154,23 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: "3001"
+      HOME: /tmp
       NODE_ENV: production
       STAFF_ALLOWED_IPS: ${STAFF_ALLOWED_IPS:-}
       STAFF_ALLOW_PRIVATE: ${STAFF_ALLOW_PRIVATE:-true}
       TRUST_PROXY: ${TRUST_PROXY:-false}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
 
 volumes:
   uploads-data:

@@ -71,7 +71,7 @@ function AssignmentRowItem({
         </span>
         <span className="truncate text-xs text-muted-foreground">
           {assignment.rubric.length} criteria · {assignment.maxScore} points
-          {(assignment.attachments?.length ?? 0) > 0
+          {assignment.attachments.length > 0
             ? ` · ${assignment.attachments.length} file${assignment.attachments.length === 1 ? "" : "s"}`
             : ""}
         </span>

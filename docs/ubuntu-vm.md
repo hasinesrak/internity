@@ -1,6 +1,6 @@
 # Run Internity on the Ubuntu VM
 
-Docker, k3s, and Argo CD are already installed. Argo CD deploys whatever is on `master` in [hasinesrak/internity](https://github.com/hasinesrak/internity) at `infra/k8s/overlays/production`. Sync is manual.
+Docker, k3s, and Argo CD are already installed. Argo CD deploys whatever is on `master` in [hasinesrak/internity](https://github.com/hasinesrak/internity) at `infra/k8s/overlays/production`. Sync is manual. Pushing to `master` runs `.github/workflows/ci.yml`: tests, then immutable `sha-<commit>` images on Docker Hub, then a commit that records those tags. A Sync rolls them out. It does not build images itself.
 
 The VM address used below is `192.168.0.103`. The login user is `esrak`. Run the VM commands over SSH. In a new shell, point `kubectl` at k3s:
 
@@ -18,7 +18,7 @@ The first setup is already on this VM. Argo CD, the images, the secret, the ingr
 - `deploy/backend-staff`
 - `statefulset/mongo`
 
-Argo CD shows `internity` as OutOfSync for those five objects only. Git asks for 1 replica. The cluster has 0. A Sync starts the app. It does not rebuild images or recreate the secret.
+Argo CD shows `internity` as OutOfSync for those five objects only when the only drift is the replica count. Git asks for 1 replica. The cluster has 0. A Sync starts the app at the image tags currently in Git. It does not rebuild images or recreate the secret.
 
 1. Open [http://argocd.192.168.0.103.sslip.io](http://argocd.192.168.0.103.sslip.io).
 2. Open the `internity` application.
@@ -46,62 +46,29 @@ Do the later sections only when something changed:
 | Application code | Rebuild and import the image in section 3, then restart that deployment |
 | Ingress host or cookie setting | Edit the manifest, push to `master`, and Sync |
 
-## 1. Point Git at this VM
+## 1. Point Argo CD at this VM
 
-Edit these files on your computer, commit, and push to `master`. Argo CD only deploys what is on GitHub.
+Git already tracks `https://github.com/hasinesrak/internity.git` at `master`. The ingress hosts, cookie setting, upload claim, and Mongo probe match this VM:
 
-`infra/argocd/internity.yaml`
-
-```yaml
-repoURL: https://github.com/hasinesrak/internity.git
-targetRevision: master
-```
-
-`infra/k8s/base/ingress.yaml` — replace each `*.internity.example.com` host:
-
-| Host | Service |
+| Setting | Value |
 |---|---|
-| `internity.192.168.0.103.sslip.io` | `web` |
-| `api.192.168.0.103.sslip.io` | `backend-public` |
-| `staff.192.168.0.103.sslip.io` | `staff` |
-| `staff-api.192.168.0.103.sslip.io` | `backend-staff` |
+| Intern site | `internity.192.168.0.103.sslip.io` |
+| Public API | `api.192.168.0.103.sslip.io` |
+| Staff site | `staff.192.168.0.103.sslip.io` |
+| Staff API | `staff-api.192.168.0.103.sslip.io` |
+| `COOKIE_SECURE` | `"false"` while the sites are plain HTTP |
+| `TRUST_PROXY` | `"true"` so the staff allowlist sees the browser address Traefik forwards |
+| `uploads-data` | `ReadWriteOnce` |
+| Mongo readiness | TCP on port `mongo` |
 
-`infra/k8s/base/configmap.yaml`
+Change those files if this VM's address changes, then push to `master`. k3s local-path can provision `ReadWriteOnce`. Both API pods are on this one node, so they can share that claim.
 
-```yaml
-APP_URL: http://internity.192.168.0.103.sslip.io
-STAFF_APP_URL: http://staff.192.168.0.103.sslip.io
-PUBLIC_CORS_ORIGIN: http://internity.192.168.0.103.sslip.io
-STAFF_CORS_ORIGIN: http://staff.192.168.0.103.sslip.io
-COOKIE_SECURE: "false"
-TRUST_PROXY: "true"
-```
-
-`COOKIE_SECURE` stays `"false"` while the sites are plain HTTP. `TRUST_PROXY` stays `"true"` so the staff allowlist sees the browser address Traefik forwards.
-
-`infra/k8s/base/uploads-pvc.yaml`
-
-```yaml
-accessModes: ["ReadWriteOnce"]
-```
-
-k3s local-path can provision that. Both API pods are on this one node, so they can share it.
-
-`infra/k8s/base/mongo-statefulset.yaml` — replace the `mongosh` readiness probe:
-
-```yaml
-readinessProbe:
-  tcpSocket:
-    port: mongo
-  initialDelaySeconds: 20
-  periodSeconds: 10
-```
-
-Push, then on the VM:
+The Argo CD application is not part of the overlay. After you pull, register it again so the project and the repo URL are the ones in Git:
 
 ```bash
 cd /home/esrak/internity
 git pull
+kubectl apply -f infra/argocd/internity.yaml
 ```
 
 ## 2. Create the cluster secret from the env files
@@ -127,15 +94,17 @@ After you change an env file, run the script again, then:
 kubectl -n internity rollout restart deploy/backend-staff deploy/staff deploy/backend-public
 ```
 
-## 3. Build the images on the VM and import them into k3s
+## 3. Publish images, or build them on the VM
 
-The production overlay runs these names, tag `sha-dev`:
+A push to `master` publishes three `linux/amd64` images, tagged `sha-<commit>`, then commits those names into `infra/k8s/overlays/production/kustomization.yaml`. The Docker Hub repositories have to be public, because the node has no pull secret. Sync after that commit. The site images bake `VITE_API_URL` at build time. CI uses `http://api.192.168.0.103.sslip.io` and `http://staff-api.192.168.0.103.sslip.io` unless the `WEB_API_URL` and `STAFF_API_URL` repository variables override them.
+
+Until that publish has run, the overlay still points at the images imported on the VM:
 
 - `docker.io/internity/internity-backend:sha-dev`
 - `docker.io/internity/internity-web:sha-dev`
 - `docker.io/internity/internity-staff:sha-dev`
 
-k3s does not see images that exist only in Docker. Build from the clone, then import. The site images bake the API address in at build time, so the build args must match the ingress hosts.
+If the node cannot pull, build the exact name and tag from the overlay and import them. k3s does not see images that exist only in Docker. The site build args must match the ingress hosts. The commands below match the overlay while its tag is still `sha-dev`.
 
 ```bash
 cd /home/esrak/internity
@@ -210,9 +179,9 @@ Sign in on the staff site with `ADMIN_EMAIL` and `ADMIN_PASSWORD` from `apps/bac
 | What you see | What to do |
 |---|---|
 | `uploads-data` is `Pending` | Confirm the claim is `ReadWriteOnce`, delete the pending claim, and Sync again. Leave the claim alone once it is `Bound`. |
-| `ImagePullBackOff` | Import the image again. `sudo k3s ctr images ls` must show the same name and `sha-dev` tag as the overlay. |
+| `ImagePullBackOff` | The overlay tag must match an image the node can see. Public Docker Hub tags pull on Sync. For a local tag, `sudo k3s ctr images ls` must show that same name and tag. |
 | `backend-staff` restarts | `kubectl -n internity logs deploy/backend-staff`. The usual cause is a missing `STAFF_ALLOWED_IPS` or a `JWT_SECRET` shorter than 32 characters. |
 | Staff sign-in is rejected | Add that computer's LAN address to `STAFF_ALLOWED_IPS` in `apps/backend/.env` or `apps/staff/.env`, run `bash infra/scripts/apply-cluster-env.sh`, and restart `backend-staff` and `staff`. |
 | The page loads and the session disappears | Set `COOKIE_SECURE` to `"false"`, push, and Sync. |
 | The site calls `localhost` | Rebuild `internity-web` or `internity-staff` with the sslip API URL, import, and restart that deployment. |
-| `mongo-0` stays unready | The readiness probe must be the TCP check from step 1. The database volume is `data-mongo-0`. Leave that volume in place. |
+| `mongo-0` stays unready | The readiness probe is a TCP check on port `mongo`. The database volume is `data-mongo-0`. Leave that volume in place. |

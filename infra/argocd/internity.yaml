@@ -1,17 +1,44 @@
 apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: internity
+  namespace: argocd
+spec:
+  description: Internity on this cluster
+  sourceRepos:
+    - https://github.com/hasinesrak/internity.git
+  destinations:
+    - namespace: internity
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+---
+apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: internity
   namespace: argocd
 spec:
-  project: default
+  project: internity
   source:
-    repoURL: https://github.com/REPLACE_OWNER/internity.git
-    targetRevision: main
+    repoURL: https://github.com/hasinesrak/internity.git
+    targetRevision: master
     path: infra/k8s/overlays/production
   destination:
     server: https://kubernetes.default.svc
     namespace: internity
+  # Sync stays manual so scaling the app to zero is left alone until the next Sync.
   syncPolicy:
     syncOptions:
       - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

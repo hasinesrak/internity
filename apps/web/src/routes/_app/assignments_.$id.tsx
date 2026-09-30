@@ -134,7 +134,7 @@ function AssignmentDetail({
             </CardContent>
           </Card>
 
-          {(assignment.attachments?.length ?? 0) > 0 ? (
+          {assignment.attachments.length > 0 ? (
             <Card>
               <CardHeader>
                 <h2 className="text-base font-medium tracking-tight">

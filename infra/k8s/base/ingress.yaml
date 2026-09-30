@@ -3,8 +3,9 @@ kind: Ingress
 metadata:
   name: internity
 spec:
+  ingressClassName: traefik
   rules:
-    - host: internity.example.com
+    - host: internity.192.168.0.103.sslip.io
       http:
         paths:
           - path: /
@@ -14,7 +15,7 @@ spec:
                 name: web
                 port:
                   name: http
-    - host: api.internity.example.com
+    - host: api.192.168.0.103.sslip.io
       http:
         paths:
           - path: /
@@ -24,7 +25,7 @@ spec:
                 name: backend-public
                 port:
                   name: http
-    - host: staff.internity.example.com
+    - host: staff.192.168.0.103.sslip.io
       http:
         paths:
           - path: /
@@ -34,7 +35,7 @@ spec:
                 name: staff
                 port:
                   name: http
-    - host: staff-api.internity.example.com
+    - host: staff-api.192.168.0.103.sslip.io
       http:
         paths:
           - path: /
