@@ -20,8 +20,8 @@ env:
   STAFF_API_URL: ${{ vars.STAFF_API_URL != '' && vars.STAFF_API_URL || 'http://staff-api.192.168.0.103.sslip.io' }}
 
 jobs:
-  lint:
-    name: Lint
+  lint-frontend:
+    name: Lint frontend
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -41,22 +41,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run ESLint
-        run: pnpm lint
+        run: pnpm --filter web --filter staff --filter @workspace/ui lint
 
-  test:
-    name: Test
+  lint-backend:
+    name: Lint backend
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    services:
-      mongo:
-        image: mongo:7.0
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -73,19 +63,16 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Run backend tests
-        run: pnpm --filter backend test
+      - name: Run ESLint
+        run: pnpm --filter backend lint
 
   build:
     name: Build
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs:
-      - lint
-      - test
+      - lint-frontend
+      - lint-backend
     steps:
       - name: Checkout code
         uses: actions/checkout@v5

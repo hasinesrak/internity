@@ -1,6 +1,6 @@
 # Run Internity on the Ubuntu VM
 
-Docker, k3s, and Argo CD are already installed. Argo CD deploys whatever is on `master` in [hasinesrak/internity](https://github.com/hasinesrak/internity) at `infra/k8s/overlays/production`. Sync is manual. Pushing to `master` runs `.github/workflows/ci.yml`: lint and test in parallel, then a build, then one Docker job that pushes immutable `sha-<commit>` images and commits those tags. A Sync rolls them out. It does not build images itself.
+Docker, k3s, and Argo CD are already installed. Argo CD deploys whatever is on `master` in [hasinesrak/internity](https://github.com/hasinesrak/internity) at `infra/k8s/overlays/production`. Sync is manual. Pushing to `master` runs `.github/workflows/ci.yml`: frontend lint and backend lint in parallel, then a build, then one Docker job that pushes immutable `sha-<commit>` images and commits those tags. A Sync rolls them out. It does not build images itself.
 
 The VM address used below is `192.168.0.103`. The login user is `esrak`. Run the VM commands over SSH. In a new shell, point `kubectl` at k3s:
 
