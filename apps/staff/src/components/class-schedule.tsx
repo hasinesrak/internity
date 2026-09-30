@@ -126,7 +126,7 @@ function ClassAgenda({
         )}
       </div>
       <p className="text-sm leading-6 text-muted-foreground">{session.agenda}</p>
-      {(session.attachments?.length ?? 0) > 0 ? (
+      {session.attachments.length > 0 ? (
         <div className="flex flex-col gap-2">
           <span className="text-xs text-muted-foreground">
             Materials · {session.attachments.length}

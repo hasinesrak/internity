@@ -172,7 +172,7 @@ function AssignmentsPage() {
           <NameCell
             label={`Open ${assignment.title}`}
             title={assignment.title}
-            subtitle={`${assignment.maxScore} points · ${assignment.rubric.length} criteria${(assignment.attachments?.length ?? 0) > 0 ? ` · ${assignment.attachments.length} file${assignment.attachments.length === 1 ? "" : "s"}` : ""}`}
+            subtitle={`${assignment.maxScore} points · ${assignment.rubric.length} criteria${assignment.attachments.length > 0 ? ` · ${assignment.attachments.length} file${assignment.attachments.length === 1 ? "" : "s"}` : ""}`}
             onOpen={() => openAssignment(assignment)}
           />
         </RowContextMenu>
@@ -441,10 +441,10 @@ function AssignmentDrawer({
 
       <div className="flex flex-col gap-2">
         <span className="text-xs text-muted-foreground">
-          Materials · {assignment.attachments?.length ?? 0}
+          Materials · {assignment.attachments.length}
         </span>
         <AttachmentList
-          attachments={assignment.attachments ?? []}
+          attachments={assignment.attachments}
           emptyLabel="No files attached."
         />
       </div>

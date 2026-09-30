@@ -92,7 +92,7 @@ function NewClassPage() {
     setTitle(existing.data.title)
     setAgenda(existing.data.agenda)
     setMeetingUrl(existing.data.meetingUrl)
-    setAttachments(existing.data.attachments ?? [])
+    setAttachments(existing.data.attachments)
     setDay(new Date(existing.data.scheduledStart))
     setStart(clock(existing.data.scheduledStart))
     setEnd(clock(existing.data.scheduledEnd))

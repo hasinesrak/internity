@@ -89,7 +89,7 @@ function NewAssignmentPage() {
         : [emptyCriterion()],
     )
     setDeadline(existing.data.deadline ? new Date(existing.data.deadline) : null)
-    setAttachments(existing.data.attachments ?? [])
+    setAttachments(existing.data.attachments)
     setErrors({})
   }, [existing.data, search.id])
 

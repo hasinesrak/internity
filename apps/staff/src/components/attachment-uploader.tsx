@@ -3,10 +3,8 @@
 // saved to /data/uploads/YYYY/MM/DD and attached to the form by id.
 import { useEffect, useRef, useState } from "react"
 import { WarningCircleIcon } from "@phosphor-icons/react"
-import {
-  FileUpload,
-  type FileUploadItem,
-} from "@workspace/ui/components/motion/file-upload"
+import { FileUpload } from "@workspace/ui/components/motion/file-upload"
+import type { FileUploadItem } from "@workspace/ui/components/motion/file-upload"
 
 import { AttachmentList } from "@/components/attachment-list"
 import { deleteUpload, uploadAttachment } from "@/lib/data"
@@ -95,8 +93,7 @@ export function AttachmentUploader({
         onFilesAdded={(added, files) => {
           setError(null)
           added.forEach((item, index) => {
-            const file = files[index]
-            if (file) void runUpload(item, file)
+            void runUpload(item, files[index])
           })
         }}
         onRemove={(item) => {
