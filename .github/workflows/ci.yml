@@ -1,9 +1,11 @@
-name: CI
+name: Node.js CI/CD
 
 on:
   pull_request:
   push:
-    branches: [master, main]
+    branches:
+      - master
+      - main
   workflow_dispatch:
 
 concurrency:
@@ -18,8 +20,31 @@ env:
   STAFF_API_URL: ${{ vars.STAFF_API_URL != '' && vars.STAFF_API_URL || 'http://staff-api.192.168.0.103.sslip.io' }}
 
 jobs:
-  check:
-    name: check
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: pnpm lint
+
+  test:
+    name: Test
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -33,13 +58,50 @@ jobs:
           --health-timeout 5s
           --health-retries 20
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v5
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Run backend tests
+        run: pnpm --filter backend test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs:
+      - lint
+      - test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Check baked API URLs
         run: |
           case "$WEB_API_URL" in
@@ -56,35 +118,41 @@ jobs:
           esac
           test -n "$WEB_API_URL"
           test -n "$STAFF_API_URL"
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm --filter backend test
-      - run: pnpm --filter backend build
-      - run: pnpm --filter web build
-        env:
-          VITE_API_URL: ${{ env.WEB_API_URL }}
-      - run: pnpm --filter staff build
-        env:
-          VITE_API_URL: ${{ env.STAFF_API_URL }}
 
-  publish:
-    name: publish
+      - name: Build application
+        run: |
+          pnpm --filter backend build
+          VITE_API_URL="$WEB_API_URL" pnpm --filter web build
+          VITE_API_URL="$STAFF_API_URL" pnpm --filter staff build
+
+      - name: Verify build output
+        run: |
+          test -f apps/backend/dist/index.js
+          test -f apps/web/dist/server/server.js
+          test -f apps/staff/dist/server/server.js
+          echo "Backend:"
+          ls -la apps/backend/dist
+          echo "Web:"
+          ls -la apps/web/dist
+          echo "Staff:"
+          ls -la apps/staff/dist
+
+  docker:
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: check
+    needs:
+      - build
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - name: internity-backend
-            file: apps/backend/Dockerfile
-          - name: internity-web
-            file: apps/web/Dockerfile
-          - name: internity-staff
-            file: apps/staff/Dockerfile
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v5
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
       - name: Check registry credentials
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -92,38 +160,59 @@ jobs:
         run: |
           test -n "$DOCKERHUB_USERNAME" || { echo "Set the DOCKERHUB_USERNAME secret."; exit 1; }
           test -n "$DOCKERHUB_TOKEN" || { echo "Set the DOCKERHUB_TOKEN secret."; exit 1; }
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - uses: docker/build-push-action@v7
+
+      # Provenance and SBOM indexes are omitted so k3s pulls a plain linux/amd64 image.
+      - name: Build and push backend
+        uses: docker/build-push-action@v7
         with:
           context: .
-          file: ${{ matrix.file }}
+          file: apps/backend/Dockerfile
           push: true
           platforms: linux/amd64
           provenance: false
           sbom: false
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
-          build-args: ${{ matrix.name == 'internity-web' && format('VITE_API_URL={0}', env.WEB_API_URL) || matrix.name == 'internity-staff' && format('VITE_API_URL={0}', env.STAFF_API_URL) || '' }}
-          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.name }}:sha-${{ github.sha }}
+          cache-from: type=gha,scope=internity-backend
+          cache-to: type=gha,mode=max,scope=internity-backend
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/internity-backend:sha-${{ github.sha }}
 
-  gitops:
-    name: gitops
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: publish
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v5
+      - name: Build and push web
+        uses: docker/build-push-action@v7
         with:
-          ref: ${{ github.ref }}
-          fetch-depth: 0
-      - name: Record the published image tags
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=internity-web
+          cache-to: type=gha,mode=max,scope=internity-web
+          build-args: VITE_API_URL=${{ env.WEB_API_URL }}
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/internity-web:sha-${{ github.sha }}
+
+      - name: Build and push staff
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: apps/staff/Dockerfile
+          push: true
+          platforms: linux/amd64
+          provenance: false
+          sbom: false
+          cache-from: type=gha,scope=internity-staff
+          cache-to: type=gha,mode=max,scope=internity-staff
+          build-args: VITE_API_URL=${{ env.STAFF_API_URL }}
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/internity-staff:sha-${{ github.sha }}
+
+      - name: Update deployment manifest and push
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
