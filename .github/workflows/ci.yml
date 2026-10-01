@@ -16,8 +16,9 @@ permissions:
   contents: read
 
 env:
-  WEB_API_URL: ${{ vars.WEB_API_URL != '' && vars.WEB_API_URL || 'http://api.192.168.0.103.sslip.io' }}
-  STAFF_API_URL: ${{ vars.STAFF_API_URL != '' && vars.STAFF_API_URL || 'http://staff-api.192.168.0.103.sslip.io' }}
+  # Browser-facing APIs always stay on localhost.
+  WEB_API_URL: http://localhost:4000
+  STAFF_API_URL: http://localhost:4001
 
 jobs:
   lint-frontend:
@@ -88,23 +89,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Check baked API URLs
-        run: |
-          case "$WEB_API_URL" in
-            *localhost*|*127.0.0.1*)
-              echo "WEB_API_URL must be the address the intern browser calls."
-              exit 1
-              ;;
-          esac
-          case "$STAFF_API_URL" in
-            *localhost*|*127.0.0.1*)
-              echo "STAFF_API_URL must be the address the staff browser calls."
-              exit 1
-              ;;
-          esac
-          test -n "$WEB_API_URL"
-          test -n "$STAFF_API_URL"
 
       - name: Build application
         run: |

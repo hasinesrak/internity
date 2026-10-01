@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
-# Create the internity namespace secret from the local env files.
+# Prepare the internity secret and register its Argo CD Application.
 # Run this on the Ubuntu VM, from any directory:
-#   bash infra/scripts/apply-cluster-env.sh
+#   bash infra/scripts/apply-cluster-env.sh [--sync]
 set -euo pipefail
+
+sync=false
+case "${1:-}" in
+  "") ;;
+  --sync) sync=true ;;
+  *)
+    echo "Usage: bash infra/scripts/apply-cluster-env.sh [--sync]" >&2
+    exit 2
+    ;;
+esac
 
 root=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$root"
@@ -105,3 +115,18 @@ cut -d= -f1 "$tmp"
 "${kctl[@]}" apply -f "$sec"
 
 echo "Secret internity-secrets is applied in namespace internity."
+
+# Register the Argo CD project and Application from the same checkout. This
+# keeps the normal VM path to one command after the env files are prepared.
+argocd_manifest="$root/infra/argocd/internity.yaml"
+if [[ -f "$argocd_manifest" ]]; then
+  "${kctl[@]}" apply -f "$argocd_manifest"
+  echo "Argo CD Application internity is registered."
+fi
+
+if [[ "$sync" == true ]]; then
+  "${kctl[@]}" -n argocd patch application internity \
+    --type merge \
+    --patch '{"operation":{"sync":{}}}' >/dev/null
+  echo "Argo CD sync requested for internity."
+fi

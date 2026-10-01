@@ -72,7 +72,7 @@ Staff browser ──► apps/staff (:3001) ──► Backend API_SURFACE=staff (
 There are **two frontends and two API processes**, but **one backend image and one database**:
 
 - `apps/web` (intern site) talks only to the **public API**. Reachable from any address.
-- `apps/staff` (staff site) talks only to the **staff API**. Published on loopback / office range and additionally gated by `STAFF_ALLOWED_IPS`.
+- `apps/staff` (staff site) talks only to the **staff API**. Published on loopback and gated by `STAFF_ALLOWED_IPS`.
 - Both API processes share `MONGODB_URI` and `JWT_SECRET`. Session cookie (`internity_session`) works against both.
 
 ### 3.2 Dual-surface backend (the core isolation mechanism)
@@ -82,7 +82,7 @@ There are **two frontends and two API processes**, but **one backend image and o
 | Surface | `API_SURFACE` | Registered routes | Purpose |
 |---|---|---|---|
 | Public | `public` | `GET /health`, `/api/auth` (intern only), `/api/intern`, `/api/departments` (read) | Intern traffic. Staff routes are **not registered** — the URLs do not exist here. Staff sign-in is refused. |
-| Staff | `staff` | Everything above **plus** `/api/admin`, `/api/hr`, `/api/supervisor`, `/api/instructor` | All staff operations. Staff sign-in additionally requires the client IP to be in `STAFF_ALLOWED_IPS` (or loopback in dev). |
+| Staff | `staff` | Everything above **plus** `/api/admin`, `/api/hr`, `/api/supervisor`, `/api/instructor` | All staff operations. Staff sign-in requires the client IP to be in `STAFF_ALLOWED_IPS`. |
 
 Isolation is by **route absence**, not just role checks: an attacker on the public address cannot reach staff handlers because they are never mounted. Role and department checks still run on every mounted route as defense in depth (`apps/backend/src/app.ts:51-72`).
 
@@ -159,7 +159,7 @@ internity/
   infra/
     k8s/            # base + overlays/production manifests
     argocd/         # Argo CD Application definitions
-  docs/             # ubuntu-vm.md, how to run on the VM
+  docs/             # Argo CD quick start and VM operations
   .github/workflows/# validation + Docker build/publish
   docker-compose.yml# mongo + 2 APIs + 2 sites (local)
   env.example       # root compose env template
@@ -301,7 +301,7 @@ Rules that matter:
 
 - `JWT_SECRET` and `MONGODB_URI` must be identical across both API processes.
 - `APP_URL` builds intern links; `STAFF_APP_URL` builds staff links — keep them aligned with the site ports.
-- `STAFF_ALLOWED_IPS` is the office egress list. Empty = loopback only (dev). **Production staff API refuses to start until it is set.**
+- `STAFF_ALLOWED_IPS` controls which client addresses may use the staff surface. Use `127.0.0.1` for the localhost deployment. **Production staff API refuses to start until it is set.**
 - `VITE_API_URL` is baked at build time — the Docker `web`/`staff` images take it from `VITE_PUBLIC_API_URL` / `VITE_STAFF_API_URL` build args.
 - Set `TRUST_PROXY=true` only behind a proxy that overwrites `X-Forwarded-For` with the observed client IP.
 - Never commit any `.env`. Templates are `env.example` / `apps/*/[env.example]`.
@@ -356,7 +356,7 @@ pnpm lint
 
 - **HTTP-only session cookie** (`internity_session`); no JWT in `localStorage`.
 - **Dual-surface isolation** — staff handlers absent from the public process.
-- **IP gating** — staff sign-in restricted to `STAFF_ALLOWED_IPS` (+ loopback in dev); off-site staff must use the office VPN. Public process refuses staff accounts unconditionally.
+- **IP gating** — staff sign-in is restricted to `STAFF_ALLOWED_IPS`; the localhost deployment uses `127.0.0.1`. Public process refuses staff accounts unconditionally.
 - **RBAC + department scope on every route** — frontend guards are cosmetic.
 - **Secrets hygiene** — `JWT_SECRET`, `GROQ_API_KEY`, `RESEND_API_KEY`, `ADMIN_PASSWORD` via env/secrets only. `GROQ_API_KEY` never enters the frontend bundle.
 - **Mail fallback** — with `RESEND_API_KEY` empty, invitation/reset links are returned to the caller and written to the server log (dev-friendly, no silent failures).
@@ -367,9 +367,9 @@ pnpm lint
 
 | Symptom | Likely cause → fix |
 |---|---|
-| Staff sign-in rejected locally (non-Docker) | `STAFF_ALLOWED_IPS` set or accessed via non-loopback → clear it in dev, use `http://localhost:3001`, or add your IP |
+| Staff sign-in rejected locally (non-Docker) | Use `http://localhost:3001` and keep `STAFF_ALLOWED_IPS=127.0.0.1` for the local staff API |
 | Staff sign-in rejected in Compose | `STAFF_ALLOW_PRIVATE` unset → set `STAFF_ALLOW_PRIVATE=true` in root `.env` (local only) |
-| Staff API exits in production | `STAFF_ALLOWED_IPS` empty → set the office egress IPs/CIDRs |
+| Staff API exits in production | `STAFF_ALLOWED_IPS` empty → set `STAFF_ALLOWED_IPS=127.0.0.1` |
 | Frontend calls wrong API | Stale `VITE_API_URL` baked at build → rebuild after changing it; check `apps/web/.env` vs `apps/staff/.env` |
 | `pnpm --filter backend test` fails to connect | No Mongo on `127.0.0.1:27017` → `docker compose up -d mongo` first |
 | Seed does nothing / login fails | Seeded a different DB than the API reads → compare `MONGODB_URI` in `apps/backend/.env` vs Compose |
@@ -382,10 +382,10 @@ Health probes: `GET /health` (liveness), `GET /health/ready` (readiness incl. DB
 
 ## 13. Deployment Overview
 
-Production path is GitOps. `.github/workflows/ci.yml` runs on `master`: frontend lint and backend lint in parallel, then a build, then one Docker job that pushes immutable `sha-<commit>` images to Docker Hub and commits those tags into `infra/k8s/overlays/production`. Argo CD (`infra/argocd/internity.yaml`) syncs that overlay into k3s when you press Sync. Separate Deployments run the intern site, the staff site, the public API, and the staff API. Both APIs are the same image with a different `API_SURFACE`. Staff access is enforced in the app from `STAFF_ALLOWED_IPS`, not by the ingress. On the VM, MongoDB is the `mongo` StatefulSet. How to start it: `docs/ubuntu-vm.md`.
+Production path is GitOps. `.github/workflows/ci.yml` runs on `master`: frontend lint and backend lint in parallel, then a build, then one Docker job that pushes immutable `sha-<commit>` images to Docker Hub and commits those tags into `infra/k8s/overlays/production`. Argo CD (`infra/argocd/internity.yaml`) syncs that overlay into k3s when you request a sync. Separate Deployments run the intern site, the staff site, the public API, and the staff API. Both APIs are the same image with a different `API_SURFACE`. Staff access is enforced in the app from `STAFF_ALLOWED_IPS`, not by the ingress. On the VM, MongoDB is the `mongo` StatefulSet. Start it with the one-command flow in `docs/argocd-quickstart.md`.
 
 ---
 
 ## 14. Further Documentation
 
-- `docs/ubuntu-vm.md` — run Internity on the Ubuntu VM with Argo CD
+- `docs/argocd-quickstart.md` — one-command Argo CD registration and sync from the Linux VM

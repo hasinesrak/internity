@@ -4,10 +4,10 @@ metadata:
   name: internity-config
 data:
   NODE_ENV: production
-  APP_URL: http://internity.192.168.0.103.sslip.io
-  STAFF_APP_URL: http://staff.192.168.0.103.sslip.io
-  PUBLIC_CORS_ORIGIN: http://internity.192.168.0.103.sslip.io
-  STAFF_CORS_ORIGIN: http://staff.192.168.0.103.sslip.io
+  APP_URL: http://localhost:3000
+  STAFF_APP_URL: http://localhost:3001
+  PUBLIC_CORS_ORIGIN: http://localhost:3000
+  STAFF_CORS_ORIGIN: http://localhost:3001
   JWT_EXPIRES_IN: 8h
   COOKIE_SECURE: "false"
   TRUST_PROXY: "true"
