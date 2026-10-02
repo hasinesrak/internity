@@ -14,7 +14,6 @@
     "seed": "tsx src/scripts/seed.ts"
   },
   "dependencies": {
-    "@ai-sdk/groq": "^4.0.41",
     "@hono/node-server": "^1.19.17",
     "ai": "^7.0.101",
     "bcryptjs": "^2.4.3",

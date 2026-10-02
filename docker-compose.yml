@@ -12,8 +12,8 @@ x-backend-environment: &backend-environment
   TRUST_PROXY: ${TRUST_PROXY:-false}
   RESEND_API_KEY: ${RESEND_API_KEY:-}
   RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-Internity <beth.t@example.com>}
-  GROQ_API_KEY: ${GROQ_API_KEY:-}
-  GROQ_MODEL: ${GROQ_MODEL:-qwen/qwen3.8-27b}
+  AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
+  AI_MODEL: ${AI_MODEL:-deepseek/deepseek-v4.1-flash}
   ADMIN_NAME: ${ADMIN_NAME:-Admin}
   ADMIN_EMAIL: ${ADMIN_EMAIL:-}
   ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}

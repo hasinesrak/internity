@@ -102,7 +102,7 @@ emit ADMIN_EMAIL "${env[ADMIN_EMAIL]:-}"
 emit ADMIN_PASSWORD "${env[ADMIN_PASSWORD]:-}"
 emit RESEND_API_KEY "${env[RESEND_API_KEY]:-}"
 emit RESEND_FROM_EMAIL "${env[RESEND_FROM_EMAIL]:-}"
-emit GROQ_API_KEY "${env[GROQ_API_KEY]:-}"
+emit AI_GATEWAY_API_KEY "${env[AI_GATEWAY_API_KEY]:-}"
 
 echo "Writing secret internity-secrets from the env files. Keys:"
 cut -d= -f1 "$tmp"

@@ -1,6 +1,7 @@
 import { Hono } from "hono"
 
 import { requireAuth, requireRoles } from "../middleware/auth.js"
+import { getAiModels, getAiProviders } from "../services/ai-catalog.service.js"
 import { listActivity } from "../services/activity.service.js"
 import { requestPasswordReset } from "../services/auth.service.js"
 import {
@@ -53,6 +54,16 @@ adminRoutes.get("/summary", async (c) =>
   c.json(await adminSummary(c.get("user")))
 )
 
+adminRoutes.get("/ai/models", async (c) => {
+  return c.json({ models: await getAiModels() })
+})
+
+adminRoutes.get("/ai/providers", async (c) => {
+  const model = c.req.query("model")?.trim()
+  if (!model) return c.json({ providers: [] })
+  return c.json({ providers: await getAiProviders(model) })
+})
+
 adminRoutes.get("/users", async (c) => {
   const query = parseQuery(userListSchema, c.req.query())
   return c.json(await listUsers(c.get("user"), query))
@@ -104,11 +115,7 @@ adminRoutes.post("/users/:id/reset-password", async (c) => {
   const id = requireId(c)
   enforceLimit(takePasswordResetEmail(c.get("user").id), "password resets")
   const body = parseBody(directResetSchema, await readJson(c))
-  const result = await requestPasswordReset(
-    c.get("user"),
-    id,
-    body.password
-  )
+  const result = await requestPasswordReset(c.get("user"), id, body.password)
   return c.json(result)
 })
 

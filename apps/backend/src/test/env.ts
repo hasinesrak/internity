@@ -7,7 +7,7 @@ const forced: Record<string, string> = {
   TRUST_PROXY: "false",
   STAFF_ALLOWED_IPS: "",
   API_SURFACE: "staff",
-  GROQ_API_KEY: "",
+  AI_GATEWAY_API_KEY: "",
   RESEND_API_KEY: "",
 }
 
@@ -16,7 +16,7 @@ const defaults: Record<string, string> = {
   APP_URL: "http://localhost:3000",
   STAFF_APP_URL: "http://localhost:3001",
   JWT_EXPIRES_IN: "8h",
-  GROQ_MODEL: "qwen/qwen3.8-27b",
+  AI_MODEL: "qwen/qwen3.8-27b",
 }
 
 for (const [key, value] of Object.entries(forced)) process.env[key] = value

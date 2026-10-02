@@ -62,7 +62,7 @@ async function main(): Promise<void> {
       surface: env.apiSurface,
       officeAddresses: env.staffAllowedIps.length,
       email: env.resendApiKey ? "on" : "off",
-      drafting: env.groqApiKey ? "on" : "off",
+      aiGateway: env.aiGatewayApiKey ? "on" : "off",
     })
   )
 

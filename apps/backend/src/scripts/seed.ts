@@ -80,7 +80,8 @@ async function main(): Promise<void> {
         key: "default",
         organizationName: "Internity",
         invitationTtlHours: 168,
-        groqModel: env.groqModel,
+        aiModel: env.aiModel,
+        aiProvider: "auto",
       },
     },
     { upsert: true }

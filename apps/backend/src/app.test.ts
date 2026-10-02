@@ -127,7 +127,7 @@ after(async () => {
 
 beforeEach(async () => {
   resetRateLimits()
-  process.env.GROQ_API_KEY = ""
+  process.env.AI_GATEWAY_API_KEY = ""
   process.env.STAFF_ALLOWED_IPS = ""
   process.env.TRUST_PROXY = "false"
   process.env.API_SURFACE = "staff"
@@ -433,7 +433,7 @@ describe("access boundaries", () => {
     }
     assert.equal(unavailableBody.error.code, "AI_UNAVAILABLE")
 
-    process.env.GROQ_API_KEY = "test-key-not-real"
+    process.env.AI_GATEWAY_API_KEY = "test-key-not-real"
     const missing = await instructorClient.call(
       "/api/instructor/ai/class-agenda-draft",
       {

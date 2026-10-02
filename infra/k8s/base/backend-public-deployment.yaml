@@ -103,17 +103,17 @@ spec:
                   name: internity-secrets
                   key: RESEND_FROM_EMAIL
                   optional: true
-            - name: GROQ_API_KEY
+            - name: AI_GATEWAY_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: internity-secrets
-                  key: GROQ_API_KEY
+                  key: AI_GATEWAY_API_KEY
                   optional: true
-            - name: GROQ_MODEL
+            - name: AI_MODEL
               valueFrom:
                 configMapKeyRef:
                   name: internity-config
-                  key: GROQ_MODEL
+                  key: AI_MODEL
             - name: UPLOAD_DIR
               valueFrom:
                 configMapKeyRef:

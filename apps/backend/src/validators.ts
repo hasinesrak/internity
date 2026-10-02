@@ -151,15 +151,30 @@ export const settingsSchema = z.object({
     .min(1, "Use at least 1 hour.")
     .max(24 * 30, "Use at most 30 days.")
     .optional(),
-  groqModel: z
+  aiModel: z
     .string()
     .trim()
     .min(1, "Enter a model id.")
     .max(120, "Use at most 120 characters.")
     .regex(
-      /^[A-Za-z0-9][A-Za-z0-9._:/-]*$/,
-      "Use a model id such as qwen/qwen3.8-27b."
+      /^[a-z0-9-]+\/[A-Za-z0-9._:-]+$/,
+      "Use a Gateway model id such as deepseek/deepseek-v4.1-flash."
     )
+    .optional(),
+  aiProvider: z
+    .string()
+    .trim()
+    .min(1)
+    .max(80)
+    .regex(/^[a-z0-9-]+$/)
+    .optional(),
+  /** @deprecated Compatibility alias for older staff clients. */
+  groqModel: z
+    .string()
+    .trim()
+    .min(1)
+    .max(120)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/)
     .optional(),
 })
 
@@ -215,6 +230,19 @@ export const changePasswordSchema = z.object({
     .min(1, "Enter your current password.")
     .max(128, "Use at most 128 characters."),
   newPassword: passwordSchema,
+})
+
+export const internCopilotSchema = z.object({
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().trim().min(1).max(4000),
+        images: z.array(z.string().max(2_000_000)).max(3).optional(),
+      })
+    )
+    .min(1)
+    .max(12),
 })
 
 export const tokenQuerySchema = z.object({

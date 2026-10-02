@@ -20,8 +20,8 @@ export type AppEnvConfig = {
   trustProxy: boolean
   resendApiKey: string
   resendFromEmail: string
-  groqApiKey: string
-  groqModel: string
+  aiGatewayApiKey: string
+  aiModel: string
   bcryptRounds: number
   adminName: string
   adminEmail: string
@@ -208,8 +208,8 @@ export function getEnv(): AppEnvConfig {
       "RESEND_FROM_EMAIL",
       "Internity <beth.t@example.com>"
     ),
-    groqApiKey: optional("GROQ_API_KEY"),
-    groqModel: optional("GROQ_MODEL", "qwen/qwen3.8-27b"),
+    aiGatewayApiKey: optional("AI_GATEWAY_API_KEY"),
+    aiModel: optional("AI_MODEL", "deepseek/deepseek-v4.1-flash"),
     bcryptRounds,
     adminName: optional("ADMIN_NAME", "Admin"),
     adminEmail: optional("ADMIN_EMAIL").toLowerCase(),

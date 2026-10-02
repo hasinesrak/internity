@@ -3,7 +3,12 @@ import type { ZodType } from "zod"
 import { ZodError } from "zod"
 
 import { getEnv } from "../config/env.js"
-import { AppError, payloadTooLarge, validation, type FieldIssue } from "./errors.js"
+import {
+  AppError,
+  payloadTooLarge,
+  validation,
+  type FieldIssue,
+} from "./errors.js"
 import { uploadRequestMaxBytes } from "./uploads.js"
 
 export function zodIssues(error: ZodError): FieldIssue[] {
@@ -65,8 +70,11 @@ export async function readBoundedBytes(
   return body
 }
 
-export async function readJson(c: Context): Promise<unknown> {
-  const bytes = await readBoundedBytes(c, JSON_MAX_BYTES)
+export async function readJson(
+  c: Context,
+  maxBytes = JSON_MAX_BYTES
+): Promise<unknown> {
+  const bytes = await readBoundedBytes(c, maxBytes)
   if (bytes.byteLength === 0) return {}
   const text = new TextDecoder().decode(bytes)
   if (!text.trim()) return {}

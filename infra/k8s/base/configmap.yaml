@@ -11,6 +11,6 @@ data:
   JWT_EXPIRES_IN: 8h
   COOKIE_SECURE: "false"
   TRUST_PROXY: "true"
-  GROQ_MODEL: qwen/qwen3.8-27b
+  AI_MODEL: deepseek/deepseek-v4.1-flash
   UPLOAD_DIR: /data/uploads
   UPLOAD_MAX_MB: "10"

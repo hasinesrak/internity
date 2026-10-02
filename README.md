@@ -49,7 +49,7 @@ One monorepo contains the full system: an **intern web app** (`apps/web`), a **s
 | Staff frontend (`apps/staff`) | TanStack Start, TanStack Router, React 19, Tailwind CSS v4, Zustand |
 | Shared UI (`packages/ui`) | shadcn-style components on Base UI primitives, beUI motion blocks (installed as source), Phosphor Icons (duotone), Manrope |
 | Backend (`apps/backend`) | Hono.js, TypeScript, Mongoose, Zod, `jose` (JWT), `bcryptjs` |
-| AI drafting (optional) | Groq API + Vercel AI SDK (`ai`, `@ai-sdk/groq`), model `qwen/qwen3.8-27b` |
+| AI features (optional) | Vercel AI Gateway + Vercel AI SDK (`ai`), default model `deepseek/deepseek-v4.1-flash` |
 | Database | MongoDB 7.x |
 | Local runtime | Docker + Docker Compose |
 | Production | Docker Hub → GitHub Actions → Argo CD → K3s |
@@ -118,7 +118,7 @@ Key design decisions:
 - **Stateless JWT sessions** in a secure, HTTP-only cookie (`internity_session`). No long-lived tokens in `localStorage`. Short lifetime (`JWT_EXPIRES_IN`, default `8h`).
 - **Backend is the authorization source of truth.** Frontend route guards exist for UX only; every permission (active status, valid JWT, role, department membership, resource-department match, intern submission ownership) is re-checked server-side.
 - **Department scoping** is enforced in middleware + service queries, so supervisors/instructors cannot cross into other departments even with valid IDs.
-- **AI drafting is assistive, not authoritative.** The backend loads department context itself (never trusts a department ID from the browser), calls Groq with a Zod-validated `Output.object` schema, and returns an editable draft. Nothing is persisted until the user submits the normal create/update action. Empty `GROQ_API_KEY` disables drafting; the rest of the API keeps running.
+- **AI features are assistive, not authoritative.** The backend loads department context itself (never trusts a department ID from the browser), calls Vercel AI Gateway with a Zod-validated `Output.object` schema, and returns an editable draft or scoped Copilot response. Nothing is persisted until the user submits the normal create/update action. Empty `AI_GATEWAY_API_KEY` disables AI; the rest of the API keeps running.
 
 ### 3.4 Frontend architecture
 
@@ -175,7 +175,7 @@ internity/
 - **pnpm** `10.33.4` (`corepack enable && corepack prepare pnpm@10.33.4 --activate`)
 - **Docker + Docker Compose** (for the recommended full-stack run)
 - **Local MongoDB optional** — only needed for the manual (non-Docker) path; Compose provides `mongo:7.0` automatically.
-- Optional: `RESEND_API_KEY` (real invitation emails), `GROQ_API_KEY` (AI drafting). Both can stay empty for local development.
+- Optional: `RESEND_API_KEY` (real invitation emails), `AI_GATEWAY_API_KEY` (AI Gateway models). Both can stay empty for local development.
 
 Verify:
 
@@ -292,7 +292,7 @@ pnpm dev
 
 | File | Purpose | Key values |
 |---|---|---|
-| `.env` (root) | Docker Compose wiring | `PUBLIC_API_PORT` (4000), `STAFF_API_PORT` (4001), `WEB_PORT` (3000), `STAFF_PORT` (3001), `APP_URL`, `STAFF_APP_URL`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, `TRUST_PROXY`, `RESEND_API_KEY`, `GROQ_API_KEY`, `GROQ_MODEL`, `ADMIN_*` bootstrap |
+| `.env` (root) | Docker Compose wiring | `PUBLIC_API_PORT` (4000), `STAFF_API_PORT` (4001), `WEB_PORT` (3000), `STAFF_PORT` (3001), `APP_URL`, `STAFF_APP_URL`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, `TRUST_PROXY`, `RESEND_API_KEY`, `AI_GATEWAY_API_KEY`, `AI_MODEL`, `ADMIN_*` bootstrap |
 | `apps/backend/.env` | Manual `pnpm --filter backend dev` | `HOST`, `PORT`, `MONGODB_URI`, `CORS_ORIGIN`, `API_SURFACE=staff\|public`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, mail + Groq keys |
 | `apps/web/.env` | Intern site | `WEB_HOST`, `WEB_PORT`, `VITE_API_URL=http://localhost:4000` (public API) |
 | `apps/staff/.env` | Staff site | `STAFF_HOST`, `STAFF_PORT`, `VITE_API_URL=http://localhost:4001` (staff API), `STAFF_ALLOWED_IPS` mirror |
@@ -358,7 +358,7 @@ pnpm lint
 - **Dual-surface isolation** — staff handlers absent from the public process.
 - **IP gating** — staff sign-in is restricted to `STAFF_ALLOWED_IPS`; the localhost deployment uses `127.0.0.1`. Public process refuses staff accounts unconditionally.
 - **RBAC + department scope on every route** — frontend guards are cosmetic.
-- **Secrets hygiene** — `JWT_SECRET`, `GROQ_API_KEY`, `RESEND_API_KEY`, `ADMIN_PASSWORD` via env/secrets only. `GROQ_API_KEY` never enters the frontend bundle.
+- **Secrets hygiene** — `JWT_SECRET`, `AI_GATEWAY_API_KEY`, `RESEND_API_KEY`, `ADMIN_PASSWORD` via env/secrets only. `AI_GATEWAY_API_KEY` never enters the frontend bundle.
 - **Mail fallback** — with `RESEND_API_KEY` empty, invitation/reset links are returned to the caller and written to the server log (dev-friendly, no silent failures).
 
 ---

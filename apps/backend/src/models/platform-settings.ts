@@ -4,7 +4,9 @@ export interface PlatformSettingsShape {
   key: string
   organizationName: string
   invitationTtlHours: number
-  groqModel: string
+  aiModel?: string
+  aiProvider?: string
+  groqModel?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -14,11 +16,10 @@ const platformSettingsSchema = new Schema<PlatformSettingsShape>(
     key: { type: String, required: true, unique: true, default: "default" },
     organizationName: { type: String, required: true, default: "Internity" },
     invitationTtlHours: { type: Number, required: true, default: 168 },
-    groqModel: {
-      type: String,
-      default: "qwen/qwen3.8-27b",
-      trim: true,
-    },
+    // Missing fields on legacy Groq settings use the Gateway defaults.
+    aiModel: { type: String, trim: true },
+    aiProvider: { type: String, trim: true },
+    groqModel: { type: String, trim: true },
   },
   { timestamps: true }
 )
