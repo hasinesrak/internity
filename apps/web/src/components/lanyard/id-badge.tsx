@@ -73,7 +73,7 @@ export function IdBadge({
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
-      <div className="relative h-[26rem] w-full sm:h-[30rem]">
+      <div className="relative h-[30rem] w-full sm:h-[34rem]">
         {swings ? (
           <Suspense fallback={<Skeleton className="h-full w-full" />}>
             {art ? (
@@ -117,7 +117,9 @@ function LanyardBadge({
   organization: string
 }) {
   const props: LanyardProps = {
-    position: [0, 0, 24],
+    // Keep the card large enough for its typography to remain readable while
+    // leaving the full ribbon and card inside the taller badge viewport.
+    position: [0, 2.6, 21],
     gravity: [0, -40, 0],
     frontImage: art.front,
     backImage: art.back,

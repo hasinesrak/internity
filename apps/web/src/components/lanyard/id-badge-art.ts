@@ -24,10 +24,14 @@ export interface BadgeArt {
   band: string | null
 }
 
-const FACE_W = 512
-const FACE_H = 776
-const BAND_W = 1024
-const BAND_H = 256
+// The GLB's 1678px atlas gives each card face roughly 840px of width. Render
+// close to that native size so text stays sharp without keeping a 2x texture
+// in memory for every face.
+const ART_SCALE = 1.75
+const FACE_W = 512 * ART_SCALE
+const FACE_H = 776 * ART_SCALE
+const BAND_W = 1024 * ART_SCALE
+const BAND_H = 256 * ART_SCALE
 
 // Neutrals, mirroring the token ramp in packages/ui/src/styles/globals.css.
 const CARD_BG = "#ffffff"
@@ -37,7 +41,9 @@ const HAIRLINE = "#e6e6e6"
 const BAND_BG = "#171717"
 const BAND_INK = "#ffffff"
 
-const FONT = "Manrope, system-ui, sans-serif"
+const FONT = "'Manrope Variable', system-ui, sans-serif"
+
+const artCache = new Map<string, Promise<BadgeArt>>()
 
 function createSurface(width: number, height: number) {
   const canvas = document.createElement("canvas")
@@ -143,9 +149,9 @@ function drawName(
   ctx.textAlign = "center"
   ctx.textBaseline = "top"
 
-  let size = 62
+  let size = 62 * ART_SCALE
   let lines: string[] = []
-  for (const candidate of [62, 52, 44, 36]) {
+  for (const candidate of [62, 52, 44, 36].map((value) => value * ART_SCALE)) {
     size = candidate
     ctx.font = `700 ${size}px ${FONT}`
     lines = wrapText(ctx, name, maxWidth, 2)
@@ -171,24 +177,53 @@ function drawFront(
 
   // Brand mark, or its monogram stand-in, in the card's upper third.
   if (logo) {
-    drawContained(ctx, logo, (FACE_W - 260) / 2, 120, 260, 168)
+    drawContained(
+      ctx,
+      logo,
+      (FACE_W - 260 * ART_SCALE) / 2,
+      120 * ART_SCALE,
+      260 * ART_SCALE,
+      168 * ART_SCALE
+    )
   } else {
-    const size = 132
-    drawMonogram(ctx, input.organization, (FACE_W - size) / 2, 140, size)
+    const size = 132 * ART_SCALE
+    drawMonogram(
+      ctx,
+      input.organization,
+      (FACE_W - size) / 2,
+      140 * ART_SCALE,
+      size
+    )
   }
 
-  const usedHeight = drawName(ctx, input.name, FACE_W / 2, 430, FACE_W - 88)
+  const usedHeight = drawName(
+    ctx,
+    input.name,
+    FACE_W / 2,
+    430 * ART_SCALE,
+    FACE_W - 88 * ART_SCALE
+  )
 
   ctx.save()
   ctx.fillStyle = INK_MUTED
-  ctx.font = `500 27px ${FONT}`
+  ctx.font = `600 ${27 * ART_SCALE}px ${FONT}`
   ctx.textAlign = "center"
   ctx.textBaseline = "top"
-  ctx.fillText(input.label, FACE_W / 2, 430 + usedHeight + 18, FACE_W - 96)
+  ctx.fillText(
+    input.label,
+    FACE_W / 2,
+    430 * ART_SCALE + usedHeight + 18 * ART_SCALE,
+    FACE_W - 96 * ART_SCALE
+  )
   ctx.restore()
 
   ctx.fillStyle = HAIRLINE
-  ctx.fillRect(FACE_W / 2 - 110, 686, 220, 3)
+  ctx.fillRect(
+    FACE_W / 2 - 110 * ART_SCALE,
+    686 * ART_SCALE,
+    220 * ART_SCALE,
+    3 * ART_SCALE
+  )
 }
 
 function drawBack(
@@ -200,22 +235,45 @@ function drawBack(
   ctx.fillRect(0, 0, FACE_W, FACE_H)
 
   if (logo) {
-    drawContained(ctx, logo, (FACE_W - 300) / 2, 220, 300, 200)
+    drawContained(
+      ctx,
+      logo,
+      (FACE_W - 300 * ART_SCALE) / 2,
+      220 * ART_SCALE,
+      300 * ART_SCALE,
+      200 * ART_SCALE
+    )
   } else {
-    const size = 156
-    drawMonogram(ctx, input.organization, (FACE_W - size) / 2, 240, size)
+    const size = 156 * ART_SCALE
+    drawMonogram(
+      ctx,
+      input.organization,
+      (FACE_W - size) / 2,
+      240 * ART_SCALE,
+      size
+    )
   }
 
   ctx.save()
   ctx.fillStyle = INK_MUTED
-  ctx.font = `600 25px ${FONT}`
+  ctx.font = `600 ${25 * ART_SCALE}px ${FONT}`
   ctx.textAlign = "center"
   ctx.textBaseline = "top"
-  ctx.fillText(input.organization, FACE_W / 2, 500, FACE_W - 88)
+  ctx.fillText(
+    input.organization,
+    FACE_W / 2,
+    500 * ART_SCALE,
+    FACE_W - 88 * ART_SCALE
+  )
   ctx.restore()
 
   ctx.fillStyle = HAIRLINE
-  ctx.fillRect(FACE_W / 2 - 110, 686, 220, 3)
+  ctx.fillRect(
+    FACE_W / 2 - 110 * ART_SCALE,
+    686 * ART_SCALE,
+    220 * ART_SCALE,
+    3 * ART_SCALE
+  )
 }
 
 function drawBand(input: BadgeArtInput, ctx: CanvasRenderingContext2D) {
@@ -224,7 +282,7 @@ function drawBand(input: BadgeArtInput, ctx: CanvasRenderingContext2D) {
 
   ctx.save()
   ctx.fillStyle = BAND_INK
-  ctx.font = `600 58px ${FONT}`
+  ctx.font = `600 ${58 * ART_SCALE}px ${FONT}`
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
   const tracked = input.organization.toUpperCase()
@@ -235,15 +293,15 @@ function drawBand(input: BadgeArtInput, ctx: CanvasRenderingContext2D) {
 
   ctx.save()
   ctx.fillStyle = BAND_INK
-  ctx.translate(96, BAND_H / 2)
+  ctx.translate(96 * ART_SCALE, BAND_H / 2)
   ctx.rotate(Math.PI / 4)
-  ctx.fillRect(-9, -9, 18, 18)
+  ctx.fillRect(-9 * ART_SCALE, -9 * ART_SCALE, 18 * ART_SCALE, 18 * ART_SCALE)
   ctx.restore()
   ctx.save()
   ctx.fillStyle = BAND_INK
-  ctx.translate(BAND_W - 96, BAND_H / 2)
+  ctx.translate(BAND_W - 96 * ART_SCALE, BAND_H / 2)
   ctx.rotate(Math.PI / 4)
-  ctx.fillRect(-9, -9, 18, 18)
+  ctx.fillRect(-9 * ART_SCALE, -9 * ART_SCALE, 18 * ART_SCALE, 18 * ART_SCALE)
   ctx.restore()
 }
 
@@ -260,7 +318,17 @@ function toDataUrl(canvas: HTMLCanvasElement): string | null {
  * Builds the three badge textures. The logo is loaded once and shared by both
  * faces; when it is missing the faces carry a monogram instead.
  */
-export async function buildBadgeArt(input: BadgeArtInput): Promise<BadgeArt> {
+export function buildBadgeArt(input: BadgeArtInput): Promise<BadgeArt> {
+  const key = JSON.stringify(input)
+  const cached = artCache.get(key)
+  if (cached) return cached
+
+  const pending = createBadgeArt(input)
+  artCache.set(key, pending)
+  return pending
+}
+
+async function createBadgeArt(input: BadgeArtInput): Promise<BadgeArt> {
   if (typeof document === "undefined") {
     return { front: null, back: null, band: null }
   }

@@ -110,7 +110,10 @@ export default function Lanyard({
     <div className="lanyard-wrapper">
       <Canvas
         camera={{ position: position, fov: fov }}
-        dpr={[1, isMobile ? 1.5 : 2]}
+        // Cap pixel density to avoid rendering a large transparent canvas at
+        // native 3x/4x device resolution. The card texture supplies the text
+        // sharpness; this cap keeps animation and physics responsive.
+        dpr={[1, isMobile ? 1.25 : 1.5]}
         gl={{ alpha: transparent }}
         onCreated={({ gl }) =>
           gl.setClearColor(new THREE.Color(0x000000), transparent ? 0 : 1)
@@ -394,7 +397,10 @@ function Band({
         >
           <CuboidCollider args={[0.8, 1.125, 0.01]} />
           <group
-            scale={2.25}
+            // The original React Bits scale is too small inside the bounded
+            // profile panel. A slightly larger card makes the generated text
+            // legible while the camera framing keeps it from being clipped.
+            scale={3}
             position={[0, -1.2, -0.05]}
             onPointerOver={() => hover(true)}
             onPointerOut={() => hover(false)}

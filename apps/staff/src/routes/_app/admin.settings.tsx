@@ -1,15 +1,31 @@
-// Platform settings: organization name, invitation lifetime, and the drafting model.
+// Platform settings: organization name, invitation lifetime, and AI Gateway routing.
 import { useEffect, useState } from "react"
 import { createFileRoute } from "@tanstack/react-router"
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
 import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field"
 import { Input } from "@workspace/ui/components/motion/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from "@workspace/ui/components/motion/select"
 import { StatefulButton } from "@workspace/ui/components/motion/button/stateful"
 import { Reveal } from "@workspace/ui/components/reveal"
 
 import { ErrorPanel, LoadingPanel } from "@/components/data-states"
 import { PageHeader } from "@/components/page-header"
-import { getPlatformSettings, updatePlatformSettings } from "@/lib/data"
+import {
+  getAiModels,
+  getAiProviders,
+  getPlatformSettings,
+  updatePlatformSettings,
+} from "@/lib/data"
 import { requireRole } from "@/lib/guards"
 import { useResource } from "@/lib/use-resource"
 import { toast } from "@/lib/toast"
@@ -25,26 +41,54 @@ function PlatformSettingsPage() {
   const settings = useResource(getPlatformSettings, [])
   const [organizationName, setOrganizationName] = useState("")
   const [invitationHours, setInvitationHours] = useState("168")
-  const [groqModel, setGroqModel] = useState("")
+  const [aiModel, setAiModel] = useState("")
+  const [aiProvider, setAiProvider] = useState("auto")
+  const [models, setModels] = useState<Awaited<ReturnType<typeof getAiModels>>>(
+    []
+  )
+  const [providers, setProviders] = useState<
+    Awaited<ReturnType<typeof getAiProviders>>
+  >([])
   const [errors, setErrors] = useState<Record<string, string | undefined>>({})
-  const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle")
+  const [state, setState] = useState<"idle" | "loading" | "success" | "error">(
+    "idle"
+  )
 
   useEffect(() => {
     if (!settings.data) return
     setOrganizationName(settings.data.organizationName)
     setInvitationHours(String(settings.data.invitationTtlHours))
-    setGroqModel(settings.data.groqModel)
+    setAiModel(
+      settings.data.aiModel ||
+        settings.data.groqModel ||
+        "deepseek/deepseek-v4.1-flash"
+    )
+    setAiProvider(settings.data.aiProvider || "auto")
   }, [settings.data])
+
+  useEffect(() => {
+    void getAiModels()
+      .then(setModels)
+      .catch(() => setModels([]))
+  }, [])
+
+  useEffect(() => {
+    if (!aiModel) return
+    void getAiProviders(aiModel)
+      .then(setProviders)
+      .catch(() => setProviders([]))
+  }, [aiModel])
 
   const save = async () => {
     const found: Record<string, string | undefined> = {}
-    if (!organizationName.trim()) found.organizationName = "Enter an organization name."
+    if (!organizationName.trim())
+      found.organizationName = "Enter an organization name."
     const hours = Number(invitationHours)
     if (!Number.isInteger(hours) || hours < 1 || hours > 24 * 30) {
       found.invitationHours = "Use a whole number of hours from 1 to 720."
     }
-    if (!/^[A-Za-z0-9][A-Za-z0-9._:/-]*$/.test(groqModel.trim())) {
-      found.groqModel = "Use a model id such as qwen/qwen3.8-27b."
+    if (!aiModel.trim()) {
+      found.aiModel = "Choose a model."
     }
     setErrors(found)
     if (Object.values(found).some(Boolean)) {
@@ -56,7 +100,8 @@ function PlatformSettingsPage() {
       await updatePlatformSettings({
         organizationName: organizationName.trim(),
         invitationTtlHours: hours,
-        groqModel: groqModel.trim(),
+        aiModel: aiModel.trim(),
+        aiProvider,
       })
       setState("success")
       toast.success("Platform settings saved")
@@ -65,7 +110,9 @@ function PlatformSettingsPage() {
       setState("error")
       setErrors({
         organizationName:
-          error instanceof Error ? error.message : "Platform settings could not be saved.",
+          error instanceof Error
+            ? error.message
+            : "Platform settings could not be saved.",
       })
     }
   }
@@ -75,7 +122,7 @@ function PlatformSettingsPage() {
       <Reveal index={0}>
         <PageHeader
           title="Platform"
-          description="The organization name, how long invitation links last, and the drafting model."
+          description="The organization name, invitation lifetime, and AI Gateway routing."
         />
       </Reveal>
 
@@ -94,8 +141,12 @@ function PlatformSettingsPage() {
             </CardHeader>
             <CardContent>
               <FieldGroup>
-                <Field data-invalid={errors.organizationName ? true : undefined}>
-                  <FieldLabel htmlFor="organization-name">Organization name</FieldLabel>
+                <Field
+                  data-invalid={errors.organizationName ? true : undefined}
+                >
+                  <FieldLabel htmlFor="organization-name">
+                    Organization name
+                  </FieldLabel>
                   <Input
                     id="organization-name"
                     label=""
@@ -107,7 +158,9 @@ function PlatformSettingsPage() {
                   />
                 </Field>
                 <Field data-invalid={errors.invitationHours ? true : undefined}>
-                  <FieldLabel htmlFor="invitation-hours">Invitation link lifetime</FieldLabel>
+                  <FieldLabel htmlFor="invitation-hours">
+                    Invitation link lifetime
+                  </FieldLabel>
                   <Input
                     id="invitation-hours"
                     label=""
@@ -125,20 +178,69 @@ function PlatformSettingsPage() {
                     Hours until an invitation link expires. 168 hours is 7 days.
                   </p>
                 </Field>
-                <Field data-invalid={errors.groqModel ? true : undefined}>
-                  <FieldLabel htmlFor="groq-model">Drafting model</FieldLabel>
-                  <Input
-                    id="groq-model"
-                    label=""
-                    value={groqModel}
-                    onChange={setGroqModel}
-                    placeholder="qwen/qwen3.8-27b"
-                    error={errors.groqModel}
-                    reserveErrorLine
+                <Field data-invalid={errors.aiModel ? true : undefined}>
+                  <FieldLabel htmlFor="ai-model">AI Gateway model</FieldLabel>
+                  <Select
+                    value={aiModel}
+                    onValueChange={setAiModel}
                     disabled={state === "loading"}
-                  />
+                  >
+                    <SelectTrigger className="w-full">
+                      <span className="truncate">
+                        {(models.find((model) => model.id === aiModel)?.name ??
+                          aiModel) ||
+                          "Choose a model"}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models.map((model) => (
+                        <SelectItem key={model.id} value={model.id}>
+                          <span className="flex items-center gap-2">
+                            {model.name}
+                            {model.supportsImages ? (
+                              <span className="text-xs text-muted-foreground">
+                                vision
+                              </span>
+                            ) : null}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <p className="px-1 text-xs text-muted-foreground">
-                    Used when a supervisor or instructor drafts an assignment or a class agenda.
+                    DeepSeek V4.1 Flash is enabled for multimodal Copilot
+                    requests.
+                  </p>
+                </Field>
+                <Field data-invalid={errors.aiProvider ? true : undefined}>
+                  <FieldLabel htmlFor="ai-provider">
+                    AI Gateway provider
+                  </FieldLabel>
+                  <Select
+                    value={aiProvider}
+                    onValueChange={setAiProvider}
+                    disabled={state === "loading"}
+                  >
+                    <SelectTrigger className="w-full">
+                      <span className="truncate">
+                        {aiProvider === "auto"
+                          ? "Automatic routing"
+                          : aiProvider}
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Automatic routing</SelectItem>
+                      {providers.map((provider) => (
+                        <SelectItem key={provider.id} value={provider.id}>
+                          {provider.id}
+                          {provider.supportsImages ? " · vision" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="px-1 text-xs text-muted-foreground">
+                    Automatic routing uses Gateway availability and latency.
+                    Choose a provider to pin requests.
                   </p>
                 </Field>
                 <StatefulButton

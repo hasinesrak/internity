@@ -9,17 +9,18 @@ import { AISidebar } from "@workspace/ui/components/agents/ai-sidebar"
 import { Tooltip } from "@workspace/ui/components/motion/tooltip"
 
 import type { NavPin } from "@/lib/nav"
-import {
-  navIcon,
-  navResources,
-  pinnedResources,
-  resolvePins,
-} from "@/lib/nav"
+import { navIcon, navResources, pinnedResources, resolvePins } from "@/lib/nav"
 import type { AssignmentRow } from "@/lib/types"
 import { assignmentView } from "@/lib/types"
 
-export function useNavPins(assignments: AssignmentRow[], pinnedIds: string[]): NavPin[] {
-  return useMemo(() => resolvePins(pinnedIds, assignments), [assignments, pinnedIds])
+export function useNavPins(
+  assignments: AssignmentRow[],
+  pinnedIds: string[]
+): NavPin[] {
+  return useMemo(
+    () => resolvePins(pinnedIds, assignments),
+    [assignments, pinnedIds]
+  )
 }
 
 /** Maps a tree row to its route. Pins open the work they saved. */
@@ -32,7 +33,9 @@ export function useNavigateToNav() {
         void navigate({ to: "/assignments/$id", params: { id: assignmentId } })
         return
       }
-      const destination = id.startsWith("destination:") ? id.slice("destination:".length) : id
+      const destination = id.startsWith("destination:")
+        ? id.slice("destination:".length)
+        : id
       switch (destination) {
         case "overview":
           void navigate({ to: "/dashboard" })
@@ -55,17 +58,23 @@ export function useNavigateToNav() {
         case "feedback":
           void navigate({ to: "/feedback" })
           return
+        case "copilot":
+          void navigate({ to: "/copilot" })
+          return
         case "settings":
           void navigate({ to: "/settings" })
           return
       }
     },
-    [navigate],
+    [navigate]
   )
 }
 
 /** Which row the current location selects. */
-export function useActiveNavId(assignments: AssignmentRow[], pinnedIds: string[]): string | null {
+export function useActiveNavId(
+  assignments: AssignmentRow[],
+  pinnedIds: string[]
+): string | null {
   const location = useRouterState({ select: (state) => state.location })
   const pins = useNavPins(assignments, pinnedIds)
 
@@ -75,6 +84,7 @@ export function useActiveNavId(assignments: AssignmentRow[], pinnedIds: string[]
 
     if (pathname === "/dashboard" || pathname === "/") return "overview"
     if (pathname === "/feedback") return "feedback"
+    if (pathname === "/copilot") return "copilot"
     if (pathname === "/settings") return "settings"
     if (pathname === "/classes") {
       return view === "past" ? "classes-past" : "classes-upcoming"
@@ -91,7 +101,9 @@ export function useActiveNavId(assignments: AssignmentRow[], pinnedIds: string[]
       const assignmentId = decodeURIComponent(detail[1])
       const pin = pins.find((item) => item.id === `assignment:${assignmentId}`)
       if (pin) return pin.id
-      const row = assignments.find((item) => item.assignment.id === assignmentId)
+      const row = assignments.find(
+        (item) => item.assignment.id === assignmentId
+      )
       return row ? `assignments-${assignmentView(row)}` : "assignments-open"
     }
     return null
@@ -116,7 +128,7 @@ export function NavTree({
 
   const items = useMemo<SidebarResource[]>(
     () => [...pinnedResources(pins), ...navResources()],
-    [pins],
+    [pins]
   )
 
   return (
@@ -157,6 +169,7 @@ export function NavRail({
     { id: "assignments-submitted", label: "Submitted work" },
     { id: "assignments-graded", label: "Graded work" },
     { id: "feedback", label: "Feedback" },
+    { id: "copilot", label: "Copilot" },
     { id: "settings", label: "Settings" },
   ]
 
@@ -176,7 +189,7 @@ export function NavRail({
               aria-current={current ? "page" : undefined}
               onClick={() => onNavigate(entry.id)}
               className={[
-                "grid size-9 place-items-center rounded-xl outline-none transition-colors",
+                "grid size-9 place-items-center rounded-xl transition-colors outline-none",
                 "hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
                 current ? "bg-muted text-foreground" : "text-muted-foreground",
               ].join(" ")}

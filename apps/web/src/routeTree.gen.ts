@@ -18,6 +18,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppFeedbackRouteImport } from './routes/_app/feedback'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppCopilotRouteImport } from './routes/_app/copilot'
 import { Route as AppClassesRouteImport } from './routes/_app/classes'
 import { Route as AppAssignmentsRouteImport } from './routes/_app/assignments'
 import { Route as AppAssignmentsIdRouteImport } from './routes/_app/assignments_.$id'
@@ -66,6 +67,11 @@ const AppDashboardRoute = AppDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCopilotRoute = AppCopilotRouteImport.update({
+  id: '/copilot',
+  path: '/copilot',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppClassesRoute = AppClassesRouteImport.update({
   id: '/classes',
   path: '/classes',
@@ -90,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/welcome': typeof WelcomeRoute
   '/assignments': typeof AppAssignmentsRoute
   '/classes': typeof AppClassesRoute
+  '/copilot': typeof AppCopilotRoute
   '/dashboard': typeof AppDashboardRoute
   '/feedback': typeof AppFeedbackRoute
   '/settings': typeof AppSettingsRoute
@@ -103,6 +110,7 @@ export interface FileRoutesByTo {
   '/welcome': typeof WelcomeRoute
   '/assignments': typeof AppAssignmentsRoute
   '/classes': typeof AppClassesRoute
+  '/copilot': typeof AppCopilotRoute
   '/dashboard': typeof AppDashboardRoute
   '/feedback': typeof AppFeedbackRoute
   '/settings': typeof AppSettingsRoute
@@ -118,6 +126,7 @@ export interface FileRoutesById {
   '/welcome': typeof WelcomeRoute
   '/_app/assignments': typeof AppAssignmentsRoute
   '/_app/classes': typeof AppClassesRoute
+  '/_app/copilot': typeof AppCopilotRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/feedback': typeof AppFeedbackRoute
   '/_app/settings': typeof AppSettingsRoute
@@ -133,6 +142,7 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/assignments'
     | '/classes'
+    | '/copilot'
     | '/dashboard'
     | '/feedback'
     | '/settings'
@@ -146,6 +156,7 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/assignments'
     | '/classes'
+    | '/copilot'
     | '/dashboard'
     | '/feedback'
     | '/settings'
@@ -160,6 +171,7 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/_app/assignments'
     | '/_app/classes'
+    | '/_app/copilot'
     | '/_app/dashboard'
     | '/_app/feedback'
     | '/_app/settings'
@@ -240,6 +252,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/copilot': {
+      id: '/_app/copilot'
+      path: '/copilot'
+      fullPath: '/copilot'
+      preLoaderRoute: typeof AppCopilotRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/classes': {
       id: '/_app/classes'
       path: '/classes'
@@ -267,6 +286,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteChildren {
   AppAssignmentsRoute: typeof AppAssignmentsRoute
   AppClassesRoute: typeof AppClassesRoute
+  AppCopilotRoute: typeof AppCopilotRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppFeedbackRoute: typeof AppFeedbackRoute
   AppSettingsRoute: typeof AppSettingsRoute
@@ -276,6 +296,7 @@ interface AppRouteChildren {
 const AppRouteChildren: AppRouteChildren = {
   AppAssignmentsRoute: AppAssignmentsRoute,
   AppClassesRoute: AppClassesRoute,
+  AppCopilotRoute: AppCopilotRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppFeedbackRoute: AppFeedbackRoute,
   AppSettingsRoute: AppSettingsRoute,

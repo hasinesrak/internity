@@ -373,7 +373,32 @@ export function revokeUser(id: string): Promise<PublicUser> {
 export interface PlatformSettings {
   organizationName: string
   invitationTtlHours: number
-  groqModel: string
+  aiModel: string
+  aiProvider: string
+  groqModel?: string
+}
+
+export interface AiModelOption {
+  id: string
+  name: string
+  supportsImages: boolean
+}
+
+export interface AiProviderOption {
+  id: string
+  supportsImages: boolean
+}
+
+export function getAiModels(): Promise<AiModelOption[]> {
+  return request<{ models: AiModelOption[] }>("/api/admin/ai/models").then(
+    (body) => body.models,
+  )
+}
+
+export function getAiProviders(model: string): Promise<AiProviderOption[]> {
+  return request<{ providers: AiProviderOption[] }>(
+    `/api/admin/ai/providers?model=${encodeURIComponent(model)}`,
+  ).then((body) => body.providers)
 }
 
 export function getPlatformSettings(): Promise<PlatformSettings> {

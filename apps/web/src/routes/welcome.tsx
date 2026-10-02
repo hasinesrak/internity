@@ -56,20 +56,31 @@ function WelcomePage() {
     <AuthShell
       title={user ? `Welcome, ${firstName}.` : "Welcome."}
       description={description}
+      mainClassName="justify-start"
+      contentClassName="min-h-[calc(100svh-2rem)] max-w-md justify-between gap-4"
     >
-      <div className="flex flex-col gap-6">
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
         {user && org ? (
-          <IdBadge name={user.name} label={label} organization={org} />
+          <IdBadge
+            name={user.name}
+            label={label}
+            organization={org}
+            className="shrink-0"
+          />
         ) : (
-          <Skeleton className="h-[26rem] w-full sm:h-[30rem]" />
+          <Skeleton className="h-[34rem] w-full shrink-0" />
         )}
         <Button
           size="lg"
-          className="w-full"
+          className="mt-auto w-full shrink-0"
           onClick={() => void navigate({ to: "/dashboard", replace: true })}
         >
           Continue to dashboard
-          <ArrowRightIcon data-icon="inline-end" weight="duotone" className="size-4" />
+          <ArrowRightIcon
+            data-icon="inline-end"
+            weight="duotone"
+            className="size-4"
+          />
         </Button>
       </div>
     </AuthShell>

@@ -11,6 +11,7 @@ import {
   GearIcon,
   HouseIcon,
   LinkSimpleIcon,
+  SparkleIcon,
   TrayIcon,
 } from "@phosphor-icons/react"
 import type { SidebarResource } from "@workspace/ui/components/agents/ai-sidebar"
@@ -47,7 +48,12 @@ export const NAV_CLASSES: NavGroup = {
   label: "Classes",
   icon: CalendarBlankIcon,
   children: [
-    { id: "classes-upcoming", label: "Upcoming", icon: ClockIcon, view: "upcoming" },
+    {
+      id: "classes-upcoming",
+      label: "Upcoming",
+      icon: ClockIcon,
+      view: "upcoming",
+    },
     { id: "classes-past", label: "Past", icon: ExamIcon, view: "past" },
   ],
 }
@@ -58,8 +64,18 @@ export const NAV_ASSIGNMENTS: NavGroup = {
   icon: ClipboardTextIcon,
   children: [
     { id: "assignments-open", label: "Open", icon: TrayIcon, view: "open" },
-    { id: "assignments-submitted", label: "Submitted", icon: LinkSimpleIcon, view: "submitted" },
-    { id: "assignments-graded", label: "Graded", icon: ExamIcon, view: "graded" },
+    {
+      id: "assignments-submitted",
+      label: "Submitted",
+      icon: LinkSimpleIcon,
+      view: "submitted",
+    },
+    {
+      id: "assignments-graded",
+      label: "Graded",
+      icon: ExamIcon,
+      view: "graded",
+    },
   ],
 }
 
@@ -67,6 +83,12 @@ export const NAV_FEEDBACK: NavLeaf = {
   id: "feedback",
   label: "Feedback",
   icon: ChatsCircleIcon,
+}
+
+export const NAV_COPILOT: NavLeaf = {
+  id: "copilot",
+  label: "Copilot",
+  icon: SparkleIcon,
 }
 
 export const NAV_SETTINGS: NavLeaf = {
@@ -81,6 +103,7 @@ export const NAV_LEAVES: NavLeaf[] = [
   ...NAV_CLASSES.children,
   ...NAV_ASSIGNMENTS.children,
   NAV_FEEDBACK,
+  NAV_COPILOT,
   NAV_SETTINGS,
 ]
 
@@ -105,7 +128,10 @@ export function pinnedResources(pins: NavPin[]): SidebarResource[] {
  * Turn pinned ids into rows. An assignment pin needs the loaded assignments; a
  * destination pin resolves from the tree itself and always works.
  */
-export function resolvePins(pinnedIds: string[], assignments: AssignmentRow[]): NavPin[] {
+export function resolvePins(
+  pinnedIds: string[],
+  assignments: AssignmentRow[]
+): NavPin[] {
   return pinnedIds.flatMap((id) => {
     if (id.startsWith("destination:")) {
       const leafId = id.slice("destination:".length)
@@ -115,7 +141,9 @@ export function resolvePins(pinnedIds: string[], assignments: AssignmentRow[]): 
     }
     if (id.startsWith("assignment:")) {
       const assignmentId = id.slice("assignment:".length)
-      const row = assignments.find((item) => item.assignment.id === assignmentId)
+      const row = assignments.find(
+        (item) => item.assignment.id === assignmentId
+      )
       if (!row) return []
       return [
         {
@@ -147,6 +175,7 @@ export function navResources(): SidebarResource[] {
     group(NAV_CLASSES),
     group(NAV_ASSIGNMENTS),
     { id: NAV_FEEDBACK.id, label: NAV_FEEDBACK.label, kind: "file" },
+    { id: NAV_COPILOT.id, label: NAV_COPILOT.label, kind: "file" },
     { id: NAV_SETTINGS.id, label: NAV_SETTINGS.label, kind: "file" },
   ]
 }

@@ -58,7 +58,7 @@ function remember(user: PublicUser | null): void {
   if (user)
     window.sessionStorage.setItem(
       SESSION_KEY,
-      JSON.stringify({ v: SNAPSHOT_VERSION, user }),
+      JSON.stringify({ v: SNAPSHOT_VERSION, user })
     )
   else window.sessionStorage.removeItem(SESSION_KEY)
 }
@@ -87,6 +87,32 @@ export interface FeedbackEntry {
   status: "reviewed" | "needs_changes"
   reviewerName: string
   createdAt: string
+}
+
+export interface CopilotMessage {
+  role: "user" | "assistant"
+  content: string
+  images?: string[]
+}
+
+export interface CopilotResponse {
+  answer: string
+  suggestions: string[]
+  references: Array<{
+    kind: "assignment" | "class" | "feedback"
+    title: string
+  }>
+}
+
+export function askInternCopilot(
+  messages: CopilotMessage[],
+  options?: { signal?: AbortSignal }
+): Promise<CopilotResponse> {
+  return request<{ response: CopilotResponse }>("/api/intern/ai/copilot", {
+    method: "POST",
+    body: JSON.stringify({ messages }),
+    signal: options?.signal,
+  }).then((body) => body.response)
 }
 
 export function getMe(): Promise<PublicUser> {
@@ -118,7 +144,7 @@ export function getDashboard(): Promise<InternDashboard> {
 
 export function getClasses(when: "upcoming" | "past"): Promise<PublicClass[]> {
   return request<{ data: PublicClass[] }>(
-    `/api/intern/classes?when=${when}`,
+    `/api/intern/classes?when=${when}`
   ).then((body) => body.data)
 }
 
@@ -131,7 +157,7 @@ export async function getAssignments(): Promise<AssignmentRow[]> {
     getSubmissions(),
   ])
   const submissionByAssignment = new Map(
-    submissions.map((submission) => [submission.assignmentId, submission]),
+    submissions.map((submission) => [submission.assignmentId, submission])
   )
   return assignments.data.map((assignment) => ({
     assignment,
@@ -153,17 +179,17 @@ export async function getAssignment(id: string): Promise<AssignmentRow> {
 
 export function submitAssignment(
   id: string,
-  input: { submissionUrl: string; notes?: string },
+  input: { submissionUrl: string; notes?: string }
 ): Promise<PublicSubmission> {
   return request<{ submission: PublicSubmission }>(
     `/api/intern/assignments/${id}/submission`,
-    { method: "PUT", body: JSON.stringify(input) },
+    { method: "PUT", body: JSON.stringify(input) }
   ).then((body) => body.submission)
 }
 
 export function getSubmissions(): Promise<PublicSubmission[]> {
   return request<{ data: PublicSubmission[] }>("/api/intern/submissions").then(
-    (body) => body.data,
+    (body) => body.data
   )
 }
 
@@ -183,7 +209,7 @@ export async function getFeedback(): Promise<FeedbackEntry[]> {
         status: review.status,
         reviewerName: "Instructor",
         createdAt: review.createdAt,
-      })),
+      }))
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
@@ -248,7 +274,7 @@ export interface InvitationPreview {
 /** Reads the invitation behind an activation link. The token is never typed. */
 export function previewInvitation(token: string): Promise<InvitationPreview> {
   return request<{ invitation: InvitationPreview }>(
-    `/api/auth/invitation?token=${encodeURIComponent(token)}`,
+    `/api/auth/invitation?token=${encodeURIComponent(token)}`
   ).then((body) => body.invitation)
 }
 
