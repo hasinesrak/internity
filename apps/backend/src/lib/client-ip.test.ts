@@ -47,6 +47,19 @@ describe("client ip", () => {
   test("supports IPv4 CIDR allowlist entries", () => {
     assert.equal(isStaffIpAllowed("192.168.0.103", ["192.168.0.0/24"]), true)
     assert.equal(isStaffIpAllowed("192.168.1.103", ["192.168.0.0/24"]), false)
+    assert.equal(isStaffIpAllowed("::ffff:192.168.0.103", ["192.168.0.0/24"]), true)
+    assert.equal(isStaffIpAllowed("192.168.0.0", ["192.168.0.0/24"]), true)
+    assert.equal(isStaffIpAllowed("192.168.0.255", ["192.168.0.0/24"]), true)
+    assert.equal(isStaffIpAllowed("192.168.0.103", ["192.168.0.103/32"]), true)
+    assert.equal(isStaffIpAllowed("192.168.0.104", ["192.168.0.103/32"]), false)
+    assert.equal(isStaffIpAllowed("203.0.113.5", ["0.0.0.0/0"]), true)
+  })
+
+  test("rejects malformed CIDR entries and client addresses", () => {
+    for (const entry of ["192.168.0.0/", "192.168.0.0/33", "192.168.0.0/-1", "192.168.0.0/24/0", "192.168.0.0/2e1", "999.0.0.0/8", "192..0.0/16"]) {
+      assert.equal(isStaffIpAllowed("192.168.0.103", [entry]), false, entry)
+    }
+    assert.equal(isStaffIpAllowed("192..0.103", ["192.0.0.0/8"]), false)
   })
 
   test("reads the first forwarded address only when the proxy is trusted", () => {

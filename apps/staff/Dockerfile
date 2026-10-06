@@ -14,7 +14,7 @@ COPY apps/staff apps/staff
 COPY packages/ui packages/ui
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
-ARG VITE_BASE_PATH=/staff
+ARG VITE_BASE_PATH=/
 ENV VITE_BASE_PATH=$VITE_BASE_PATH
 RUN test -n "$VITE_API_URL"
 # pnpm 10 deploy refuses a workspace unless dependencies are injected.

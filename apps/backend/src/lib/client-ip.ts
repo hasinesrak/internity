@@ -26,7 +26,9 @@ export function isStaffIpAllowed(ip: string, allowlist: string[]): boolean {
   return allowlist.some((entry) => {
     const value = normalizeIp(entry)
     if (!value.includes("/")) return value === normalized
-    const [network, prefixRaw] = value.split("/", 2)
+    const cidr = value.split("/")
+    if (cidr.length !== 2 || !/^\d{1,2}$/.test(cidr[1])) return false
+    const [network, prefixRaw] = cidr
     const prefix = Number(prefixRaw)
     const address = ipv4ToNumber(normalized)
     const subnet = ipv4ToNumber(network)
@@ -38,6 +40,7 @@ export function isStaffIpAllowed(ip: string, allowlist: string[]): boolean {
 }
 
 function ipv4ToNumber(value: string): number | null {
+  if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) return null
   const parts = value.split(".")
   if (parts.length !== 4) return null
   const octets = parts.map(Number)

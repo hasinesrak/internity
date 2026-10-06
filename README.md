@@ -392,6 +392,10 @@ Health probes: `GET /health` (liveness), `GET /health/ready` (readiness incl. DB
 
 ## 13. Deployment Overview
 
+The k3s deployment uses the VM IP directly. Open `http://192.168.0.103/` for the intern app and `http://192.168.0.103/staff` for staff. No hosts-file entries are needed. Public API requests use `/api/*`; staff API requests use `/staff-api/api/*`. Readiness checks are `/health/ready` and `/staff-api/health/ready`. The staff router and assets are built with `VITE_BASE_PATH=/staff`, and the production server receives `STAFF_BASE_PATH=/staff`.
+
+`infra/k8s/base/configmap.yaml` sets the VM IP for application links and CORS. If the VM IP changes, update its `APP_URL`, `STAFF_APP_URL`, `PUBLIC_CORS_ORIGIN`, and `STAFF_CORS_ORIGIN`. `STAFF_ALLOWED_IPS` accepts individual IPs and IPv4 CIDRs; the VM environment uses `192.168.0.0/24,127.0.0.1` so staff can sign in from this LAN. For a different office network, update the VM environment and rerun `bash infra/scripts/apply-cluster-env.sh`.
+
 Production path is GitOps. `.github/workflows/ci.yml` runs on `master`: frontend lint and backend lint in parallel, then a build, then one Docker job that pushes immutable `sha-<commit>` images to Docker Hub and commits those tags into `infra/k8s/overlays/production`. Argo CD (`infra/argocd/internity.yaml`) syncs that overlay into k3s when you request a sync. Separate Deployments run the intern site, the staff site, the public API, and the staff API. Both APIs are the same image with a different `API_SURFACE`. Staff access is enforced in the app from `STAFF_ALLOWED_IPS`, not by the ingress. On the VM, MongoDB is the `mongo` StatefulSet. Start it with the one-command flow in `docs/argocd-quickstart.md`.
 
 ---
