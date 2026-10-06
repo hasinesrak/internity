@@ -21,9 +21,9 @@ export const Route = createRootRoute({
   notFoundComponent: () => (
     <main className="flex min-h-svh items-center justify-center bg-background p-6">
       <NotFoundGlitch
-        homeHref="/"
+        homeHref={import.meta.env.BASE_URL}
         homeLabel="Back to overview"
-        browseHref="/settings"
+        browseHref={`${import.meta.env.BASE_URL}settings`}
         browseLabel="Open settings"
       />
     </main>

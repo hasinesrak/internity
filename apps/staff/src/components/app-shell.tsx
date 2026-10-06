@@ -64,7 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     // Sign-out leaves with a full reload: no signed-in state survives in
     // memory, and the address bar and the screen can never disagree.
     void signOut().finally(() => {
-      window.location.replace("/sign-in")
+      window.location.replace(`${import.meta.env.BASE_URL}sign-in`)
     })
   }
 

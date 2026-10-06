@@ -40,6 +40,8 @@ spec:
               value: "3001"
             - name: HOME
               value: /tmp
+            - name: STAFF_BASE_PATH
+              value: /staff
             - name: TRUST_PROXY
               valueFrom:
                 configMapKeyRef:

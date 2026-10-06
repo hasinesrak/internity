@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url"
 
 const appDir = fileURLToPath(new URL(".", import.meta.url))
 const clientRoot = join(appDir, "dist", "client")
+const basePath = (process.env.STAFF_BASE_PATH || "").replace(/\/+$/, "")
 const { default: app } = await import("./dist/server/server.js")
 
 const MIME = {
@@ -33,7 +34,10 @@ const SECURITY = {
 }
 
 function clientFile(urlPath) {
-  const pathname = decodeURIComponent((urlPath ?? "/").split("?")[0] ?? "/")
+  let pathname = decodeURIComponent((urlPath ?? "/").split("?")[0] ?? "/")
+  if (basePath && pathname.startsWith(`${basePath}/`)) {
+    pathname = pathname.slice(basePath.length)
+  }
   if (!pathname || pathname.includes("\0")) return null
   const relative = normalize(pathname).replace(/^[/\\]+/, "")
   if (!relative || relative.split(sep).includes("..")) return null
@@ -65,7 +69,7 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 const server = createServer(async (req, res) => {
   try {
     const pathname = (req.url ?? "/").split("?")[0]
-    if (pathname === "/health") {
+    if (pathname === "/health" || pathname === `${basePath}/health`) {
       res.writeHead(200, { ...SECURITY, "content-type": "text/plain; charset=utf-8" })
       res.end("ok")
       return
