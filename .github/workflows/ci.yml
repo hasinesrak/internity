@@ -20,10 +20,12 @@ permissions:
   contents: read
 
 env:
-  # Override these repository Variables when using real DNS names. The
-  # .local defaults work with the /etc/hosts entries in setup-instructions.md.
-  WEB_API_URL: ${{ vars.PUBLIC_API_URL || 'http://api.internity.local' }}
-  STAFF_API_URL: ${{ vars.STAFF_API_URL || 'http://staff-api.internity.local' }}
+  # Same-origin defaults work with the VM IP and the path-based ingress.
+  # Override these repository Variables only when deploying behind a separate
+  # public API origin.
+  WEB_API_URL: ${{ vars.PUBLIC_API_URL || '/' }}
+  STAFF_API_URL: ${{ vars.STAFF_API_URL || '/staff-api' }}
+  STAFF_BASE_PATH: /staff
 
 jobs:
   lint-frontend:
@@ -99,7 +101,7 @@ jobs:
         run: |
           pnpm --filter backend build
           VITE_API_URL="$WEB_API_URL" pnpm --filter web build
-          VITE_API_URL="$STAFF_API_URL" pnpm --filter staff build
+          VITE_API_URL="$STAFF_API_URL" VITE_BASE_PATH="$STAFF_BASE_PATH" pnpm --filter staff build
 
       - name: Verify build output
         run: |
@@ -185,7 +187,9 @@ jobs:
           sbom: false
           cache-from: type=gha,scope=internity-staff
           cache-to: type=gha,mode=max,scope=internity-staff
-          build-args: VITE_API_URL=${{ env.STAFF_API_URL }}
+          build-args: |
+            VITE_API_URL=${{ env.STAFF_API_URL }}
+            VITE_BASE_PATH=${{ env.STAFF_BASE_PATH }}
           tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/internity-staff:sha-${{ github.sha }}
 
       - name: Update deployment manifest and push

@@ -5,45 +5,35 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    # Use these names in /etc/hosts on the VM and on each developer laptop.
-    # Keeping one host per service avoids four ambiguous "localhost /" routes.
-    - host: internity.local
-      http:
+    # All services share the VM IP. The longer prefixes are selected before
+    # the catch-all web route by Kubernetes ingress path matching.
+    - http:
         paths:
-          - path: /
+          - path: /staff-api
             pathType: Prefix
             backend:
               service:
-                name: web
+                name: backend-staff
                 port:
                   name: http
-    - host: api.internity.local
-      http:
-        paths:
-          - path: /
+          - path: /api
             pathType: Prefix
             backend:
               service:
                 name: backend-public
                 port:
                   name: http
-    - host: staff.internity.local
-      http:
-        paths:
-          - path: /
+          - path: /staff
             pathType: Prefix
             backend:
               service:
                 name: staff
                 port:
                   name: http
-    - host: staff-api.internity.local
-      http:
-        paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: backend-staff
+                name: web
                 port:
                   name: http

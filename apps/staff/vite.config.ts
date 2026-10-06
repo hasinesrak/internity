@@ -95,11 +95,16 @@ export default defineConfig(({ mode }) => {
   }
   const host = setting("STAFF_HOST", fileEnv, "127.0.0.1")
   const port = portSetting("STAFF_PORT", fileEnv, "3001")
+  const basePathRaw = setting("VITE_BASE_PATH", fileEnv, "/")
+  const basePath = basePathRaw === "/"
+    ? "/"
+    : `/${basePathRaw.replace(/^\/+|\/+$/g, "")}/`
   const trustProxy = ["true", "1"].includes(
     setting("TRUST_PROXY", fileEnv, "false").toLowerCase()
   )
   return {
     resolve: { tsconfigPaths: true },
+    base: basePath,
     // A Windows file lock on a static asset (an editor or antivirus holding a
     // PNG open) makes the watcher throw EBUSY and take the whole dev server
     // down, so public/ stays unwatched. Assets there are served as-is; refresh
