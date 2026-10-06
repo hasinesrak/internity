@@ -17,7 +17,7 @@ One monorepo contains the full system: an **intern web app** (`apps/web`), a **s
 5. [Prerequisites](#5-prerequisites)
 6. [Run Locally](#6-run-locally)
 7. [Environment Variables](#7-environment-variables)
-8. [Seed Data and Demo Accounts](#8-seed-data-and-demo-accounts)
+8. [Seed Data and Admin Account](#8-seed-data-and-admin-account)
 9. [Scripts Reference](#9-scripts-reference)
 10. [Testing, Linting, and Typechecking](#10-testing-linting-and-typechecking)
 11. [Security Model](#11-security-model)
@@ -203,7 +203,7 @@ copy env.example .env
 # 2. Build and start everything in the background
 docker compose up -d --build
 
-# 3. Install deps and seed demo accounts (first run only)
+# 3. Install deps and seed the admin account (first run only)
 pnpm install
 pnpm --filter backend seed
 ```
@@ -215,7 +215,7 @@ cp env.example .env
 # 2. Build and start everything
 docker compose up -d --build
 
-# 3. Install deps and seed demo accounts (first run only)
+# 3. Install deps and seed the admin account (first run only)
 pnpm install
 pnpm --filter backend seed
 ```
@@ -318,19 +318,11 @@ AI Gateway and returns an editable draft.
 
 ---
 
-## 8. Seed Data and Demo Accounts
+## 8. Seed Data and Admin Account
 
-`pnpm --filter backend seed` creates the bootstrap organization, departments, and demo users (idempotent — safe to re-run). Default password for HR/supervisor/instructor/intern is `123456`; the admin password is `Admin123456` unless overridden by `ADMIN_*` env.
+`pnpm --filter backend seed` creates or updates only the configured admin account from `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`. It does not create demo HR, supervisor, instructor, or intern accounts. On the staff API's first startup, the same `ADMIN_*` values are used to bootstrap the admin automatically when no active admin exists.
 
-| Email | Password | Role | Where to sign in |
-|---|---|---|---|
-| `admin@ba-sys.com` | `Admin123456` | Admin | Staff site `:3001` |
-| `hr@ba-sys.com` | `123456` | HR | Staff site `:3001` |
-| `supervisor@ba-sys.com` | `123456` | Supervisor | Staff site `:3001` |
-| `instructor@ba-sys.com` | `123456` | Instructor | Staff site `:3001` |
-| `intern@ba-sys.com` | `123456` | Intern | Intern site `:3000` |
-
-Staff accounts are rejected on the intern site / public API, and the intern account is rejected on the staff surface — this is expected.
+Set `ADMIN_PASSWORD` to a value with at least eight characters, including a letter and a number. Keep the credentials in the VM environment files and never commit them.
 
 ---
 
@@ -343,7 +335,7 @@ Root (`package.json`, Turborepo-orchestrated):
 | `pnpm dev` | `turbo dev` — all apps in dev mode |
 | `pnpm dev:web` / `dev:staff` / `dev:backend` | Single app in dev mode |
 | `pnpm build` | Build all apps |
-| `pnpm seed` | Seed demo data via backend |
+| `pnpm seed` | Seed or update the configured admin account via the backend |
 | `pnpm test` / `lint` / `typecheck` / `format` | Quality gates across the workspace |
 
 Backend (`pnpm --filter backend <script>`): `dev` (watch), `build` → `dist/`, `start` (`node dist/index.js`), `seed`, `test`, `lint`, `typecheck`.
