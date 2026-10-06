@@ -6,10 +6,10 @@ resources:
 images:
   - name: internity-backend
     newName: docker.io/1cryptic/internity-backend
-    newTag: sha-2d17afe42ca2ebd61fd40eb3bf0ad307133b282e
+    newTag: sha-14c9f21472e941e42af0af213d838e7c4571ccb0
   - name: internity-web
     newName: docker.io/1cryptic/internity-web
-    newTag: sha-2d17afe42ca2ebd61fd40eb3bf0ad307133b282e
+    newTag: sha-14c9f21472e941e42af0af213d838e7c4571ccb0
   - name: internity-staff
     newName: docker.io/1cryptic/internity-staff
-    newTag: sha-2d17afe42ca2ebd61fd40eb3bf0ad307133b282e
+    newTag: sha-14c9f21472e941e42af0af213d838e7c4571ccb0
