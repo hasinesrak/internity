@@ -31,8 +31,10 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: internity
-  # Sync stays manual so scaling the app to zero is left alone until the next Sync.
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
       - CreateNamespace=true
       - ApplyOutOfSyncOnly=true

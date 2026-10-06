@@ -4,10 +4,10 @@ metadata:
   name: internity-config
 data:
   NODE_ENV: production
-  APP_URL: http://localhost:3000
-  STAFF_APP_URL: http://localhost:3001
-  PUBLIC_CORS_ORIGIN: http://localhost:3000
-  STAFF_CORS_ORIGIN: http://localhost:3001
+  APP_URL: http://internity.local
+  STAFF_APP_URL: http://staff.internity.local
+  PUBLIC_CORS_ORIGIN: http://internity.local
+  STAFF_CORS_ORIGIN: http://staff.internity.local
   JWT_EXPIRES_IN: 8h
   COOKIE_SECURE: "false"
   TRUST_PROXY: "true"

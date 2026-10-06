@@ -5,7 +5,9 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: localhost
+    # Use these names in /etc/hosts on the VM and on each developer laptop.
+    # Keeping one host per service avoids four ambiguous "localhost /" routes.
+    - host: internity.local
       http:
         paths:
           - path: /
@@ -15,7 +17,7 @@ spec:
                 name: web
                 port:
                   name: http
-    - host: localhost
+    - host: api.internity.local
       http:
         paths:
           - path: /
@@ -25,7 +27,7 @@ spec:
                 name: backend-public
                 port:
                   name: http
-    - host: localhost
+    - host: staff.internity.local
       http:
         paths:
           - path: /
@@ -35,7 +37,7 @@ spec:
                 name: staff
                 port:
                   name: http
-    - host: localhost
+    - host: staff-api.internity.local
       http:
         paths:
           - path: /

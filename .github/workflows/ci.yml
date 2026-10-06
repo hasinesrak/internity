@@ -6,6 +6,10 @@ on:
     branches:
       - master
       - main
+    # The docker job commits this generated GitOps file. Do not start a
+    # second build when that is the only file in the commit.
+    paths-ignore:
+      - infra/k8s/overlays/production/kustomization.yaml
   workflow_dispatch:
 
 concurrency:
@@ -16,9 +20,10 @@ permissions:
   contents: read
 
 env:
-  # Browser-facing APIs always stay on localhost.
-  WEB_API_URL: http://localhost:4000
-  STAFF_API_URL: http://localhost:4001
+  # Override these repository Variables when using real DNS names. The
+  # .local defaults work with the /etc/hosts entries in setup-instructions.md.
+  WEB_API_URL: ${{ vars.PUBLIC_API_URL || 'http://api.internity.local' }}
+  STAFF_API_URL: ${{ vars.STAFF_API_URL || 'http://staff-api.internity.local' }}
 
 jobs:
   lint-frontend:
