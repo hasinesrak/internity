@@ -41,7 +41,10 @@ export interface StaffAccountDialogProps {
   onSaved: (result: CreateUserResult) => void
 }
 
-export function StaffAccountDialog({ onClose, onSaved }: StaffAccountDialogProps) {
+export function StaffAccountDialog({
+  onClose,
+  onSaved,
+}: StaffAccountDialogProps) {
   const [viewId, setViewId] = useState<string | null>("staff-account")
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -57,7 +60,9 @@ export function StaffAccountDialog({ onClose, onSaved }: StaffAccountDialogProps
     department?: string
     password?: string
   }>({})
-  const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle")
+  const [state, setState] = useState<"idle" | "loading" | "success" | "error">(
+    "idle"
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -67,7 +72,9 @@ export function StaffAccountDialog({ onClose, onSaved }: StaffAccountDialogProps
       })
       .catch(() => {
         if (!cancelled)
-          setDepartmentsError("Departments could not load. Close and try again.")
+          setDepartmentsError(
+            "Departments could not load. Close and try again."
+          )
       })
     return () => {
       cancelled = true
@@ -88,7 +95,6 @@ export function StaffAccountDialog({ onClose, onSaved }: StaffAccountDialogProps
       found.email = "That does not look like an email address."
     }
     if (!role) found.role = "Choose a role."
-    if (!departmentId) found.department = "Choose a department."
     // Matches the backend passwordSchema. Empty means invitation; a value
     // means an active account is created right away.
     if (password) {
@@ -101,7 +107,13 @@ export function StaffAccountDialog({ onClose, onSaved }: StaffAccountDialogProps
       }
     }
     setErrors(found)
-    if (found.name || found.email || found.role || found.department || found.password) {
+    if (
+      found.name ||
+      found.email ||
+      found.role ||
+      found.department ||
+      found.password
+    ) {
       setState("error")
       return
     }
@@ -112,12 +124,14 @@ export function StaffAccountDialog({ onClose, onSaved }: StaffAccountDialogProps
         name: name.trim(),
         email: email.trim(),
         role: role as StaffRoleOption,
-        departmentId,
+        ...(departmentId ? { departmentId } : { departmentId: null }),
         ...(password ? { password } : {}),
       })
       setState("success")
       if (password) {
-        toast.success(`${roleLabel(role as StaffRoleOption)} account created for ${name.trim()}`)
+        toast.success(
+          `${roleLabel(role as StaffRoleOption)} account created for ${name.trim()}`
+        )
       } else {
         toast.success(`Invitation sent to ${email.trim()}`)
       }
@@ -132,14 +146,22 @@ export function StaffAccountDialog({ onClose, onSaved }: StaffAccountDialogProps
           password: error.issueFor("password"),
           department: error.issueFor("departmentId"),
         }
-        if (!next.name && !next.email && !next.password && !next.department && !next.role) {
+        if (
+          !next.name &&
+          !next.email &&
+          !next.password &&
+          !next.department &&
+          !next.role
+        ) {
           next.email = error.message || "The account could not be created."
         }
         setErrors(next)
       } else {
         setErrors({
           email:
-            error instanceof Error ? error.message : "The account could not be created.",
+            error instanceof Error
+              ? error.message
+              : "The account could not be created.",
         })
       }
     }
@@ -159,10 +181,13 @@ export function StaffAccountDialog({ onClose, onSaved }: StaffAccountDialogProps
         }}
       >
         <div className="flex flex-col gap-1">
-          <h2 className="text-base font-medium tracking-tight">Add a staff account</h2>
+          <h2 className="text-base font-medium tracking-tight">
+            Add a staff account
+          </h2>
           <p className="text-sm text-muted-foreground">
-            Choose a supervisor or instructor, pick their department, then send an
-            invitation or set a temporary password.
+            Choose a supervisor or instructor. A department is optional and can
+            be assigned later, then send an invitation or set a temporary
+            password.
           </p>
         </div>
 
@@ -209,7 +234,10 @@ export function StaffAccountDialog({ onClose, onSaved }: StaffAccountDialogProps
 
           <Field data-invalid={errors.role ? true : undefined}>
             <FieldLabel>Role</FieldLabel>
-            <Combobox value={role} onValueChange={(next) => setRole(next as StaffRoleOption)}>
+            <Combobox
+              value={role}
+              onValueChange={(next) => setRole(next as StaffRoleOption)}
+            >
               <ComboboxTrigger>
                 <ComboboxValue placeholder="Choose a role" />
               </ComboboxTrigger>
@@ -232,17 +260,21 @@ export function StaffAccountDialog({ onClose, onSaved }: StaffAccountDialogProps
               <p className="text-xs text-destructive">{errors.role}</p>
             ) : (
               <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                <ChalkboardTeacherIcon weight="duotone" className="size-3.5" aria-hidden="true" />
+                <ChalkboardTeacherIcon
+                  weight="duotone"
+                  className="size-3.5"
+                  aria-hidden="true"
+                />
                 Supervisors run a department. Instructors teach in one.
               </p>
             )}
           </Field>
 
           <Field data-invalid={errors.department ? true : undefined}>
-            <FieldLabel>Department</FieldLabel>
+            <FieldLabel>Department (optional)</FieldLabel>
             <Combobox value={departmentId} onValueChange={setDepartmentId}>
               <ComboboxTrigger>
-                <ComboboxValue placeholder="Choose a department" />
+                <ComboboxValue placeholder="Assign later" />
               </ComboboxTrigger>
               <ComboboxContent>
                 <ComboboxList ariaLabel="Departments">
@@ -266,10 +298,14 @@ export function StaffAccountDialog({ onClose, onSaved }: StaffAccountDialogProps
               <p className="text-xs text-destructive">{errors.department}</p>
             ) : (
               <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                <BuildingsIcon weight="duotone" className="size-3.5" aria-hidden="true" />
+                <BuildingsIcon
+                  weight="duotone"
+                  className="size-3.5"
+                  aria-hidden="true"
+                />
                 {departmentName
                   ? `They join ${departmentName}.`
-                  : "They stay scoped to this department."}
+                  : "They can be assigned to a department later."}
               </p>
             )}
           </Field>

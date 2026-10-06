@@ -123,6 +123,7 @@ export interface PublicSubmission {
     title: string
     status: AssignmentStatus
     deadline: string | null
+    maxScore: number
   }
   intern?: { id: string; name: string; email: string }
   reviews?: PublicReview[]

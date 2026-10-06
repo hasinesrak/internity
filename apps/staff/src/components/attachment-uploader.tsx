@@ -120,7 +120,7 @@ export function AttachmentUploader({
         maxFiles={Math.max(0, maxFiles - attachments.length)}
         disabled={disabled}
         title="Drop files here"
-        description="Images, PDFs, and office documents up to 10 MB each."
+        description="PDF, DOC/DOCX, TXT, MD, images, and office documents up to 10 MB each."
         browseLabel="Browse"
       />
 

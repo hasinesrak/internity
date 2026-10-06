@@ -93,6 +93,13 @@ export interface CopilotMessage {
   role: "user" | "assistant"
   content: string
   images?: string[]
+  files?: CopilotFile[]
+}
+
+export interface CopilotFile {
+  name: string
+  mediaType: string
+  data: string
 }
 
 export interface CopilotResponse {
@@ -204,7 +211,7 @@ export async function getFeedback(): Promise<FeedbackEntry[]> {
         assignmentTitle: submission.assignment?.title ?? "Assignment",
         submissionId: submission.id,
         score: review.score,
-        maxScore: 0,
+        maxScore: submission.assignment?.maxScore ?? 0,
         feedback: review.feedback,
         status: review.status,
         reviewerName: "Instructor",

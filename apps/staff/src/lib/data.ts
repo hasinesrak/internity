@@ -8,6 +8,7 @@ import type {
   ActivityEntry,
   AdminDashboard,
   AgendaDraft,
+  AutomatedReview,
   AssignmentDraft,
   AssignmentRosterRow,
   AssignmentStatus,
@@ -795,6 +796,15 @@ export function reviewSubmission(
     `/api/instructor/submissions/${id}/review`,
     { method: "POST", body: JSON.stringify(input) },
   ).then((body) => body.submission)
+}
+
+export function automatedReviewSubmission(
+  id: string,
+): Promise<AutomatedReview> {
+  return request<{ review: AutomatedReview }>(
+    `/api/instructor/submissions/${id}/ai-review`,
+    { method: "POST" },
+  ).then((body) => body.review)
 }
 
 // ---------------------------------------------------------------------------

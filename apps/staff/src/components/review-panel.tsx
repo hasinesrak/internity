@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react"
 import {
   CopyIcon,
   LinkSimpleIcon,
+  SparkleIcon,
 } from "@phosphor-icons/react"
 import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field"
 import { AdaptiveStepper, AdaptiveStepperDecrement, AdaptiveStepperIncrement, AdaptiveStepperValue } from "@workspace/ui/components/motion/adaptive-stepper"
@@ -14,10 +15,15 @@ import { Textarea } from "@workspace/ui/components/textarea"
 
 import { RubricList } from "@/components/rubric-list"
 import { StatusChip, SubmissionStatusChip } from "@/components/status-chip"
-import { reviewSubmission } from "@/lib/data"
+import { automatedReviewSubmission, reviewSubmission } from "@/lib/data"
 import { copyText } from "@/lib/clipboard"
 import { formatDate, relativeTime } from "@/lib/format"
-import type { PublicAssignment, PublicSubmission, ReviewInput } from "@/lib/types"
+import type {
+  AutomatedReview,
+  PublicAssignment,
+  PublicSubmission,
+  ReviewInput,
+} from "@/lib/types"
 import { rubricMaxScore } from "@/lib/types"
 import { toast } from "@/lib/toast"
 
@@ -42,6 +48,28 @@ export function ReviewPanel({
   const [feedback, setFeedback] = useState(submission.feedback)
   const [error, setError] = useState<string | undefined>(undefined)
   const [saving, setSaving] = useState<SaveState>("idle")
+  const [aiDraft, setAiDraft] = useState<AutomatedReview | null>(null)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [aiError, setAiError] = useState<string | undefined>(undefined)
+
+  const runAutomatedReview = useCallback(async () => {
+    setAiBusy(true)
+    setAiError(undefined)
+    try {
+      const draft = await automatedReviewSubmission(submission.id)
+      setAiDraft(draft)
+      setScore(Math.min(draft.score, draft.maxScore))
+      setFeedback(draft.feedback)
+    } catch (cause) {
+      setAiError(
+        cause instanceof Error
+          ? cause.message
+          : "The automated review could not be completed.",
+      )
+    } finally {
+      setAiBusy(false)
+    }
+  }, [maxScore, submission.id])
 
   const submit = useCallback(async (status: ReviewInput["status"]) => {
     const trimmed = feedback.trim()
@@ -153,6 +181,40 @@ export function ReviewPanel({
           <RubricList rubric={assignment.rubric} />
         </div>
       ) : null}
+
+      <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-muted/30 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-medium">Automated assignment review</p>
+            <p className="text-xs text-muted-foreground">
+              Railway checks the repository in a disposable sandbox and drafts feedback.
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={busy || aiBusy}
+            onClick={() => void runAutomatedReview()}
+          >
+            <SparkleIcon weight="duotone" data-icon="inline-start" />
+            {aiBusy ? "Reviewing…" : "Draft with AI"}
+          </Button>
+        </div>
+        {aiError ? <p className="text-xs text-destructive">{aiError}</p> : null}
+        {aiDraft ? (
+          <div className="flex flex-col gap-2 border-t border-border/60 pt-2 text-xs">
+            <p className="leading-5 text-foreground/90">{aiDraft.summary}</p>
+            {aiDraft.improvements.length > 0 ? (
+              <p className="leading-5 text-muted-foreground">
+                Next steps: {aiDraft.improvements.join(" · ")}
+              </p>
+            ) : null}
+            <p className="text-muted-foreground">
+              Inspected {aiDraft.filesInspected.length} file(s) · recommendation: {aiDraft.recommendation === "reviewed" ? "ready to review" : "needs changes"}
+            </p>
+          </div>
+        ) : null}
+      </div>
 
       <FieldGroup>
         <Field>

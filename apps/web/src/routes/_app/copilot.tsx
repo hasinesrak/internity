@@ -4,8 +4,11 @@ import {
   BookOpenTextIcon,
   CalendarBlankIcon,
   CheckCircleIcon,
+  FileTextIcon,
+  PaperclipIcon,
   SparkleIcon,
   UserCircleIcon,
+  XIcon,
 } from "@phosphor-icons/react"
 import {
   Message,
@@ -17,7 +20,6 @@ import {
   MessageScroller,
 } from "@workspace/ui/components/agents/message"
 import type { MessageFrom } from "@workspace/ui/components/agents/message"
-import { PaperclipIcon, XIcon } from "@phosphor-icons/react"
 import { PromptInput } from "@workspace/ui/components/agents/prompt-input"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/motion/button/base"
@@ -26,7 +28,7 @@ import { Reveal } from "@workspace/ui/components/reveal"
 
 import { PageHeader } from "@/components/page-header"
 import { askInternCopilot } from "@/lib/data"
-import type { CopilotMessage, CopilotResponse } from "@/lib/data"
+import type { CopilotFile, CopilotMessage, CopilotResponse } from "@/lib/data"
 
 export const Route = createFileRoute("/_app/copilot")({
   component: CopilotPage,
@@ -43,6 +45,34 @@ const STARTERS = [
   "Make a step-by-step plan for this week.",
 ]
 
+const COPILOT_MAX_FILES = 3
+const COPILOT_FILE_MAX_BYTES = 4 * 1024 * 1024
+const COPILOT_FILE_TYPES: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+  ".pdf": "application/pdf",
+  ".txt": "text/plain",
+  ".md": "text/markdown",
+  ".csv": "text/csv",
+  ".zip": "application/zip",
+  ".doc": "application/msword",
+  ".docx":
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xls": "application/vnd.ms-excel",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".ppt": "application/vnd.ms-powerpoint",
+  ".pptx":
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+}
+
+const COPILOT_ACCEPT = [
+  ...Object.keys(COPILOT_FILE_TYPES),
+  ...Object.values(COPILOT_FILE_TYPES),
+].join(",")
+
 const initialMessage: ChatMessage = {
   id: "welcome",
   role: "assistant",
@@ -52,11 +82,11 @@ const initialMessage: ChatMessage = {
 
 function CopilotPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([initialMessage])
-  const [pendingImages, setPendingImages] = useState<string[]>([])
+  const [pendingFiles, setPendingFiles] = useState<CopilotFile[]>([])
   const [loading, setLoading] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
-  const send = async (content: string, attachedImages = pendingImages) => {
+  const send = async (content: string, attachedFiles = pendingFiles) => {
     const prompt = content.trim()
     if (!prompt || loading) return
 
@@ -64,7 +94,10 @@ function CopilotPage() {
       id: `user-${Date.now()}`,
       role: "user",
       content: prompt,
-      images: attachedImages,
+      images: attachedFiles
+        .filter((file) => file.mediaType.startsWith("image/"))
+        .map((file) => file.data),
+      files: attachedFiles,
     }
     const nextMessages = [...messages, userMessage]
     setMessages(nextMessages)
@@ -74,11 +107,12 @@ function CopilotPage() {
 
     try {
       const response = await askInternCopilot(
-        nextMessages.map(({ role, content: text, images }, index) => ({
+        nextMessages.map(({ role, content: text, images, files }, index) => ({
           role,
           content: text,
-          ...(index === nextMessages.length - 1 && images?.length
-            ? { images }
+          ...(index === nextMessages.length - 1 &&
+          (images?.length || files?.length)
+            ? { images, files }
             : {}),
         })),
         { signal: controller.signal }
@@ -114,34 +148,36 @@ function CopilotPage() {
     }
   }
 
-  const chooseImages = async (files: FileList | null) => {
+  const chooseFiles = async (files: FileList | null) => {
     if (!files) return
-    const available = 3 - pendingImages.length
+    const available = COPILOT_MAX_FILES - pendingFiles.length
     const selected = Array.from(files).slice(0, available)
-    const images = await Promise.all(
+    const attachments = await Promise.all(
       selected.map(
         (file) =>
-          new Promise<string | null>((resolve) => {
-            if (
-              !/^image\/(png|jpeg|webp)$/.test(file.type) ||
-              file.size > 1024 * 1024
-            ) {
+          new Promise<CopilotFile | null>((resolve) => {
+            const mediaType = copilotMediaType(file)
+            if (!mediaType || file.size > COPILOT_FILE_MAX_BYTES) {
               resolve(null)
               return
             }
             const reader = new FileReader()
             reader.onload = () =>
-              resolve(typeof reader.result === "string" ? reader.result : null)
+              resolve(
+                typeof reader.result === "string"
+                  ? { name: file.name, mediaType, data: reader.result }
+                  : null
+              )
             reader.onerror = () => resolve(null)
             reader.readAsDataURL(file)
           })
       )
     )
-    setPendingImages((current) =>
+    setPendingFiles((current) =>
       [
         ...current,
-        ...images.filter((image): image is string => Boolean(image)),
-      ].slice(0, 3)
+        ...attachments.filter((file): file is CopilotFile => Boolean(file)),
+      ].slice(0, COPILOT_MAX_FILES)
     )
   }
 
@@ -200,21 +236,21 @@ function CopilotPage() {
                   placeholder="Ask about your work…"
                   loading={loading}
                   onSubmit={(value) => {
-                    const images = pendingImages
-                    setPendingImages([])
-                    void send(value, images)
+                    const files = pendingFiles
+                    setPendingFiles([])
+                    void send(value, files)
                   }}
                   onStop={stop}
                   leadingAction={
                     <>
                       <input
-                        id="copilot-images"
+                        id="copilot-files"
                         type="file"
-                        accept="image/png,image/jpeg,image/webp"
+                        accept={COPILOT_ACCEPT}
                         multiple
                         className="sr-only"
                         onChange={(event) => {
-                          void chooseImages(event.target.files)
+                          void chooseFiles(event.target.files)
                           event.currentTarget.value = ""
                         }}
                       />
@@ -223,10 +259,12 @@ function CopilotPage() {
                         size="icon"
                         variant="ghost"
                         className="size-8 rounded-full"
-                        aria-label="Attach images"
-                        disabled={loading || pendingImages.length >= 3}
+                        aria-label="Attach files"
+                        disabled={
+                          loading || pendingFiles.length >= COPILOT_MAX_FILES
+                        }
                         onClick={() =>
-                          document.getElementById("copilot-images")?.click()
+                          document.getElementById("copilot-files")?.click()
                         }
                       >
                         <PaperclipIcon weight="duotone" aria-hidden="true" />
@@ -234,24 +272,32 @@ function CopilotPage() {
                     </>
                   }
                 />
-                {pendingImages.length ? (
+                {pendingFiles.length ? (
                   <div className="flex flex-wrap gap-2 px-1">
-                    {pendingImages.map((image, index) => (
+                    {pendingFiles.map((file, index) => (
                       <div
-                        key={`${image.slice(0, 24)}-${index}`}
-                        className="relative size-12 overflow-hidden rounded-lg border border-border bg-muted"
+                        key={`${file.name}-${index}`}
+                        className="relative flex max-w-56 items-center gap-2 rounded-lg border border-border bg-muted px-2 py-1.5 text-xs"
                       >
-                        <img
-                          src={image}
-                          alt={`Attachment ${index + 1}`}
-                          className="size-full object-cover"
-                        />
+                        {file.mediaType.startsWith("image/") ? (
+                          <img
+                            src={file.data}
+                            alt={`Attachment ${index + 1}`}
+                            className="size-9 rounded object-cover"
+                          />
+                        ) : (
+                          <FileTextIcon
+                            weight="duotone"
+                            className="size-5 shrink-0"
+                          />
+                        )}
+                        <span className="truncate">{file.name}</span>
                         <button
                           type="button"
                           aria-label={`Remove attachment ${index + 1}`}
                           className="absolute top-0.5 right-0.5 grid size-4 place-items-center rounded-full bg-background/90 text-foreground"
                           onClick={() =>
-                            setPendingImages((current) =>
+                            setPendingFiles((current) =>
                               current.filter(
                                 (_, itemIndex) => itemIndex !== index
                               )
@@ -266,7 +312,8 @@ function CopilotPage() {
                 ) : null}
                 <p className="px-1 text-[11px] text-muted-foreground">
                   Copilot uses your department’s assignments, classes,
-                  submissions, and feedback.
+                  submissions, and feedback. Files are analyzed with Gemini 3.5
+                  Flash Lite.
                 </p>
               </div>
             </div>
@@ -296,15 +343,24 @@ function CopilotMessageRow({ message }: { message: ChatMessage }) {
             {message.content}
           </MessageBubbleContent>
         </MessageBubble>
-        {message.images?.length ? (
+        {message.files?.length ? (
           <div className="flex flex-wrap gap-2 px-1">
-            {message.images.map((image, index) => (
-              <img
-                key={`${image.slice(0, 24)}-${index}`}
-                src={image}
-                alt={`Attached image ${index + 1}`}
-                className="max-h-32 max-w-48 rounded-lg border border-border object-cover"
-              />
+            {message.files.map((file, index) => (
+              <div
+                key={`${file.name}-${index}`}
+                className="flex items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs"
+              >
+                {file.mediaType.startsWith("image/") ? (
+                  <img
+                    src={file.data}
+                    alt={`Attached image ${index + 1}`}
+                    className="size-8 rounded object-cover"
+                  />
+                ) : (
+                  <FileTextIcon weight="duotone" className="size-4" />
+                )}
+                <span className="max-w-48 truncate">{file.name}</span>
+              </div>
             ))}
           </div>
         ) : null}
@@ -331,6 +387,16 @@ function CopilotMessageRow({ message }: { message: ChatMessage }) {
       </MessageContent>
     </Message>
   )
+}
+
+function copilotMediaType(file: File): string | null {
+  if (file.type && Object.values(COPILOT_FILE_TYPES).includes(file.type)) {
+    return file.type
+  }
+  const dot = file.name.lastIndexOf(".")
+  return dot >= 0
+    ? (COPILOT_FILE_TYPES[file.name.slice(dot).toLowerCase()] ?? null)
+    : null
 }
 
 function ThinkingRow() {

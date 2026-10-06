@@ -10,6 +10,7 @@ import {
   ClipboardTextIcon,
   EnvelopeSimpleIcon,
   IdentificationCardIcon,
+  SparkleIcon,
   UserCircleIcon,
 } from "@phosphor-icons/react"
 import type { CommandItem } from "@workspace/ui/components/motion/command-palette"
@@ -74,6 +75,18 @@ export function CommandMenu({
       },
     }
 
+    const automatedReview: CommandItem = {
+      id: "ai-review-queue",
+      label: "Open AI review queue",
+      group: "AI tools",
+      icon: SparkleIcon,
+      keywords: ["ai", "review", "sandbox", "assignment"],
+      onSelect: () => {
+        close()
+        void navigate({ to: "/submissions", search: { view: "review" } })
+      },
+    }
+
     const creates: CommandItem[] =
       role === "hr"
         ? [
@@ -131,6 +144,7 @@ export function CommandMenu({
             ? [
                 scheduleClass,
                 createAssignment,
+                automatedReview,
                 {
                   id: "create-instructor",
                   label: "Add instructor",
@@ -145,7 +159,7 @@ export function CommandMenu({
                   },
                 },
               ]
-            : [scheduleClass, createAssignment]
+            : [scheduleClass, createAssignment, automatedReview]
 
     const people: CommandItem[] =
       role === "instructor"

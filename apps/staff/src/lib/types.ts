@@ -71,7 +71,7 @@ export interface PublicInvitation {
   email: string
   role: Role
   status: InvitationStatus
-  departmentId: string
+  departmentId: string | null
   departmentName: string | null
   userId: string
   invitedBy: string | null
@@ -214,6 +214,31 @@ export interface ReviewInput {
   status: Extract<SubmissionStatus, "reviewed" | "needs_changes">
 }
 
+export interface AutomatedReview {
+  recommendation: "reviewed" | "needs_changes"
+  score: number
+  maxScore: number
+  summary: string
+  feedback: string
+  criterionScores: Array<{
+    criterion: string
+    score: number
+    maxPoints: number
+    rationale: string
+  }>
+  strengths: string[]
+  improvements: string[]
+  evidence: Array<{ path: string; detail: string }>
+  repositoryUrl: string
+  filesInspected: string[]
+  tests: Array<{
+    command: string
+    exitCode: number | null
+    timedOut: boolean
+    output: string
+  }>
+}
+
 /** What `POST /api/instructor/ai/assignment-draft` returns. */
 export interface AssignmentDraft {
   title: string
@@ -287,7 +312,7 @@ export interface AiDraft {
 }
 
 export function isAssignmentDraft(
-  draft: AiDraft,
+  draft: AiDraft
 ): draft is AiDraft & { payload: AssignmentDraft } {
   return draft.kind === "assignment"
 }
