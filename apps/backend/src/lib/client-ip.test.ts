@@ -44,6 +44,11 @@ describe("client ip", () => {
     assert.equal(isStaffIpAllowed("", ["10.0.0.8"]), false)
   })
 
+  test("supports IPv4 CIDR allowlist entries", () => {
+    assert.equal(isStaffIpAllowed("192.168.0.103", ["192.168.0.0/24"]), true)
+    assert.equal(isStaffIpAllowed("192.168.1.103", ["192.168.0.0/24"]), false)
+  })
+
   test("reads the first forwarded address only when the proxy is trusted", () => {
     assert.equal(
       extractClientIp({
