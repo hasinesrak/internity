@@ -2,15 +2,16 @@ import { createMiddleware } from "hono/factory"
 import { getCookie } from "hono/cookie"
 
 import { networkAllowsStaff } from "./network.js"
-import { SESSION_COOKIE, type Role } from "../config/constants.js"
+import { type Role } from "../config/constants.js"
 import { AppError, forbidden } from "../lib/errors.js"
 import { denyStaff } from "../lib/staff-access.js"
+import { sessionCookieName } from "./cookies.js"
 import { readSession } from "../lib/session.js"
 import { User } from "../models/user.js"
 import type { AppEnv } from "../types.js"
 
 export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
-  const token = getCookie(c, SESSION_COOKIE)
+  const token = getCookie(c, sessionCookieName())
   if (!token) throw new AppError(401, "UNAUTHENTICATED", "Sign in to continue.")
   const session = await readSession(token)
   const user = await User.findById(session.userId)

@@ -1,8 +1,5 @@
 export const COPILOT_MAX_IMAGES = 3
 export const COPILOT_IMAGE_MAX_BYTES = 1024 * 1024
-export const COPILOT_JSON_MAX_BYTES =
-  COPILOT_MAX_IMAGES * Math.ceil(COPILOT_IMAGE_MAX_BYTES / 3) * 4 + 256 * 1024
-
 // Accept inline raster data only; never fetch a client-supplied URL.
 export function validCopilotImage(dataUrl: string): boolean {
   const match =

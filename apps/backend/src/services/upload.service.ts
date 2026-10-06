@@ -8,6 +8,7 @@ import { AppError, notFound, validation } from "../lib/errors.js"
 import {
   absoluteFor,
   isAllowedMime,
+  mimeTypeForFilename,
   removeUploadFile,
   saveUploadFile,
   uploadMaxBytes,
@@ -41,13 +42,16 @@ export async function createUpload(
   const departmentId = ownDepartmentId(actor)
   await requireActiveDepartment(departmentId)
   const originalName = cleanFileName(input.originalName)
-  const mimeType = (input.mimeType || "application/octet-stream")
+  const declaredMimeType = (input.mimeType || "application/octet-stream")
     .toLowerCase()
     .split(";")[0]
     .trim()
+  const mimeType = isAllowedMime(declaredMimeType)
+    ? declaredMimeType
+    : mimeTypeForFilename(originalName) ?? declaredMimeType
   if (!isAllowedMime(mimeType)) {
     throw validation(
-      "That file type is not allowed. Use an image, PDF, or office document.",
+      "That file type is not allowed. Use a PDF, DOC/DOCX, TXT, MD, image, or office document.",
       "file"
     )
   }

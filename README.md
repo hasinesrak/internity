@@ -34,7 +34,8 @@ One monorepo contains the full system: an **intern web app** (`apps/web`), a **s
 - **Invitation onboarding** — HR invites interns by email; interns activate via expiring token link.
 - **Class scheduling** — Instructors and supervisors schedule classes with external meeting links.
 - **Assignments and submissions** — Publish assignments, collect external submission links, review with score + feedback.
-- **AI drafting assistance** — Supervisors and instructors can draft assignment text, rubrics, and class agendas via Groq (optional, backend-only).
+- **AI drafting assistance** — Supervisors and instructors can draft assignment text, rubrics, and class agendas via the Vercel AI Gateway (optional, backend-only).
+- **Automated assignment review** — Instructors and supervisors can use the AI review command from a submission drawer. A public repository is cloned into a disposable Railway Sandbox, bounded tests and source evidence are inspected, and the AI returns an editable review draft. A staff member must still save the score and feedback.
 - **Department scoping** — Supervisors and instructors operate strictly inside their assigned department.
 - **Activity logging** — Admin-visible audit trail of key actions.
 
@@ -93,7 +94,7 @@ Route groups (`apps/backend/src/routes/`):
 - `/api/admin` — users, HR accounts, departments override, settings, activity log
 - `/api/hr` — departments, supervisor assignment, invitations, directory
 - `/api/supervisor` — instructor roster within own department (+ instructor-level actions there)
-- `/api/instructor` — classes, assignments, submission review; `POST /api/instructor/ai/*` drafting endpoints
+- `/api/instructor` — classes, assignments, submission review; `POST /api/instructor/ai/*` drafting endpoints and `POST /api/instructor/submissions/:id/ai-review` for human-approved automated review drafts
 - `/api/intern` — own department view, classes/assignments, submission links, feedback
 - `/api/departments` — department reads
 
@@ -118,7 +119,7 @@ Key design decisions:
 - **Stateless JWT sessions** in a secure, HTTP-only cookie (`internity_session`). No long-lived tokens in `localStorage`. Short lifetime (`JWT_EXPIRES_IN`, default `8h`).
 - **Backend is the authorization source of truth.** Frontend route guards exist for UX only; every permission (active status, valid JWT, role, department membership, resource-department match, intern submission ownership) is re-checked server-side.
 - **Department scoping** is enforced in middleware + service queries, so supervisors/instructors cannot cross into other departments even with valid IDs.
-- **AI features are assistive, not authoritative.** The backend loads department context itself (never trusts a department ID from the browser), calls Vercel AI Gateway with a Zod-validated `Output.object` schema, and returns an editable draft or scoped Copilot response. Nothing is persisted until the user submits the normal create/update action. Empty `AI_GATEWAY_API_KEY` disables AI; the rest of the API keeps running.
+- **AI features are assistive, not authoritative.** The backend loads department context itself (never trusts a department ID from the browser), calls Vercel AI Gateway with a Zod-validated `Output.object` schema, and returns an editable draft or scoped Copilot response. Automated repository review creates a temporary `ssh railway.new` VM, runs the preinstalled OpenCode agent plus bounded checks, and sends only capped evidence to the AI Gateway. Nothing is persisted until the user submits the normal create/update action. An empty `AI_GATEWAY_API_KEY` disables AI features; the rest of the API keeps running.
 
 ### 3.4 Frontend architecture
 
@@ -292,7 +293,7 @@ pnpm dev
 
 | File | Purpose | Key values |
 |---|---|---|
-| `.env` (root) | Docker Compose wiring | `PUBLIC_API_PORT` (4000), `STAFF_API_PORT` (4001), `WEB_PORT` (3000), `STAFF_PORT` (3001), `APP_URL`, `STAFF_APP_URL`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, `TRUST_PROXY`, `RESEND_API_KEY`, `AI_GATEWAY_API_KEY`, `AI_MODEL`, `ADMIN_*` bootstrap |
+| `.env` (root) | Docker Compose wiring | `PUBLIC_API_PORT` (4000), `STAFF_API_PORT` (4001), `WEB_PORT` (3000), `STAFF_PORT` (3001), `APP_URL`, `STAFF_APP_URL`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, `TRUST_PROXY`, `RESEND_API_KEY`, `AI_GATEWAY_API_KEY`, `AI_MODEL`, `AI_FILE_MODEL` (defaults to `google/gemini-3.5-flash-lite` for Copilot attachments), optional `RAILWAY_NEW_SSH_PRIVATE_KEY_B64`/`RAILWAY_NEW_SSH_KEY_PATH`, `ADMIN_*` bootstrap |
 | `apps/backend/.env` | Manual `pnpm --filter backend dev` | `HOST`, `PORT`, `MONGODB_URI`, `CORS_ORIGIN`, `API_SURFACE=staff\|public`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, mail + Groq keys |
 | `apps/web/.env` | Intern site | `WEB_HOST`, `WEB_PORT`, `VITE_API_URL=http://localhost:4000` (public API) |
 | `apps/staff/.env` | Staff site | `STAFF_HOST`, `STAFF_PORT`, `VITE_API_URL=http://localhost:4001` (staff API), `STAFF_ALLOWED_IPS` mirror |
@@ -305,6 +306,15 @@ Rules that matter:
 - `VITE_API_URL` is baked at build time — the Docker `web`/`staff` images take it from `VITE_PUBLIC_API_URL` / `VITE_STAFF_API_URL` build args.
 - Set `TRUST_PROXY=true` only behind a proxy that overwrites `X-Forwarded-For` with the observed client IP.
 - Never commit any `.env`. Templates are `env.example` / `apps/*/[env.example]`.
+
+For automated assignment review, the backend runs `ssh railway.new`. Railway's
+anonymous VM has OpenCode preinstalled, so the repository is cloned into the VM
+and inspected by OpenCode. The backend generates and reuses an ephemeral SSH
+key for the process; for a stable local VM across backend restarts, configure
+`RAILWAY_NEW_SSH_PRIVATE_KEY_B64` or `RAILWAY_NEW_SSH_KEY_PATH`. The VM is
+temporary and expires automatically; no Railway token or AI Gateway key is
+passed into it. The backend still sends only capped repository evidence to the
+AI Gateway and returns an editable draft.
 
 ---
 
@@ -358,7 +368,7 @@ pnpm lint
 - **Dual-surface isolation** — staff handlers absent from the public process.
 - **IP gating** — staff sign-in is restricted to `STAFF_ALLOWED_IPS`; the localhost deployment uses `127.0.0.1`. Public process refuses staff accounts unconditionally.
 - **RBAC + department scope on every route** — frontend guards are cosmetic.
-- **Secrets hygiene** — `JWT_SECRET`, `AI_GATEWAY_API_KEY`, `RESEND_API_KEY`, `ADMIN_PASSWORD` via env/secrets only. `AI_GATEWAY_API_KEY` never enters the frontend bundle.
+- **Secrets hygiene** — `JWT_SECRET`, `AI_GATEWAY_API_KEY`, `RESEND_API_KEY`, and `ADMIN_PASSWORD` use env/secrets only. AI credentials never enter the frontend bundle or the anonymous sandbox. Repository URLs are limited to public HTTPS GitHub, GitLab, and Bitbucket hosts.
 - **Mail fallback** — with `RESEND_API_KEY` empty, invitation/reset links are returned to the caller and written to the server log (dev-friendly, no silent failures).
 
 ---

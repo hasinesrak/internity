@@ -27,6 +27,16 @@ const EXT_BY_MIME: Record<string, string> = {
 
 export const ALLOWED_MIME_TYPES = new Set(Object.keys(EXT_BY_MIME))
 
+const MIME_BY_EXTENSION = Object.fromEntries(
+  Object.entries(EXT_BY_MIME).map(([mimeType, extension]) => [extension, mimeType])
+)
+
+export function mimeTypeForFilename(name: string): string | null {
+  const dot = name.toLowerCase().lastIndexOf(".")
+  if (dot < 0) return null
+  return MIME_BY_EXTENSION[name.toLowerCase().slice(dot)] ?? null
+}
+
 export function uploadRoot(): string {
   return getEnv().uploadDir
 }

@@ -14,7 +14,7 @@ import {
   submitWork,
 } from "../services/submission.service.js"
 import { parseBody, parseQuery, readJson, requireId } from "../lib/http.js"
-import { COPILOT_JSON_MAX_BYTES } from "../lib/copilot-images.js"
+import { COPILOT_JSON_MAX_BYTES } from "../lib/copilot-files.js"
 import { enforceLimit, takeAiCopilot } from "../lib/rate-limit.js"
 import {
   classListSchema,

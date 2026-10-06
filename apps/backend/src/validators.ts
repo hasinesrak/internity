@@ -239,6 +239,16 @@ export const internCopilotSchema = z.object({
         role: z.enum(["user", "assistant"]),
         content: z.string().trim().min(1).max(4000),
         images: z.array(z.string().max(2_000_000)).max(3).optional(),
+        files: z
+          .array(
+            z.object({
+              name: z.string().trim().min(1).max(160),
+              mediaType: z.string().trim().min(1).max(120),
+              data: z.string().max(6_000_000),
+            })
+          )
+          .max(3)
+          .optional(),
       })
     )
     .min(1)

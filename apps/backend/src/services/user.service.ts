@@ -115,7 +115,7 @@ function assertRoleDepartment(
       "departmentId"
     )
   }
-  if (role !== "admin" && role !== "hr" && !departmentId) {
+  if (role === "intern" && !departmentId) {
     throw validation("Choose a department for this account.", "departmentId")
   }
 }

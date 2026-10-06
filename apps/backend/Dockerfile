@@ -26,7 +26,9 @@ ENV NODE_ENV=production \
     HOME=/tmp
 LABEL org.opencontainers.image.source="https://github.com/hasinesrak/internity" \
       org.opencontainers.image.title="internity-backend"
-RUN mkdir -p /data/uploads && chown node:node /data/uploads
+RUN apk add --no-cache openssh-client \
+ && mkdir -p /data/uploads \
+ && chown node:node /data/uploads
 COPY --from=build --chown=node:node /out/dist ./dist
 COPY --from=build --chown=node:node /out/package.json ./package.json
 COPY --from=build --chown=node:node /out/node_modules ./node_modules

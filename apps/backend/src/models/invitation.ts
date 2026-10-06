@@ -4,7 +4,7 @@ import type { InvitationRole, InvitationStatus } from "../config/constants.js"
 
 export interface InvitationShape {
   email: string
-  departmentId: Types.ObjectId
+  departmentId: Types.ObjectId | null
   role: InvitationRole
   tokenHash: string
   expiresAt: Date
@@ -23,7 +23,7 @@ const invitationSchema = new Schema<InvitationShape>(
     departmentId: {
       type: Schema.Types.ObjectId,
       ref: "Department",
-      required: true,
+      default: null,
       index: true,
     },
     role: {

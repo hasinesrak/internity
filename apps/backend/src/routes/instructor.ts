@@ -1,7 +1,11 @@
 import { Hono } from "hono"
 
 import { requireAuth, requireRoles } from "../middleware/auth.js"
-import { draftAssignment, draftClassAgenda } from "../services/ai.service.js"
+import {
+  automatedAssignmentReview,
+  draftAssignment,
+  draftClassAgenda,
+} from "../services/ai.service.js"
 import {
   closeAssignment,
   createAssignment,
@@ -37,7 +41,12 @@ import {
   readUploadedFormFile,
   requireId,
 } from "../lib/http.js"
-import { enforceLimit, takeAiDraft, takeUpload } from "../lib/rate-limit.js"
+import {
+  enforceLimit,
+  takeAiDraft,
+  takeAiReview,
+  takeUpload,
+} from "../lib/rate-limit.js"
 import { downloadHeaders } from "../lib/uploads.js"
 import {
   assignmentDraftSchema,
@@ -193,4 +202,14 @@ instructorRoutes.post("/ai/class-agenda-draft", async (c) => {
   const body = parseBody(classAgendaDraftSchema, await readJson(c))
   enforceLimit(takeAiDraft(c.get("user").id), "drafts")
   return c.json({ draft: await draftClassAgenda(c.get("user"), body) })
+})
+
+// This returns a draft only. Saving a score or feedback still requires the
+// existing human review endpoint, so an AI result can never silently grade an
+// intern's work.
+instructorRoutes.post("/submissions/:id/ai-review", async (c) => {
+  enforceLimit(takeAiReview(c.get("user").id), "reviews")
+  return c.json({
+    review: await automatedAssignmentReview(c.get("user"), requireId(c)),
+  })
 })

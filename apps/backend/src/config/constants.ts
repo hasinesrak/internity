@@ -56,6 +56,7 @@ export const SUBMISSION_STATUSES = [
 export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number]
 
 export const SESSION_COOKIE = "internity_session"
+export const STAFF_SESSION_COOKIE = "internity_staff_session"
 
 export const RESET_TTL_HOURS = 2
 

@@ -51,12 +51,12 @@ function expirySentence(hours: number): string {
 function invitationLetter(input: {
   organization: string
   role: InvitationRole
-  department: string
+  department: string | null
   url: string
   hours: number
 }): string {
   return [
-    `You are invited to join the ${input.department} department at ${input.organization} as ${rolePhrase(input.role)}.`,
+    `You are invited to join ${input.department ? `the ${input.department} department` : input.organization} as ${rolePhrase(input.role)}.`,
     "",
     "Activate your account:",
     input.url,
@@ -75,9 +75,23 @@ async function expireStaleInvitations() {
 function assertCanInvite(
   actor: SessionUser,
   role: InvitationRole,
-  departmentId: string
+  departmentId: string | null
 ) {
+  if (role === "intern" && !departmentId) {
+    throw new AppError(
+      422,
+      "DEPARTMENT_REQUIRED",
+      "Choose a department for this invitation."
+    )
+  }
   if (actor.role === "admin") return
+  if (!departmentId) {
+    throw new AppError(
+      422,
+      "DEPARTMENT_REQUIRED",
+      "Choose a department for this invitation."
+    )
+  }
   if (actor.role === "hr") {
     if (role === "intern" || role === "supervisor" || role === "instructor")
       return
@@ -104,8 +118,8 @@ async function deliverInvitation(input: {
   user: UserDoc
   createdUser: boolean
   role: InvitationRole
-  departmentId: string
-  departmentName: string
+  departmentId: string | null
+  departmentName: string | null
 }) {
   const { token, tokenHash } = createSecretToken()
   const settings = await getSettings()
@@ -114,7 +128,9 @@ async function deliverInvitation(input: {
   )
   const invitation = await Invitation.create({
     email: input.user.email,
-    departmentId: new Types.ObjectId(input.departmentId),
+    departmentId: input.departmentId
+      ? new Types.ObjectId(input.departmentId)
+      : null,
     role: input.role,
     tokenHash,
     expiresAt,
@@ -146,7 +162,7 @@ async function deliverInvitation(input: {
       },
       { $set: { status: "revoked", revokedAt: new Date() } }
     )
-    if (input.role === "supervisor") {
+    if (input.role === "supervisor" && input.departmentId) {
       await assignSupervisorSlot(input.departmentId, input.user._id.toString())
     }
     await recordActivity({
@@ -176,12 +192,15 @@ export async function invitePerson(
     email: string
     name?: string
     role: InvitationRole
-    departmentId: string
+    departmentId?: string | null
     profile?: ProfileInput
   }
 ) {
-  assertCanInvite(actor, input.role, input.departmentId)
-  const department = await requireActiveDepartment(input.departmentId)
+  const departmentId = input.departmentId ?? null
+  assertCanInvite(actor, input.role, departmentId)
+  const department = departmentId
+    ? await requireActiveDepartment(departmentId)
+    : null
   const email = input.email.toLowerCase()
   const existing = await User.findOne({ email }).select("+passwordHash")
   if (existing && existing.role !== input.role) {
@@ -216,7 +235,7 @@ export async function invitePerson(
       email,
       role: input.role,
       status: "pending",
-      departmentId: department._id,
+      departmentId: department?._id ?? null,
       createdBy: new Types.ObjectId(actor.id),
       profile: profileFromInput(input.profile),
     })
@@ -225,7 +244,7 @@ export async function invitePerson(
     user.name = input.name?.trim() || user.name
     user.role = input.role
     user.status = "pending"
-    user.departmentId = department._id
+    user.departmentId = department?._id ?? null
     user.passwordHash = null
     user.tokenVersion += 1
     if (input.profile) {
@@ -242,8 +261,8 @@ export async function invitePerson(
       user,
       createdUser,
       role: input.role,
-      departmentId: department._id.toString(),
-      departmentName: department.name,
+      departmentId: department?._id.toString() ?? null,
+      departmentName: department?.name ?? null,
     })
   } catch (error) {
     if (!createdUser) {
@@ -279,7 +298,9 @@ export async function listInvitations(
     invitations.map((invitation) =>
       serializeInvitation(
         invitation,
-        briefs.get(invitation.departmentId.toString())?.name ?? null
+        invitation.departmentId
+          ? (briefs.get(invitation.departmentId.toString())?.name ?? null)
+          : null
       )
     ),
     query.page,
@@ -300,7 +321,11 @@ export async function resendInvitation(
   await expireStaleInvitations()
   const current = await Invitation.findById(invitationId)
   if (!current) throw notFound("That invitation was not found.")
-  assertCanInvite(actor, current.role, current.departmentId.toString())
+  assertCanInvite(
+    actor,
+    current.role,
+    current.departmentId ? current.departmentId.toString() : null
+  )
   if (current.status === "accepted") {
     throw new AppError(
       409,
@@ -324,24 +349,24 @@ export async function resendInvitation(
       "This account is suspended. Ask an administrator to restore it."
     )
   }
-  const department = await requireActiveDepartment(
-    current.departmentId.toString()
-  )
+  const department = current.departmentId
+    ? await requireActiveDepartment(current.departmentId.toString())
+    : null
   enforceLimit(takeMailSend(actor.id), "invitation emails")
   const sent = await deliverInvitation({
     actor,
     user,
     createdUser: false,
     role: current.role,
-    departmentId: department._id.toString(),
-    departmentName: department.name,
+    departmentId: department?._id.toString() ?? null,
+    departmentName: department?.name ?? null,
   })
   await recordActivity({
     actorId: actor.id,
     action: "invitation.resent",
     entityType: "invitation",
     entityId: sent.invitation.id,
-    departmentId: department._id.toString(),
+    departmentId: department?._id.toString() ?? null,
     metadata: { email: user.email },
   })
   return sent
@@ -369,10 +394,14 @@ export async function revokeInvitation(
     action: "invitation.revoked",
     entityType: "invitation",
     entityId: invitationId,
-    departmentId: invitation.departmentId.toString(),
+    departmentId: invitation.departmentId
+      ? invitation.departmentId.toString()
+      : null,
     metadata: { email: invitation.email },
   })
-  const department = await Department.findById(invitation.departmentId)
+  const department = invitation.departmentId
+    ? await Department.findById(invitation.departmentId)
+    : null
   return serializeInvitation(invitation, department?.name ?? null)
 }
 
@@ -411,7 +440,9 @@ async function loadTokenInvitation(token: string): Promise<InvitationDoc> {
 
 export async function previewInvitation(token: string) {
   const invitation = await loadTokenInvitation(token)
-  const department = await Department.findById(invitation.departmentId)
+  const department = invitation.departmentId
+    ? await Department.findById(invitation.departmentId)
+    : null
   return {
     email: invitation.email,
     role: invitation.role,

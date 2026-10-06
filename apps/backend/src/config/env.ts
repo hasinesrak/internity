@@ -22,6 +22,9 @@ export type AppEnvConfig = {
   resendFromEmail: string
   aiGatewayApiKey: string
   aiModel: string
+  aiFileModel: string
+  railwayNewSshPrivateKeyB64: string
+  railwayNewSshKeyPath: string
   bcryptRounds: number
   adminName: string
   adminEmail: string
@@ -210,6 +213,9 @@ export function getEnv(): AppEnvConfig {
     ),
     aiGatewayApiKey: optional("AI_GATEWAY_API_KEY"),
     aiModel: optional("AI_MODEL", "deepseek/deepseek-v4.1-flash"),
+    aiFileModel: optional("AI_FILE_MODEL", "google/gemini-3.5-flash-lite"),
+    railwayNewSshPrivateKeyB64: optional("RAILWAY_NEW_SSH_PRIVATE_KEY_B64"),
+    railwayNewSshKeyPath: optional("RAILWAY_NEW_SSH_KEY_PATH"),
     bcryptRounds,
     adminName: optional("ADMIN_NAME", "Admin"),
     adminEmail: optional("ADMIN_EMAIL").toLowerCase(),

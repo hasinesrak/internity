@@ -30,6 +30,9 @@ export const PASSWORD_CHANGE_MAX_FAILURES = 5
 /** Drafts for one person inside an hour. */
 export const AI_DRAFT_MAX = 8
 
+/** Automated sandbox reviews for one person inside an hour. */
+export const AI_REVIEW_MAX = 4
+
 /** Intern copilot turns for one person inside an hour. */
 export const AI_COPILOT_MAX = 30
 
@@ -106,6 +109,7 @@ const invitationWindow = new FailureWindow(INVITATION_MAX_ATTEMPTS)
 const resetWindow = new FailureWindow(RESET_MAX_ATTEMPTS)
 const passwordChangeWindow = new FailureWindow(PASSWORD_CHANGE_MAX_FAILURES)
 const aiWindow = new FailureWindow(AI_DRAFT_MAX, HOUR_MS)
+const aiReviewWindow = new FailureWindow(AI_REVIEW_MAX, HOUR_MS)
 const aiCopilotWindow = new FailureWindow(AI_COPILOT_MAX, HOUR_MS)
 const mailWindow = new FailureWindow(MAIL_MAX_SENDS, HOUR_MS)
 const resetEmailWindow = new FailureWindow(RESET_EMAIL_MAX, HOUR_MS)
@@ -118,6 +122,7 @@ const windows = [
   resetWindow,
   passwordChangeWindow,
   aiWindow,
+  aiReviewWindow,
   aiCopilotWindow,
   mailWindow,
   resetEmailWindow,
@@ -220,6 +225,10 @@ export function recordPasswordChangeSuccess(userId: string): void {
 
 export function takeAiDraft(userId: string, now = Date.now()): LimitDecision {
   return take(aiWindow, userId, now)
+}
+
+export function takeAiReview(userId: string, now = Date.now()): LimitDecision {
+  return take(aiReviewWindow, userId, now)
 }
 
 export function takeAiCopilot(userId: string, now = Date.now()): LimitDecision {

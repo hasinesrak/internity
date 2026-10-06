@@ -78,7 +78,7 @@ adminRoutes.post("/users", async (c) => {
     })
     return c.json({ user }, 201)
   }
-  if (body.role === "admin" || body.role === "hr" || !body.departmentId) {
+  if (body.role === "admin" || body.role === "hr") {
     throw validation("Set a password for this account.", "password")
   }
   const invited = await invitePerson(c.get("user"), {

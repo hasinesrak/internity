@@ -13,8 +13,13 @@ import { hashToken } from "./lib/tokens.js"
 import { Assignment } from "./models/assignment.js"
 import { Department } from "./models/department.js"
 import { Invitation } from "./models/invitation.js"
+import { Submission } from "./models/submission.js"
 import { User } from "./models/user.js"
-import { setDraftGenerator } from "./services/ai.service.js"
+import {
+  setAutomatedReviewGenerator,
+  setDraftGenerator,
+  setRepositoryInspector,
+} from "./services/ai.service.js"
 import type { Role } from "./config/constants.js"
 
 let app!: ReturnType<typeof createApp>
@@ -41,9 +46,8 @@ function api() {
       })
       for (const header of response.headers.getSetCookie()) {
         const [pair] = header.split(";")
-        if (!pair?.startsWith("internity_session=")) continue
-        const value = pair.slice("internity_session=".length)
-        cookie = value ? `internity_session=${value}` : ""
+        if (!pair?.startsWith("internity_") || !pair.includes("=")) continue
+        cookie = pair
       }
       return response
     },
@@ -135,6 +139,8 @@ beforeEach(async () => {
   process.env.STAFF_APP_URL = "http://localhost:3001"
   process.env.RESEND_API_KEY = ""
   setDraftGenerator(null)
+  setAutomatedReviewGenerator(null)
+  setRepositoryInspector(null)
   await Promise.all(
     Object.values(mongoose.connection.collections).map((collection) =>
       collection.deleteMany({})
@@ -577,7 +583,9 @@ describe("access boundaries", () => {
       settings: { groqModel: string }
     }
     assert.equal(updatedBody.settings.groqModel, "qwen/qwen3.6-27b")
-    const loaded = (await json(await adminClient.call("/api/admin/settings"))) as {
+    const loaded = (await json(
+      await adminClient.call("/api/admin/settings")
+    )) as {
       settings: { groqModel: string }
     }
     assert.equal(loaded.settings.groqModel, "qwen/qwen3.6-27b")
@@ -595,6 +603,97 @@ describe("access boundaries", () => {
       body: { groqModel: "llama-3.3-70b-versatile" },
     })
     assert.equal(forbidden.status, 403)
+  })
+})
+
+describe("automated assignment review", () => {
+  test("creates a human-approval review draft from sandbox evidence", async () => {
+    const department = await makeDepartment("Engineering")
+    const instructor = await makeUser({
+      role: "instructor",
+      departmentId: department.id,
+    })
+    const intern = await makeUser({
+      role: "intern",
+      departmentId: department.id,
+    })
+    const assignment = await Assignment.create({
+      departmentId: department.id,
+      title: "Build a test plan",
+      instructions: "Add a small automated test suite.",
+      rubric: [
+        {
+          name: "Coverage",
+          description: "Covers the important behavior.",
+          points: 100,
+        },
+      ],
+      deadline: new Date(Date.now() + 86_400_000),
+      createdBy: instructor.id,
+      status: "published",
+    })
+    const submission = await Submission.create({
+      assignmentId: assignment._id,
+      internId: intern.id,
+      departmentId: department.id,
+      submissionUrl: "https://github.com/example/intern-project",
+      notes: "I added tests for the happy path.",
+      submittedAt: new Date(),
+      status: "submitted",
+    })
+
+    process.env.AI_GATEWAY_API_KEY = "test-key-not-real"
+    setRepositoryInspector(async () => ({
+      repositoryUrl: "https://github.com/example/intern-project",
+      files: [{ path: "src/index.ts", content: "export const answer = 42" }],
+      packageManifest: JSON.stringify({ scripts: { test: "vitest" } }),
+      tests: [
+        {
+          command: "CI=true npm test -- --runInBand",
+          exitCode: 0,
+          timedOut: false,
+          output: "1 passed",
+        },
+      ],
+      openCodeReport:
+        "Summary\nThe repository contains the expected implementation.",
+    }))
+    setAutomatedReviewGenerator(async () => ({
+      recommendation: "reviewed",
+      score: 85,
+      summary: "The core behavior is implemented and the test pass is green.",
+      feedback: "Good coverage of the main path. Add an edge-case test next.",
+      criterionScores: [
+        {
+          criterion: "Coverage",
+          score: 85,
+          maxPoints: 100,
+          rationale: "The submitted test covers the main path.",
+        },
+      ],
+      strengths: ["The main behavior is tested."],
+      improvements: ["Add an edge-case test."],
+      evidence: [
+        { path: "src/index.ts", detail: "Exports the implementation." },
+      ],
+    }))
+
+    const client = api()
+    await signIn(client, instructor.email, instructor.password)
+    const response = await client.call(
+      `/api/instructor/submissions/${submission._id.toString()}/ai-review`,
+      { method: "POST" }
+    )
+    assert.equal(response.status, 200)
+    const body = (await json(response)) as {
+      review: { score: number; maxScore: number; recommendation: string }
+    }
+    assert.equal(body.review.score, 85)
+    assert.equal(body.review.maxScore, 100)
+    assert.equal(body.review.recommendation, "reviewed")
+    const untouched = await Submission.findById(submission._id)
+    assert.equal(untouched?.status, "submitted")
+    assert.equal(untouched?.score, null)
   })
 })
 
@@ -660,9 +759,7 @@ describe("api surface", () => {
       body: JSON.stringify({ email: hr.email, password: hr.password }),
     })
     assert.equal(staffLogin.status, 200)
-    const staffCookie = staffLogin.headers
-      .get("set-cookie")
-      ?.split(";")[0]
+    const staffCookie = staffLogin.headers.get("set-cookie")?.split(";")[0]
     assert.ok(staffCookie)
 
     process.env.API_SURFACE = "public"
@@ -697,11 +794,11 @@ describe("api surface", () => {
       const replay = await publicApp.request("/api/auth/me", {
         headers: { cookie: staffCookie },
       })
-      assert.equal(replay.status, 403)
+      assert.equal(replay.status, 401)
       const departments = await publicApp.request("/api/departments", {
         headers: { cookie: staffCookie },
       })
-      assert.equal(departments.status, 403)
+      assert.equal(departments.status, 401)
 
       const internLogin = await publicApp.request("/api/auth/login", {
         method: "POST",
@@ -721,6 +818,58 @@ describe("api surface", () => {
     } finally {
       process.env.API_SURFACE = "staff"
     }
+  })
+})
+
+describe("unassigned staff accounts", () => {
+  test("lets admins create and invite staff without a department", async () => {
+    const admin = await makeUser({ role: "admin" })
+    const client = api()
+    await signIn(client, admin.email, admin.password)
+
+    const created = await client.call("/api/admin/users", {
+      method: "POST",
+      body: {
+        name: "Unassigned Instructor",
+        email: "unassigned.instructor@example.com",
+        role: "instructor",
+        password: "Instructor123",
+      },
+    })
+    assert.equal(created.status, 201)
+    const createdBody = (await json(created)) as {
+      user: { role: string; departmentId: string | null }
+    }
+    assert.equal(createdBody.user.role, "instructor")
+    assert.equal(createdBody.user.departmentId, null)
+
+    const invited = await client.call("/api/admin/users", {
+      method: "POST",
+      body: {
+        name: "Unassigned Supervisor",
+        email: "unassigned.supervisor@example.com",
+        role: "supervisor",
+      },
+    })
+    assert.equal(invited.status, 201)
+    const invitedBody = (await json(invited)) as {
+      user: { role: string; departmentId: string | null }
+      invitation: { departmentId: string | null }
+    }
+    assert.equal(invitedBody.user.role, "supervisor")
+    assert.equal(invitedBody.user.departmentId, null)
+    assert.equal(invitedBody.invitation.departmentId, null)
+
+    const rejectedIntern = await client.call("/api/admin/users", {
+      method: "POST",
+      body: {
+        name: "Unassigned Intern",
+        email: "unassigned.intern@example.com",
+        role: "intern",
+        password: "Intern123",
+      },
+    })
+    assert.equal(rejectedIntern.status, 422)
   })
 })
 
@@ -752,7 +901,10 @@ describe("abuse limits", () => {
       error: { code: string; message: string }
     }
     assert.equal(body.error.code, "TOO_MANY_ATTEMPTS")
-    assert.match(body.error.message, /Too many sign-in attempts for this account/)
+    assert.match(
+      body.error.message,
+      /Too many sign-in attempts for this account/
+    )
   })
 
   test("sign-out retires the session cookie", async () => {
@@ -802,5 +954,65 @@ describe("abuse limits", () => {
       }),
     })
     assert.equal(response.status, 422)
+  })
+})
+
+describe("file uploads", () => {
+  test("accepts PDF, DOC, DOCX, TXT, and MD materials", async () => {
+    const department = await makeDepartment("Materials")
+    const instructor = await makeUser({
+      role: "instructor",
+      departmentId: department.id,
+    })
+    const login = await app.request("/api/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: instructor.email,
+        password: instructor.password,
+      }),
+    })
+    assert.equal(login.status, 200)
+    const cookie = login.headers
+      .getSetCookie()
+      .map((header) => header.split(";")[0])
+      .find((pair) => pair.startsWith("internity_"))
+    assert.ok(cookie)
+
+    const files = [
+      ["guide.pdf", "application/pdf", "%PDF-1.7\n"],
+      ["legacy.doc", "application/msword", "Legacy Word"],
+      [
+        "guide.docx",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "DOCX placeholder",
+      ],
+      ["notes.txt", "text/plain", "Plain text notes"],
+      ["readme.md", "text/markdown", "# Markdown notes"],
+    ] as const
+
+    for (const [name, expectedMime, contents] of files) {
+      const form = new FormData()
+      form.set(
+        "file",
+        new Blob([contents], { type: "application/octet-stream" }),
+        name
+      )
+      const uploaded = await app.request("/api/instructor/uploads", {
+        method: "POST",
+        headers: { cookie },
+        body: form,
+      })
+      assert.equal(uploaded.status, 201, name)
+      const body = (await json(uploaded)) as {
+        attachment: { id: string; mimeType: string }
+      }
+      assert.equal(body.attachment.mimeType, expectedMime, name)
+      const removed = await app.request(
+        `/api/instructor/uploads/${body.attachment.id}`,
+        { method: "DELETE", headers: { cookie } }
+      )
+      assert.equal(removed.status, 204, name)
+    }
   })
 })

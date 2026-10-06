@@ -136,9 +136,7 @@ export type PublicAttachment = {
   createdAt: string
 }
 
-export function serializeUpload(
-  upload: WithId<UploadShape>
-): PublicAttachment {
+export function serializeUpload(upload: WithId<UploadShape>): PublicAttachment {
   return {
     id: upload._id.toString(),
     originalName: upload.originalName,
@@ -151,7 +149,7 @@ export function serializeUpload(
 
 export type PublicClass = {
   id: string
-  departmentId: string
+  departmentId: string | null
   title: string
   agenda: string
   meetingUrl: string
@@ -184,7 +182,7 @@ export function serializeClass(
 
 export type PublicAssignment = {
   id: string
-  departmentId: string
+  departmentId: string | null
   title: string
   instructions: string
   rubric: RubricCriterion[]
@@ -262,6 +260,7 @@ export type PublicSubmission = {
     title: string
     status: AssignmentStatus
     deadline: string | null
+    maxScore: number
   }
   intern?: { id: string; name: string; email: string }
   reviews?: PublicReview[]
@@ -302,6 +301,7 @@ export function serializeSubmission(
             title: extras.assignment.title,
             status: extras.assignment.status,
             deadline: iso(extras.assignment.deadline),
+            maxScore: maxScoreFor(extras.assignment.rubric),
           },
         }
       : {}),
@@ -317,7 +317,7 @@ export type PublicInvitation = {
   email: string
   role: InvitationShape["role"]
   status: InvitationStatus
-  departmentId: string
+  departmentId: string | null
   departmentName: string | null
   userId: string
   invitedBy: string | null
@@ -336,7 +336,7 @@ export function serializeInvitation(
     email: invitation.email,
     role: invitation.role,
     status: invitation.status,
-    departmentId: invitation.departmentId.toString(),
+    departmentId: idOf(invitation.departmentId),
     departmentName,
     userId: invitation.userId.toString(),
     invitedBy: idOf(invitation.invitedBy),

@@ -1,9 +1,12 @@
 import { Hono } from "hono"
 import { getCookie } from "hono/cookie"
 
-import { SESSION_COOKIE } from "../config/constants.js"
 import { requireAuth } from "../middleware/auth.js"
-import { clearSessionCookie, setSessionCookie } from "../middleware/cookies.js"
+import {
+  clearSessionCookie,
+  sessionCookieName,
+  setSessionCookie,
+} from "../middleware/cookies.js"
 import { clientIp, networkAllowsStaff } from "../middleware/network.js"
 import {
   changePassword,
@@ -78,7 +81,7 @@ authRoutes.post("/login", async (c) => {
 
 authRoutes.post("/logout", async (c) => {
   try {
-    await endSession(getCookie(c, SESSION_COOKIE))
+    await endSession(getCookie(c, sessionCookieName()))
   } finally {
     clearSessionCookie(c)
   }
