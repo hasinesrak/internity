@@ -1,0 +1,36 @@
+{
+  "name": "@internity/cli",
+  "version": "0.1.0",
+  "description": "Run Internity assignment verification checks locally",
+  "type": "module",
+  "private": false,
+  "bin": {
+    "internity": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.8.3",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.0",
+    "typescript-eslint": "^8.0.0"
+  }
+}

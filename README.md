@@ -32,12 +32,15 @@ One monorepo contains the full system: an **intern web app** (`apps/web`), a **s
 - **Role-based access** — Admin, HR, Supervisor, Instructor, and Intern, enforced on the backend.
 - **Department management** — Create/archive departments, assign supervisors and instructors.
 - **Invitation onboarding** — HR invites interns by email; interns activate via expiring token link.
-- **Class scheduling** — Instructors and supervisors schedule classes with external meeting links.
+- **Class scheduling** — Instructors and supervisors schedule classes with external meeting links, a calendar view, cancellation/restore controls, and automatic intern email notices for new or changed sessions.
 - **Assignments and submissions** — Publish assignments, collect external submission links, review with score + feedback.
+- **Optional CLI verification** — Instructors can leave checks off, write them manually, or ask AI to recommend bounded setup checks for technical assignments. Interns see clear instructions, run locally with `@internity/cli`, and the API stores the structured verification run for staff review.
 - **AI drafting assistance** — Supervisors and instructors can draft assignment text, rubrics, and class agendas via the Vercel AI Gateway (optional, backend-only).
 - **Automated assignment review** — Instructors and supervisors can use the AI review command from a submission drawer. A public repository is cloned into a disposable Railway Sandbox, bounded tests and source evidence are inspected, and the AI returns an editable review draft. A staff member must still save the score and feedback.
 - **Department scoping** — Supervisors and instructors operate strictly inside their assigned department.
 - **Activity logging** — Admin-visible audit trail of key actions.
+- **Attendance monitoring** — Interns mark their own daily attendance; supervisors can correct attendance for their department and review a weekly/monthly calendar grid.
+- **Intern CV records** — HR can upload or replace an intern CV, while authorized supervisors can view it from the intern profile.
 
 ---
 
@@ -94,8 +97,11 @@ Route groups (`apps/backend/src/routes/`):
 - `/api/admin` — users, HR accounts, departments override, settings, activity log
 - `/api/hr` — departments, supervisor assignment, invitations, directory
 - `/api/supervisor` — instructor roster within own department (+ instructor-level actions there)
-- `/api/instructor` — classes, assignments, submission review; `POST /api/instructor/ai/*` drafting endpoints and `POST /api/instructor/submissions/:id/ai-review` for human-approved automated review drafts
+- `/api/instructor` — classes (including cancel/restore), assignments, submission review; `POST /api/instructor/ai/*` drafting endpoints and `POST /api/instructor/submissions/:id/ai-review` for human-approved automated review drafts
 - `/api/intern` — own department view, classes/assignments, submission links, feedback
+- `/api/cli` — Bearer-authenticated verification manifest and run endpoints for `@internity/cli`
+- `/api/attendance` — date-keyed self attendance and supervisor-scoped attendance grids
+- `/api/documents` — HR CV upload plus department-scoped intern document/profile reads
 - `/api/departments` — department reads
 
 ### 3.3 Backend layering
@@ -107,7 +113,7 @@ apps/backend/src/
   middleware/   auth (JWT verify), requireRole, department scope, error handler,
                 client-IP extraction, rate limiting
   models/       Mongoose schemas: User, Department, Invitation,
-                ClassSession, Assignment, Submission, Review, ActivityLog
+                ClassSession, Assignment, Submission, VerificationRun, Review, ActivityLog
   routes/       one module per group above; thin handlers
   services/     business logic (invitations, mail, AI drafting)
   validators/   Zod request/response contracts
@@ -134,7 +140,7 @@ Both apps are TanStack Start applications sharing one design system:
 ```text
 Department 1──* User (role, status, departmentId)
 Department 1──* Invitation (email, role, tokenHash, expiresAt)
-Department 1──* ClassSession (title, agenda, meetingUrl, schedule)
+Department 1──* ClassSession (title, agenda, meetingUrl, schedule, status)
 Department 1──* Assignment (title, instructions, rubric, deadline, status)
 Assignment 1──* Submission (internId, url, notes, status, score, feedback)
 User *──* ActivityLog (who, what, when)
@@ -241,6 +247,51 @@ docker compose down -v     # stop and delete DB data
 
 > Compose sets `STAFF_ALLOW_PRIVATE=true` so staff sign-in works from your machine through the Docker bridge. Never set `STAFF_ALLOW_PRIVATE` in production.
 
+### Open the app from another computer on the same network
+
+The computer running Docker is the server. Give it a LAN address and use that
+address everywhere the browser needs to connect. In the root `.env`, set the
+following values (replace `192.168.1.25` with the server's IPv4 address):
+
+```dotenv
+APP_HOST=192.168.1.25
+WEB_HOST=0.0.0.0
+STAFF_HOST=0.0.0.0
+PUBLIC_API_BIND=0.0.0.0
+STAFF_API_BIND=0.0.0.0
+PUBLIC_CORS_ORIGIN=
+STAFF_CORS_ORIGIN=
+APP_URL=
+STAFF_APP_URL=
+VITE_PUBLIC_API_URL=
+VITE_STAFF_API_URL=
+STAFF_ALLOWED_IPS=
+STAFF_ALLOW_PRIVATE=true
+```
+
+The empty URL values let Compose derive `http://192.168.1.25` for the sites,
+APIs, CORS, and bootstrap links. Rebuild after changing them because the
+`VITE_*_API_URL` values are embedded in the frontend bundle:
+
+```powershell
+docker compose up -d --build
+```
+
+Open `http://192.168.1.25:3000` for the intern site and
+`http://192.168.1.25:3001` for the staff and admin site. Both computers must be
+on the same LAN (or connected through the office VPN). If the server's firewall
+blocks the ports, allow TCP `3000,3001,4000,4001`. On Windows, run this in an
+elevated PowerShell:
+
+```powershell
+New-NetFirewallRule -DisplayName "Internity LAN" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3000,3001,4000,4001 -Profile Private
+```
+
+Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env` before the first startup, then
+run the seed command shown above. The staff gate allows private LAN addresses
+in this Compose setup; use a VPN or a production reverse proxy instead of
+exposing the staff ports directly to the public internet.
+
 ### Option B — Manual dev with hot reload
 
 Run MongoDB (via Compose's mongo service or your own), then each app in its own terminal:
@@ -293,7 +344,7 @@ pnpm dev
 
 | File | Purpose | Key values |
 |---|---|---|
-| `.env` (root) | Docker Compose wiring | `PUBLIC_API_PORT` (4000), `STAFF_API_PORT` (4001), `WEB_PORT` (3000), `STAFF_PORT` (3001), `APP_URL`, `STAFF_APP_URL`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, `TRUST_PROXY`, `RESEND_API_KEY`, `AI_GATEWAY_API_KEY`, `AI_MODEL`, `AI_FILE_MODEL` (defaults to `google/gemini-3.5-flash-lite` for Copilot attachments), optional `RAILWAY_NEW_SSH_PRIVATE_KEY_B64`/`RAILWAY_NEW_SSH_KEY_PATH`, `ADMIN_*` bootstrap |
+| `.env` (root) | Docker Compose wiring | `APP_HOST`, `PUBLIC_API_PORT` (4000), `STAFF_API_PORT` (4001), `WEB_PORT` (3000), `STAFF_PORT` (3001), `APP_URL`, `STAFF_APP_URL`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, `TRUST_PROXY`, `RESEND_API_KEY`, `AI_GATEWAY_API_KEY`, `AI_MODEL`, `AI_FILE_MODEL` (defaults to `google/gemini-3.5-flash-lite` for Copilot attachments), optional `RAILWAY_NEW_SSH_PRIVATE_KEY_B64`/`RAILWAY_NEW_SSH_KEY_PATH`, `ADMIN_*` bootstrap |
 | `apps/backend/.env` | Manual `pnpm --filter backend dev` | `HOST`, `PORT`, `MONGODB_URI`, `CORS_ORIGIN`, `API_SURFACE=staff\|public`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, mail + Groq keys |
 | `apps/web/.env` | Intern site | `WEB_HOST`, `WEB_PORT`, `VITE_API_URL=http://localhost:4000` (public API) |
 | `apps/staff/.env` | Staff site | `STAFF_HOST`, `STAFF_PORT`, `VITE_API_URL=http://localhost:4001` (staff API), `STAFF_ALLOWED_IPS` mirror |
@@ -301,6 +352,7 @@ pnpm dev
 Rules that matter:
 
 - `JWT_SECRET` and `MONGODB_URI` must be identical across both API processes.
+- `APP_HOST` is the address other computers use to reach this server. Compose derives `APP_URL`, `STAFF_APP_URL`, CORS origins, and both frontend API URLs from it when those values are blank.
 - `APP_URL` builds intern links; `STAFF_APP_URL` builds staff links — keep them aligned with the site ports.
 - `STAFF_ALLOWED_IPS` controls which client addresses may use the staff surface. Use `127.0.0.1` for the localhost deployment. **Production staff API refuses to start until it is set.**
 - `VITE_API_URL` is baked at build time — the Docker `web`/`staff` images take it from `VITE_PUBLIC_API_URL` / `VITE_STAFF_API_URL` build args.
@@ -340,6 +392,15 @@ Root (`package.json`, Turborepo-orchestrated):
 
 Backend (`pnpm --filter backend <script>`): `dev` (watch), `build` → `dist/`, `start` (`node dist/index.js`), `seed`, `test`, `lint`, `typecheck`.
 
+CLI (`pnpm --filter @internity/cli <script>`): `build`, `dev`, `typecheck`, `lint`. After publishing, interns can run `npm install -g @internity/cli`, `internity login`, `internity run <assignment-id>` to practice locally, and `internity verify <assignment-id>` to submit completion from the project folder.
+
+The CLI has its own GitHub Actions workflow at `.github/workflows/cli.yml`.
+Pull requests and `master` changes run lint, typecheck, build, and an npm
+package-content check. Publishing is explicit: bump `packages/cli/package.json`,
+commit the change, create a matching `cli-v<version>` tag, and push the tag.
+The repository must have an `NPM_TOKEN` secret with permission to publish
+`@internity/cli`; the workflow publishes with npm provenance enabled.
+
 Frontends (`pnpm --filter web|staff <script>`): `dev`, `build`, `start` (prod server), `preview`, `lint`, `typecheck`.
 
 ---
@@ -357,9 +418,11 @@ pnpm lint
 ## 11. Security Model
 
 - **HTTP-only session cookie** (`internity_session`); no JWT in `localStorage`.
+- **CLI credentials** — The CLI uses a Bearer token returned by the dedicated intern-only CLI login endpoint and stores it in the platform config directory with restrictive permissions. Browser sessions remain cookie-based.
 - **Dual-surface isolation** — staff handlers absent from the public process.
 - **IP gating** — staff sign-in is restricted to `STAFF_ALLOWED_IPS`; the localhost deployment uses `127.0.0.1`. Public process refuses staff accounts unconditionally.
 - **RBAC + department scope on every route** — frontend guards are cosmetic.
+- **Verification bounds** — Assignment manifests limit shells, working directories, step counts, timeouts, assertion sizes, and captured output. The server re-evaluates assertions before persisting a run.
 - **Secrets hygiene** — `JWT_SECRET`, `AI_GATEWAY_API_KEY`, `RESEND_API_KEY`, and `ADMIN_PASSWORD` use env/secrets only. AI credentials never enter the frontend bundle or the anonymous sandbox. Repository URLs are limited to public HTTPS GitHub, GitLab, and Bitbucket hosts.
 - **Mail fallback** — with `RESEND_API_KEY` empty, invitation/reset links are returned to the caller and written to the server log (dev-friendly, no silent failures).
 
@@ -371,6 +434,7 @@ pnpm lint
 |---|---|
 | Staff sign-in rejected locally (non-Docker) | Use `http://localhost:3001` and keep `STAFF_ALLOWED_IPS=127.0.0.1` for the local staff API |
 | Staff sign-in rejected in Compose | `STAFF_ALLOW_PRIVATE` unset → set `STAFF_ALLOW_PRIVATE=true` in root `.env` (local only) |
+| Staff site unavailable from another computer | Set `APP_HOST` to the server LAN IPv4 address, bind the staff UI/API to `0.0.0.0`, leave `STAFF_ALLOWED_IPS` empty with `STAFF_ALLOW_PRIVATE=true` in Compose, then rebuild |
 | Staff API exits in production | `STAFF_ALLOWED_IPS` empty → set `STAFF_ALLOWED_IPS=127.0.0.1` |
 | Frontend calls wrong API | Stale `VITE_API_URL` baked at build → rebuild after changing it; check `apps/web/.env` vs `apps/staff/.env` |
 | `pnpm --filter backend test` fails to connect | No Mongo on `127.0.0.1:27017` → `docker compose up -d mongo` first |
@@ -388,7 +452,7 @@ The k3s deployment uses the VM IP directly. Open `http://192.168.0.103/` for the
 
 `infra/k8s/base/configmap.yaml` sets the VM IP for application links and CORS. If the VM IP changes, update its `APP_URL`, `STAFF_APP_URL`, `PUBLIC_CORS_ORIGIN`, and `STAFF_CORS_ORIGIN`. `STAFF_ALLOWED_IPS` accepts individual IPs and IPv4 CIDRs; the VM environment uses `192.168.0.0/24,127.0.0.1` so staff can sign in from this LAN. For a different office network, update the VM environment and rerun `bash infra/scripts/apply-cluster-env.sh`.
 
-Production path is GitOps. `.github/workflows/ci.yml` runs on `master`: frontend lint and backend lint in parallel, then a build, then one Docker job that pushes immutable `sha-<commit>` images to Docker Hub and commits those tags into `infra/k8s/overlays/production`. Argo CD (`infra/argocd/internity.yaml`) syncs that overlay into k3s when you request a sync. Separate Deployments run the intern site, the staff site, the public API, and the staff API. Both APIs are the same image with a different `API_SURFACE`. Staff access is enforced in the app from `STAFF_ALLOWED_IPS`, not by the ingress. On the VM, MongoDB is the `mongo` StatefulSet. Start it with the one-command flow in `docs/argocd-quickstart.md`.
+Production path is GitOps. `.github/workflows/ci.yml` validates the repository, builds the three images, and publishes immutable `sha-<commit>` images to Docker Hub. It then opens a deployment pull request that updates `infra/k8s/overlays/production`; merging that pull request is the production promotion step, after which Argo CD (`infra/argocd/internity.yaml`) syncs the overlay into k3s. Separate Deployments run the intern site, the staff site, the public API, and the staff API. Both APIs are the same image with a different `API_SURFACE`. Staff access is enforced in the app from `STAFF_ALLOWED_IPS`, not by the ingress. On the VM, MongoDB is the `mongo` StatefulSet. Start it with the one-command flow in `docs/argocd-quickstart.md`.
 
 ---
 
