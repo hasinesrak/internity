@@ -4,8 +4,9 @@ x-backend-environment: &backend-environment
   NODE_ENV: development
   HOME: /tmp
   MONGODB_URI: mongodb://mongo:27017/internity
-  APP_URL: ${APP_URL:-http://localhost:3000}
-  STAFF_APP_URL: ${STAFF_APP_URL:-http://localhost:3001}
+  APP_URL: ${APP_URL:-http://${APP_HOST:-localhost}:3000}
+  STAFF_APP_URL: ${STAFF_APP_URL:-http://${APP_HOST:-localhost}:3001}
+  APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Dhaka}
   JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-please-32}
   JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
   COOKIE_SECURE: "false"
@@ -66,7 +67,7 @@ services:
       HOST: ${HOST:-0.0.0.0}
       PORT: ${API_CONTAINER_PORT:-4000}
       API_SURFACE: public
-      CORS_ORIGIN: ${PUBLIC_CORS_ORIGIN:-http://localhost:3000}
+      CORS_ORIGIN: ${PUBLIC_CORS_ORIGIN:-http://${APP_HOST:-localhost}:3000}
       STAFF_ALLOWED_IPS: ""
     volumes:
       - uploads-data:/data/uploads
@@ -92,13 +93,13 @@ services:
       context: .
       dockerfile: apps/backend/Dockerfile
     ports:
-      - "${STAFF_API_BIND:-127.0.0.1}:${STAFF_API_PORT:-4001}:${API_CONTAINER_PORT:-4000}"
+      - "${STAFF_API_BIND:-0.0.0.0}:${STAFF_API_PORT:-4001}:${API_CONTAINER_PORT:-4000}"
     environment:
       <<: *backend-environment
       HOST: ${HOST:-0.0.0.0}
       PORT: ${API_CONTAINER_PORT:-4000}
       API_SURFACE: staff
-      CORS_ORIGIN: ${STAFF_CORS_ORIGIN:-http://localhost:3001}
+      CORS_ORIGIN: ${STAFF_CORS_ORIGIN:-http://${APP_HOST:-localhost}:3001}
       STAFF_ALLOWED_IPS: ${STAFF_ALLOWED_IPS:-}
       STAFF_ALLOW_PRIVATE: ${STAFF_ALLOW_PRIVATE:-true}
     volumes:
@@ -125,7 +126,8 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        VITE_API_URL: ${VITE_PUBLIC_API_URL:-http://localhost:4000}
+        VITE_API_URL: ${VITE_PUBLIC_API_URL:-http://${APP_HOST:-localhost}:4000}
+        VITE_APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Dhaka}
     ports:
       - "${WEB_HOST:-0.0.0.0}:${WEB_PORT:-3000}:3000"
     environment:
@@ -152,9 +154,9 @@ services:
       context: .
       dockerfile: apps/staff/Dockerfile
       args:
-        VITE_API_URL: ${VITE_STAFF_API_URL:-http://localhost:4001}
+        VITE_API_URL: ${VITE_STAFF_API_URL:-http://${APP_HOST:-localhost}:4001}
     ports:
-      - "${STAFF_HOST:-127.0.0.1}:${STAFF_PORT:-3001}:3001"
+      - "${STAFF_HOST:-0.0.0.0}:${STAFF_PORT:-3001}:3001"
     environment:
       HOST: 0.0.0.0
       PORT: "3001"

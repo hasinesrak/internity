@@ -1,5 +1,7 @@
 import { Schema, model, type HydratedDocument, type Types } from "mongoose"
 
+export type ClassSessionStatus = "scheduled" | "cancelled"
+
 export interface ClassSessionShape {
   departmentId: Types.ObjectId
   title: string
@@ -9,6 +11,10 @@ export interface ClassSessionShape {
   scheduledEnd: Date
   attachments: Types.ObjectId[]
   createdBy: Types.ObjectId
+  status: ClassSessionStatus
+  cancellationReason: string | null
+  cancelledAt: Date | null
+  cancelledBy: Types.ObjectId | null
   createdAt: Date
   updatedAt: Date
 }
@@ -31,6 +37,15 @@ const classSessionSchema = new Schema<ClassSessionShape>(
       default: [],
     },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    status: {
+      type: String,
+      enum: ["scheduled", "cancelled"],
+      default: "scheduled",
+      index: true,
+    },
+    cancellationReason: { type: String, default: null, maxlength: 1000 },
+    cancelledAt: { type: Date, default: null },
+    cancelledBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true }
 )

@@ -13,6 +13,7 @@ import { AppError, notFound, validation } from "../lib/errors.js"
 import {
   Assignment,
   type AssignmentDoc,
+  type AssignmentVerification,
   type RubricCriterion,
 } from "../models/assignment.js"
 import { Submission } from "../models/submission.js"
@@ -41,6 +42,7 @@ export async function createAssignment(
     rubric?: RubricCriterion[]
     deadline?: string | null
     attachments?: string[]
+    verification?: AssignmentVerification | null
     status?: "draft" | "published"
   }
 ): Promise<PublicAssignment> {
@@ -59,6 +61,7 @@ export async function createAssignment(
     rubric: cleanRubric(input.rubric),
     deadline,
     attachments,
+    verification: input.verification ?? null,
     createdBy: new Types.ObjectId(actor.id),
     status,
   })
@@ -136,6 +139,7 @@ export async function updateAssignment(
     rubric?: RubricCriterion[]
     deadline?: string | null
     attachments?: string[]
+    verification?: AssignmentVerification | null
   }
 ): Promise<PublicAssignment> {
   const departmentId = ownDepartmentId(actor)
@@ -150,6 +154,8 @@ export async function updateAssignment(
       input.attachments
     )
   }
+  if (input.verification !== undefined)
+    assignment.verification = input.verification
   if (input.deadline !== undefined) {
     assignment.deadline = input.deadline ? new Date(input.deadline) : null
   }

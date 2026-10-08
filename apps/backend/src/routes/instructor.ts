@@ -4,6 +4,7 @@ import { requireAuth, requireRoles } from "../middleware/auth.js"
 import {
   automatedAssignmentReview,
   draftAssignment,
+  draftVerification,
   draftClassAgenda,
 } from "../services/ai.service.js"
 import {
@@ -16,10 +17,12 @@ import {
   updateAssignment,
 } from "../services/assignment.service.js"
 import {
+  cancelClass,
   createClass,
   deleteClass,
   getClass,
   listClasses,
+  restoreClass,
   updateClass,
 } from "../services/class.service.js"
 import {
@@ -29,6 +32,7 @@ import {
   listSubmissions,
   reviewSubmission,
 } from "../services/submission.service.js"
+import { listVerificationRuns } from "../services/verification.service.js"
 import {
   createUpload,
   deleteUpload,
@@ -50,9 +54,11 @@ import {
 import { downloadHeaders } from "../lib/uploads.js"
 import {
   assignmentDraftSchema,
+  verificationDraftSchema,
   assignmentListSchema,
   assignmentUpdateSchema,
   assignmentWriteSchema,
+  classCancelSchema,
   classAgendaDraftSchema,
   classListSchema,
   classUpdateSchema,
@@ -89,6 +95,19 @@ instructorRoutes.patch("/classes/:id", async (c) => {
   return c.json({ class: await updateClass(c.get("user"), requireId(c), body) })
 })
 
+instructorRoutes.post("/classes/:id/cancel", async (c) => {
+  const body = parseBody(classCancelSchema, await readJson(c))
+  return c.json({
+    class: await cancelClass(c.get("user"), requireId(c), body.reason),
+  })
+})
+
+instructorRoutes.post("/classes/:id/restore", async (c) => {
+  return c.json({
+    class: await restoreClass(c.get("user"), requireId(c)),
+  })
+})
+
 instructorRoutes.delete("/classes/:id", async (c) => {
   await deleteClass(c.get("user"), requireId(c))
   return c.body(null, 204)
@@ -109,6 +128,17 @@ instructorRoutes.post("/assignments", async (c) => {
 
 instructorRoutes.get("/assignments/:id/roster", async (c) => {
   return c.json(await assignmentRoster(c.get("user"), requireId(c)))
+})
+
+instructorRoutes.get("/assignments/:id/verification-runs", async (c) => {
+  const internId = c.req.query("internId")
+  return c.json({
+    data: await listVerificationRuns(
+      c.get("user"),
+      requireId(c),
+      internId && /^[a-f\d]{24}$/i.test(internId) ? internId : undefined
+    ),
+  })
 })
 
 instructorRoutes.get("/assignments/:id", async (c) => {
@@ -194,8 +224,18 @@ instructorRoutes.post("/ai/assignment-draft", async (c) => {
   const body = parseBody(assignmentDraftSchema, await readJson(c))
   enforceLimit(takeAiDraft(c.get("user").id), "drafts")
   return c.json({
-    draft: await draftAssignment(c.get("user"), body.learningGoal),
+    draft: await draftAssignment(
+      c.get("user"),
+      body.learningGoal,
+      body.verificationMode
+    ),
   })
+})
+
+instructorRoutes.post("/ai/verification-draft", async (c) => {
+  const body = parseBody(verificationDraftSchema, await readJson(c))
+  enforceLimit(takeAiDraft(c.get("user").id), "drafts")
+  return c.json({ draft: await draftVerification(c.get("user"), body) })
 })
 
 instructorRoutes.post("/ai/class-agenda-draft", async (c) => {

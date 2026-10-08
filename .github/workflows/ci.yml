@@ -1,37 +1,45 @@
-name: Node.js CI/CD
+name: CI/CD
 
 on:
   pull_request:
   push:
     branches:
       - master
-      - main
-    # The docker job commits this generated GitOps file. Do not start a
-    # second build when that is the only file in the commit.
+    # A manifest-only merge is already the result of the publish job. Do not
+    # rebuild and publish the same commit when that PR lands.
     paths-ignore:
       - infra/k8s/overlays/production/kustomization.yaml
   workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 permissions:
   contents: read
 
 env:
   # Same-origin defaults work with the VM IP and the path-based ingress.
-  # Override these repository Variables only when deploying behind a separate
-  # public API origin.
   WEB_API_URL: ${{ vars.PUBLIC_API_URL || '/' }}
   STAFF_API_URL: ${{ vars.STAFF_API_URL || '/staff-api' }}
   STAFF_BASE_PATH: /staff
+  PUBLISH_IMAGES: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/master' }}
 
 jobs:
-  lint-frontend:
-    name: Lint frontend
+  validate:
+    name: Validate
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
+    services:
+      mongo:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -45,93 +53,44 @@ jobs:
           node-version: 22
           cache: pnpm
 
-      - name: Install dependencies
+      - name: Install dependencies once
         run: pnpm install --frozen-lockfile
 
-      - name: Run ESLint
-        run: pnpm --filter web --filter staff --filter @workspace/ui lint
+      - name: Lint
+        run: pnpm lint
 
-  lint-backend:
-    name: Lint backend
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
+      - name: Typecheck
+        run: pnpm typecheck
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Backend tests
+        run: pnpm --filter backend test
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run ESLint
-        run: pnpm --filter backend lint
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs:
-      - lint-frontend
-      - lint-backend
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build application
-        run: |
-          pnpm --filter backend build
-          VITE_API_URL="$WEB_API_URL" pnpm --filter web build
-          VITE_API_URL="$STAFF_API_URL" VITE_BASE_PATH="$STAFF_BASE_PATH" pnpm --filter staff build
-
-      - name: Verify build output
-        run: |
-          test -f apps/backend/dist/index.js
-          test -f apps/web/dist/server/server.js
-          test -f apps/staff/dist/server/server.js
-          echo "Backend:"
-          ls -la apps/backend/dist
-          echo "Web:"
-          ls -la apps/web/dist
-          echo "Staff:"
-          ls -la apps/staff/dist
-
-  docker:
-    name: Build and Push Docker Image
+  build-images:
+    name: Build container images
+    needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs:
-      - build
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main')
     permissions:
-      contents: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: internity-backend
+            dockerfile: apps/backend/Dockerfile
+            cache_scope: internity-backend
+          - image: internity-web
+            dockerfile: apps/web/Dockerfile
+            cache_scope: internity-web
+          - image: internity-staff
+            dockerfile: apps/staff/Dockerfile
+            cache_scope: internity-staff
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-        with:
-          ref: ${{ github.ref }}
-          fetch-depth: 0
 
       - name: Check registry credentials
+        if: env.PUBLISH_IMAGES == 'true'
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -143,56 +102,58 @@ jobs:
         uses: docker/setup-buildx-action@v4
 
       - name: Login to Docker Hub
+        if: env.PUBLISH_IMAGES == 'true'
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Provenance and SBOM indexes are omitted so k3s pulls a plain linux/amd64 image.
-      - name: Build and push backend
+      - name: Select frontend build arguments
+        id: docker_args
+        shell: bash
+        run: |
+          {
+            echo 'args<<EOF'
+            case "${{ matrix.image }}" in
+              internity-web)
+                echo "VITE_API_URL=${WEB_API_URL}"
+                ;;
+              internity-staff)
+                echo "VITE_API_URL=${STAFF_API_URL}"
+                echo "VITE_BASE_PATH=${STAFF_BASE_PATH}"
+                ;;
+            esac
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push ${{ matrix.image }}
         uses: docker/build-push-action@v7
         with:
           context: .
-          file: apps/backend/Dockerfile
-          push: true
+          file: ${{ matrix.dockerfile }}
+          push: ${{ env.PUBLISH_IMAGES == 'true' }}
           platforms: linux/amd64
           provenance: false
           sbom: false
-          cache-from: type=gha,scope=internity-backend
-          cache-to: type=gha,mode=max,scope=internity-backend
-          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/internity-backend:sha-${{ github.sha }}
+          build-args: ${{ steps.docker_args.outputs.args }}
+          cache-from: type=gha,scope=${{ matrix.cache_scope }}
+          cache-to: ${{ env.PUBLISH_IMAGES == 'true' && format('type=gha,mode=max,scope={0}', matrix.cache_scope) || '' }}
+          tags: ${{ env.PUBLISH_IMAGES == 'true' && format('docker.io/{0}/{1}:sha-{2}', secrets.DOCKERHUB_USERNAME, matrix.image, github.sha) || format('internity/{0}:ci-{1}', matrix.image, github.sha) }}
 
-      - name: Build and push web
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: apps/web/Dockerfile
-          push: true
-          platforms: linux/amd64
-          provenance: false
-          sbom: false
-          cache-from: type=gha,scope=internity-web
-          cache-to: type=gha,mode=max,scope=internity-web
-          build-args: VITE_API_URL=${{ env.WEB_API_URL }}
-          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/internity-web:sha-${{ github.sha }}
+  propose-deployment:
+    name: Propose deployment manifest update
+    needs: build-images
+    if: (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
 
-      - name: Build and push staff
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          file: apps/staff/Dockerfile
-          push: true
-          platforms: linux/amd64
-          provenance: false
-          sbom: false
-          cache-from: type=gha,scope=internity-staff
-          cache-to: type=gha,mode=max,scope=internity-staff
-          build-args: |
-            VITE_API_URL=${{ env.STAFF_API_URL }}
-            VITE_BASE_PATH=${{ env.STAFF_BASE_PATH }}
-          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/internity-staff:sha-${{ github.sha }}
-
-      - name: Update deployment manifest and push
+      - name: Update image references
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
@@ -201,18 +162,18 @@ jobs:
             "$DOCKERHUB_USERNAME" \
             "sha-${GITHUB_SHA}" \
             infra/k8s/overlays/production/kustomization.yaml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add infra/k8s/overlays/production/kustomization.yaml
-          if git diff --cached --quiet; then
-            echo "Production image tags already match this commit."
-            exit 0
-          fi
-          git commit -m "Publish images ${GITHUB_SHA::7}"
-          for attempt in 1 2 3 4 5; do
-            if git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}"; then
-              exit 0
-            fi
-            sleep $((attempt * 2))
-          done
-          exit 1
+
+      - name: Open deployment pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: ${{ github.ref_name }}
+          branch: ci/deploy-${{ github.ref_name }}
+          delete-branch: true
+          commit-message: "Deploy images ${{ github.sha }}"
+          title: "Deploy images ${{ github.sha }}"
+          body: |
+            This pull request updates the production overlay to the images built from `${{ github.sha }}`.
+
+            Merge this pull request to let Argo CD sync the new images. The application code was validated before the images were published.
+          add-paths: infra/k8s/overlays/production/kustomization.yaml

@@ -17,6 +17,7 @@ export type AppEnvConfig = {
   cookieSecure: boolean
   staffAllowedIps: string[]
   staffAllowPrivate: boolean
+  appTimezone: string
   trustProxy: boolean
   resendApiKey: string
   resendFromEmail: string
@@ -156,6 +157,13 @@ export function getEnv(): AppEnvConfig {
   ).replace(/\/$/, "")
   if (!appUrl) throw new Error("APP_URL is required")
 
+  const appTimezone = optional("APP_TIMEZONE", "Asia/Dhaka")
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: appTimezone }).format()
+  } catch {
+    throw new Error("APP_TIMEZONE must be a valid IANA time zone")
+  }
+
   let staffAppUrl = optional(
     "STAFF_APP_URL",
     nodeEnv === "production" ? "" : "http://localhost:3001"
@@ -205,6 +213,7 @@ export function getEnv(): AppEnvConfig {
     staffAllowPrivate: ["true", "1"].includes(
       optional("STAFF_ALLOW_PRIVATE").toLowerCase()
     ),
+    appTimezone,
     trustProxy: ["true", "1"].includes(optional("TRUST_PROXY").toLowerCase()),
     resendApiKey: optional("RESEND_API_KEY"),
     resendFromEmail: optional(

@@ -8,6 +8,35 @@ export interface RubricCriterion {
   points: number
 }
 
+export type VerificationAssertionType =
+  | "exitCode"
+  | "stdoutContains"
+  | "stdoutNotContains"
+  | "stdoutRegex"
+
+export interface VerificationAssertion {
+  type: VerificationAssertionType
+  equals?: number
+  value?: string
+}
+
+export interface VerificationStep {
+  id: string
+  description: string
+  command: string
+  shell: "default" | "sh" | "pwsh"
+  cwd: string
+  timeoutMs: number
+  assertions: VerificationAssertion[]
+}
+
+export interface AssignmentVerification {
+  version: number
+  instructions: string
+  allowedOS: string[]
+  steps: VerificationStep[]
+}
+
 export interface AssignmentShape {
   departmentId: Types.ObjectId
   title: string
@@ -17,6 +46,7 @@ export interface AssignmentShape {
   attachments: Types.ObjectId[]
   createdBy: Types.ObjectId
   status: AssignmentStatus
+  verification: AssignmentVerification | null
   createdAt: Date
   updatedAt: Date
 }
@@ -26,6 +56,61 @@ const rubricSchema = new Schema<RubricCriterion>(
     name: { type: String, required: true, trim: true },
     description: { type: String, required: true },
     points: { type: Number, required: true, min: 0 },
+  },
+  { _id: false }
+)
+
+const verificationAssertionSchema = new Schema<VerificationAssertion>(
+  {
+    type: {
+      type: String,
+      required: true,
+      enum: ["exitCode", "stdoutContains", "stdoutNotContains", "stdoutRegex"],
+    },
+    equals: { type: Number },
+    value: { type: String },
+  },
+  { _id: false }
+)
+
+const verificationStepSchema = new Schema<VerificationStep>(
+  {
+    id: { type: String, required: true, trim: true },
+    description: { type: String, required: true, trim: true },
+    command: { type: String, required: true, trim: true },
+    shell: {
+      type: String,
+      required: true,
+      enum: ["default", "sh", "pwsh"],
+      default: "default",
+    },
+    cwd: { type: String, required: true, trim: true, default: "." },
+    timeoutMs: {
+      type: Number,
+      required: true,
+      min: 1000,
+      max: 120000,
+      default: 30000,
+    },
+    assertions: {
+      type: [verificationAssertionSchema],
+      required: true,
+      default: [],
+    },
+  },
+  { _id: false }
+)
+
+const verificationSchema = new Schema<AssignmentVerification>(
+  {
+    version: { type: Number, required: true, min: 1, default: 1 },
+    instructions: { type: String, default: "", maxlength: 6000 },
+    allowedOS: {
+      type: [String],
+      required: true,
+      default: ["win32", "linux", "darwin"],
+    },
+    steps: { type: [verificationStepSchema], required: true, default: [] },
   },
   { _id: false }
 )
@@ -53,6 +138,7 @@ const assignmentSchema = new Schema<AssignmentShape>(
       enum: ["draft", "published", "closed"],
       default: "draft",
     },
+    verification: { type: verificationSchema, default: null },
   },
   { timestamps: true }
 )

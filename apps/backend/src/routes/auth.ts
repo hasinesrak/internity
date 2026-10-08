@@ -20,7 +20,7 @@ import {
 } from "../services/invitation.service.js"
 import { presentUser } from "../services/user.service.js"
 import { parseBody, parseQuery, readJson } from "../lib/http.js"
-import { AppError, tooManyAttempts } from "../lib/errors.js"
+import { AppError, forbidden, tooManyAttempts } from "../lib/errors.js"
 import {
   checkLoginAttempts,
   checkPasswordChange,
@@ -72,6 +72,32 @@ authRoutes.post("/login", async (c) => {
   } catch (error) {
     // Only wrong credentials count toward the window. Access and network
     // denials are not guessing and must not lock a real person out.
+    if (error instanceof AppError && error.code === "INVALID_CREDENTIALS") {
+      recordLoginFailure(ip, body.email)
+    }
+    throw error
+  }
+})
+
+/** Password login for the local CLI. The returned token is used as a Bearer
+ * token; browser clients continue to use the HTTP-only cookie above. */
+authRoutes.post("/cli-login", async (c) => {
+  const body = parseBody(loginSchema, await readJson(c))
+  const ip = clientIp(c)
+  const throttle = checkLoginAttempts(ip, body.email)
+  if (!throttle.allowed) {
+    throw tooManyAttempts(
+      throttleMessage(throttle.scope, throttle.retryAfterSeconds),
+      throttle.retryAfterSeconds
+    )
+  }
+  try {
+    const result = await login(body.email, body.password, networkAllowsStaff(c))
+    if (result.user.role !== "intern")
+      throw forbidden("Only intern accounts can use the CLI.")
+    recordLoginSuccess(body.email)
+    return c.json({ token: result.token, user: result.user })
+  } catch (error) {
     if (error instanceof AppError && error.code === "INVALID_CREDENTIALS") {
       recordLoginFailure(ip, body.email)
     }

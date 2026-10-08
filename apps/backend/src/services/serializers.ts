@@ -8,7 +8,11 @@ import type {
   SubmissionStatus,
   UserStatus,
 } from "../config/constants.js"
-import type { AssignmentShape, RubricCriterion } from "../models/assignment.js"
+import type {
+  AssignmentShape,
+  AssignmentVerification,
+  RubricCriterion,
+} from "../models/assignment.js"
 import { maxScoreFor } from "../models/assignment.js"
 import type { ClassSessionShape } from "../models/class-session.js"
 import type { DepartmentShape } from "../models/department.js"
@@ -16,6 +20,12 @@ import type { InvitationShape } from "../models/invitation.js"
 import type { ReviewShape } from "../models/review.js"
 import type { SubmissionShape } from "../models/submission.js"
 import type { UploadShape } from "../models/upload.js"
+import type { AttendanceShape } from "../models/attendance.js"
+import type { InternDocumentShape } from "../models/intern-document.js"
+import type {
+  VerificationRunShape,
+  VerificationStepResult,
+} from "../models/verification-run.js"
 import type { UserProfile, UserShape } from "../models/user.js"
 
 type WithId<T> = T & { _id: { toString(): string } }
@@ -147,6 +157,68 @@ export function serializeUpload(upload: WithId<UploadShape>): PublicAttachment {
   }
 }
 
+export type PublicAttendance = {
+  id: string
+  internId: string
+  departmentId: string
+  date: string
+  status: AttendanceShape["status"]
+  note: string
+  markedBy: string
+  source: AttendanceShape["source"]
+  createdAt: string
+  updatedAt: string
+}
+
+export function serializeAttendance(
+  attendance: WithId<AttendanceShape>
+): PublicAttendance {
+  return {
+    id: attendance._id.toString(),
+    internId: attendance.internId.toString(),
+    departmentId: attendance.departmentId.toString(),
+    date: attendance.date,
+    status: attendance.status,
+    note: attendance.note,
+    markedBy: attendance.markedBy.toString(),
+    source: attendance.source,
+    createdAt: attendance.createdAt.toISOString(),
+    updatedAt: attendance.updatedAt.toISOString(),
+  }
+}
+
+export type PublicInternDocument = {
+  id: string
+  internId: string
+  type: InternDocumentShape["type"]
+  originalName: string
+  mimeType: string
+  size: number
+  version: number
+  uploadedBy: string
+  url: string
+  createdAt: string
+  updatedAt: string
+}
+
+export function serializeInternDocument(
+  document: WithId<InternDocumentShape>
+): PublicInternDocument {
+  return {
+    id: document._id.toString(),
+    internId: document.internId.toString(),
+    type: document.type,
+    originalName: document.originalName,
+    mimeType: document.mimeType,
+    size: document.size,
+    version: document.version,
+    uploadedBy: document.uploadedBy.toString(),
+    url: `/api/documents/${document._id.toString()}/file`,
+    createdAt: document.createdAt.toISOString(),
+    updatedAt: document.updatedAt.toISOString(),
+  }
+}
+
 export type PublicClass = {
   id: string
   departmentId: string | null
@@ -156,6 +228,10 @@ export type PublicClass = {
   scheduledStart: string
   scheduledEnd: string
   attachments: PublicAttachment[]
+  instructor: { id: string; name: string; email: string } | null
+  status: "scheduled" | "cancelled"
+  cancellationReason: string | null
+  cancelledAt: string | null
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -163,7 +239,8 @@ export type PublicClass = {
 
 export function serializeClass(
   session: WithId<ClassSessionShape>,
-  attachments: PublicAttachment[] = []
+  attachments: PublicAttachment[] = [],
+  instructor: { id: string; name: string; email: string } | null = null
 ): PublicClass {
   return {
     id: session._id.toString(),
@@ -174,6 +251,10 @@ export function serializeClass(
     scheduledStart: session.scheduledStart.toISOString(),
     scheduledEnd: session.scheduledEnd.toISOString(),
     attachments,
+    instructor,
+    status: session.status ?? "scheduled",
+    cancellationReason: session.cancellationReason ?? null,
+    cancelledAt: iso(session.cancelledAt),
     createdBy: session.createdBy.toString(),
     createdAt: session.createdAt.toISOString(),
     updatedAt: session.updatedAt.toISOString(),
@@ -190,9 +271,34 @@ export type PublicAssignment = {
   attachments: PublicAttachment[]
   status: AssignmentStatus
   maxScore: number
+  verification: AssignmentVerification | null
   createdBy: string
   createdAt: string
   updatedAt: string
+}
+
+export function serializeVerification(
+  verification: AssignmentVerification | null | undefined
+): AssignmentVerification | null {
+  if (!verification) return null
+  return {
+    version: verification.version,
+    instructions: verification.instructions ?? "",
+    allowedOS: [...verification.allowedOS],
+    steps: verification.steps.map((step) => ({
+      id: step.id,
+      description: step.description,
+      command: step.command,
+      shell: step.shell,
+      cwd: step.cwd,
+      timeoutMs: step.timeoutMs,
+      assertions: step.assertions.map((assertion) => ({
+        type: assertion.type,
+        ...(assertion.equals === undefined ? {} : { equals: assertion.equals }),
+        ...(assertion.value === undefined ? {} : { value: assertion.value }),
+      })),
+    })),
+  }
 }
 
 export function serializeAssignment(
@@ -213,9 +319,55 @@ export function serializeAssignment(
     attachments,
     status: assignment.status,
     maxScore: maxScoreFor(assignment.rubric),
+    verification: serializeVerification(assignment.verification),
     createdBy: assignment.createdBy.toString(),
     createdAt: assignment.createdAt.toISOString(),
     updatedAt: assignment.updatedAt.toISOString(),
+  }
+}
+
+export type PublicVerificationRun = {
+  id: string
+  assignmentId: string
+  internId: string
+  departmentId: string
+  manifestVersion: number
+  manifestHash: string
+  status: VerificationRunShape["status"]
+  steps: VerificationStepResult[]
+  cliVersion: string
+  platform: string
+  nodeVersion: string
+  startedAt: string
+  completedAt: string
+  createdAt: string
+}
+
+export function serializeVerificationRun(
+  run: WithId<VerificationRunShape>
+): PublicVerificationRun {
+  return {
+    id: run._id.toString(),
+    assignmentId: run.assignmentId.toString(),
+    internId: run.internId.toString(),
+    departmentId: run.departmentId.toString(),
+    manifestVersion: run.manifestVersion,
+    manifestHash: run.manifestHash,
+    status: run.status,
+    steps: run.steps.map((step) => ({
+      id: step.id,
+      exitCode: step.exitCode,
+      stdout: step.stdout,
+      stderr: step.stderr,
+      durationMs: step.durationMs,
+      assertions: step.assertions.map((assertion) => ({ ...assertion })),
+    })),
+    cliVersion: run.cliVersion,
+    platform: run.platform,
+    nodeVersion: run.nodeVersion,
+    startedAt: run.startedAt.toISOString(),
+    completedAt: run.completedAt.toISOString(),
+    createdAt: run.createdAt.toISOString(),
   }
 }
 

@@ -2,6 +2,12 @@ import { Types, type FilterQuery } from "mongoose"
 
 import { memberDepartmentId, ownDepartmentId } from "./access.js"
 import { recordActivity } from "./activity.service.js"
+import {
+  notifyClassCancelled,
+  notifyClassRestored,
+  notifyClassScheduled,
+  notifyClassUpdated,
+} from "./class-notification.service.js"
 import { requireActiveDepartment } from "./department.service.js"
 import { serializeClass, type PublicClass } from "./serializers.js"
 import {
@@ -11,6 +17,7 @@ import {
 } from "./upload.service.js"
 import { notFound, validation } from "../lib/errors.js"
 import { ClassSession, type ClassSessionDoc } from "../models/class-session.js"
+import { User } from "../models/user.js"
 import type { SessionUser } from "../types.js"
 
 function assertSchedule(start: Date, end: Date) {
@@ -33,6 +40,33 @@ async function classInDepartment(id: string, departmentId: string) {
   const session = await ClassSession.findOne({ _id: id, departmentId })
   if (!session) throw notFound("That class was not found.")
   return session
+}
+
+async function instructorBrief(createdBy: Types.ObjectId) {
+  const user = await User.findById(createdBy).select("name email")
+  return user
+    ? { id: user._id.toString(), name: user.name, email: user.email }
+    : null
+}
+
+async function serializeSession(session: ClassSessionDoc) {
+  return serializeClass(
+    session,
+    await attachmentsFor(session.attachments ?? []),
+    await instructorBrief(session.createdBy)
+  )
+}
+
+async function noticeFor(session: ClassSessionDoc) {
+  const instructor = await instructorBrief(session.createdBy)
+  return {
+    title: session.title,
+    agenda: session.agenda,
+    meetingUrl: session.meetingUrl,
+    scheduledStart: session.scheduledStart,
+    scheduledEnd: session.scheduledEnd,
+    instructorName: instructor?.name ?? "Instructor",
+  }
 }
 
 export async function createClass(
@@ -70,10 +104,8 @@ export async function createClass(
     departmentId,
     metadata: { title: session.title },
   })
-  return serializeClass(
-    session,
-    await attachmentsFor(session.attachments ?? [])
-  )
+  void notifyClassScheduled(departmentId, await noticeFor(session))
+  return serializeSession(session)
 }
 
 export async function listClasses(
@@ -88,11 +120,7 @@ export async function listClasses(
   const sessions = await ClassSession.find(filter).sort(
     when === "past" ? { scheduledStart: -1 } : { scheduledStart: 1 }
   )
-  return Promise.all(
-    sessions.map(async (session) =>
-      serializeClass(session, await attachmentsFor(session.attachments ?? []))
-    )
-  )
+  return Promise.all(sessions.map((session) => serializeSession(session)))
 }
 
 export async function getClass(
@@ -100,10 +128,7 @@ export async function getClass(
   id: string
 ): Promise<PublicClass> {
   const session = await classInDepartment(id, memberDepartmentId(actor))
-  return serializeClass(
-    session,
-    await attachmentsFor(session.attachments ?? [])
-  )
+  return serializeSession(session)
 }
 
 export async function updateClass(
@@ -121,6 +146,14 @@ export async function updateClass(
   const departmentId = ownDepartmentId(actor)
   await requireActiveDepartment(departmentId)
   const session = await classInDepartment(id, departmentId)
+  const changed = Boolean(
+    input.title ||
+    input.agenda ||
+    input.meetingUrl ||
+    input.attachments !== undefined ||
+    input.scheduledStart ||
+    input.scheduledEnd
+  )
   if (input.title) session.title = input.title.trim()
   if (input.agenda) session.agenda = input.agenda.trim()
   if (input.meetingUrl) session.meetingUrl = input.meetingUrl.trim()
@@ -139,10 +172,62 @@ export async function updateClass(
     entityId: id,
     departmentId,
   })
-  return serializeClass(
-    session,
-    await attachmentsFor(session.attachments ?? [])
-  )
+  if (changed && session.status === "scheduled")
+    void notifyClassUpdated(departmentId, await noticeFor(session))
+  return serializeSession(session)
+}
+
+export async function cancelClass(
+  actor: SessionUser,
+  id: string,
+  reason?: string
+): Promise<PublicClass> {
+  const departmentId = ownDepartmentId(actor)
+  await requireActiveDepartment(departmentId)
+  const session = await classInDepartment(id, departmentId)
+  if (session.status === "cancelled") return serializeSession(session)
+  session.status = "cancelled"
+  session.cancellationReason = reason?.trim() || null
+  session.cancelledAt = new Date()
+  session.cancelledBy = new Types.ObjectId(actor.id)
+  await session.save()
+  await recordActivity({
+    actorId: actor.id,
+    action: "class.cancelled",
+    entityType: "class",
+    entityId: id,
+    departmentId,
+    metadata: { title: session.title, reason: session.cancellationReason },
+  })
+  void notifyClassCancelled(departmentId, {
+    ...(await noticeFor(session)),
+    reason: session.cancellationReason ?? undefined,
+  })
+  return serializeSession(session)
+}
+
+export async function restoreClass(
+  actor: SessionUser,
+  id: string
+): Promise<PublicClass> {
+  const departmentId = ownDepartmentId(actor)
+  await requireActiveDepartment(departmentId)
+  const session = await classInDepartment(id, departmentId)
+  if (session.status === "scheduled") return serializeSession(session)
+  session.status = "scheduled"
+  session.cancellationReason = null
+  session.cancelledAt = null
+  session.cancelledBy = null
+  await session.save()
+  await recordActivity({
+    actorId: actor.id,
+    action: "class.restored",
+    entityType: "class",
+    entityId: id,
+    departmentId,
+  })
+  void notifyClassRestored(departmentId, await noticeFor(session))
+  return serializeSession(session)
 }
 
 export async function deleteClass(
@@ -152,6 +237,7 @@ export async function deleteClass(
   const departmentId = ownDepartmentId(actor)
   const session = await classInDepartment(id, departmentId)
   const attachmentIds = [...(session.attachments ?? [])]
+  const notice = await noticeFor(session)
   await session.deleteOne()
   await deleteUploadsForClass(actor, id, attachmentIds)
   await recordActivity({
@@ -161,5 +247,9 @@ export async function deleteClass(
     entityId: id,
     departmentId,
     metadata: { title: session.title },
+  })
+  void notifyClassCancelled(departmentId, {
+    ...notice,
+    reason: "This class was removed from the schedule.",
   })
 }

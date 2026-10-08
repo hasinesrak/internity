@@ -6,8 +6,11 @@ import { getEnv } from "./config/env.js"
 import { handleError } from "./middleware/error.js"
 import { adminRoutes } from "./routes/admin.js"
 import { authRoutes } from "./routes/auth.js"
+import { cliRoutes } from "./routes/cli.js"
 import { departmentRoutes } from "./routes/departments.js"
 import { healthRoutes } from "./routes/health.js"
+import { attendanceRoutes } from "./routes/attendance.js"
+import { documentRoutes } from "./routes/documents.js"
 import { hrRoutes } from "./routes/hr.js"
 import { instructorRoutes } from "./routes/instructor.js"
 import { internRoutes } from "./routes/intern.js"
@@ -46,16 +49,19 @@ export function createApp(): Hono<AppEnv> {
       origin: env.corsOrigins,
       credentials: true,
       allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-      allowHeaders: ["Content-Type"],
+      allowHeaders: ["Content-Type", "Authorization"],
     })
   )
   const staffSurface = env.apiSurface === "staff"
   const routers = [
     healthRoutes,
     authRoutes,
+    cliRoutes,
     internRoutes,
     departmentRoutes,
     uploadRoutes,
+    attendanceRoutes,
+    documentRoutes,
     ...(staffSurface
       ? [adminRoutes, hrRoutes, supervisorRoutes, instructorRoutes]
       : []),
@@ -64,9 +70,12 @@ export function createApp(): Hono<AppEnv> {
   for (const router of routers) installErrors(router)
   app.route("/health", healthRoutes)
   app.route("/api/auth", authRoutes)
+  app.route("/api/cli", cliRoutes)
   app.route("/api/intern", internRoutes)
   app.route("/api/departments", departmentRoutes)
   app.route("/api/uploads", uploadRoutes)
+  app.route("/api/attendance", attendanceRoutes)
+  app.route("/api/documents", documentRoutes)
   if (staffSurface) {
     app.route("/api/admin", adminRoutes)
     app.route("/api/hr", hrRoutes)

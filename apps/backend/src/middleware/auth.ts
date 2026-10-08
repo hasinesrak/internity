@@ -11,7 +11,10 @@ import { User } from "../models/user.js"
 import type { AppEnv } from "../types.js"
 
 export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
-  const token = getCookie(c, sessionCookieName())
+  const cookieToken = getCookie(c, sessionCookieName())
+  const authorization = c.req.header("authorization")
+  const bearerToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]
+  const token = cookieToken ?? bearerToken
   if (!token) throw new AppError(401, "UNAUTHENTICATED", "Sign in to continue.")
   const session = await readSession(token)
   const user = await User.findById(session.userId)
