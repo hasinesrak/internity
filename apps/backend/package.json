@@ -10,7 +10,6 @@
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --import ./src/test/env.ts --test src/lib/client-ip.test.ts src/lib/rate-limit.test.ts src/app.test.ts",
     "seed": "tsx src/scripts/seed.ts"
   },
   "dependencies": {

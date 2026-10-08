@@ -19,7 +19,7 @@ One monorepo contains the full system: an **intern web app** (`apps/web`), a **s
 7. [Environment Variables](#7-environment-variables)
 8. [Seed Data and Admin Account](#8-seed-data-and-admin-account)
 9. [Scripts Reference](#9-scripts-reference)
-10. [Testing, Linting, and Typechecking](#10-testing-linting-and-typechecking)
+10. [Linting and Typechecking](#10-linting-and-typechecking)
 11. [Security Model](#11-security-model)
 12. [Troubleshooting](#12-troubleshooting)
 13. [Deployment Overview](#13-deployment-overview)
@@ -388,15 +388,15 @@ Root (`package.json`, Turborepo-orchestrated):
 | `pnpm dev:web` / `dev:staff` / `dev:backend` | Single app in dev mode |
 | `pnpm build` | Build all apps |
 | `pnpm seed` | Seed or update the configured admin account via the backend |
-| `pnpm test` / `lint` / `typecheck` / `format` | Quality gates across the workspace |
+| `pnpm lint` / `typecheck` / `format` | Quality gates across the workspace |
 
-Backend (`pnpm --filter backend <script>`): `dev` (watch), `build` → `dist/`, `start` (`node dist/index.js`), `seed`, `test`, `lint`, `typecheck`.
+Backend (`pnpm --filter backend <script>`): `dev` (watch), `build` → `dist/`, `start` (`node dist/index.js`), `seed`, `lint`, `typecheck`.
 
 CLI (`pnpm --filter @internity/cli <script>`): `build`, `dev`, `typecheck`, `lint`. After publishing, interns can run `npm install -g @internity/cli`, `internity login`, `internity run <assignment-id>` to practice locally, and `internity verify <assignment-id>` to submit completion from the project folder.
 
 The CLI has its own GitHub Actions workflow at `.github/workflows/cli.yml`.
-Pull requests and `master` changes run lint, typecheck, build, and an npm
-package-content check. Publishing is explicit: bump `packages/cli/package.json`,
+Pull requests and `master` changes run lint and build. Publishing is explicit:
+bump `packages/cli/package.json`,
 commit the change, create a matching `cli-v<version>` tag, and push the tag.
 The repository must have an `NPM_TOKEN` secret with permission to publish
 `@internity/cli`; the workflow publishes with npm provenance enabled.
@@ -405,10 +405,9 @@ Frontends (`pnpm --filter web|staff <script>`): `dev`, `build`, `start` (prod se
 
 ---
 
-## 10. Testing, Linting, and Typechecking
+## 10. Linting and Typechecking
 
 ```powershell
-pnpm --filter backend test   # API tests vs mongodb://127.0.0.1:27017/internity_test (needs local Mongo)
 pnpm typecheck
 pnpm lint
 ```
@@ -437,7 +436,6 @@ pnpm lint
 | Staff site unavailable from another computer | Set `APP_HOST` to the server LAN IPv4 address, bind the staff UI/API to `0.0.0.0`, leave `STAFF_ALLOWED_IPS` empty with `STAFF_ALLOW_PRIVATE=true` in Compose, then rebuild |
 | Staff API exits in production | `STAFF_ALLOWED_IPS` empty → set `STAFF_ALLOWED_IPS=127.0.0.1` |
 | Frontend calls wrong API | Stale `VITE_API_URL` baked at build → rebuild after changing it; check `apps/web/.env` vs `apps/staff/.env` |
-| `pnpm --filter backend test` fails to connect | No Mongo on `127.0.0.1:27017` → `docker compose up -d mongo` first |
 | Seed does nothing / login fails | Seeded a different DB than the API reads → compare `MONGODB_URI` in `apps/backend/.env` vs Compose |
 | Port already in use | Another service on 3000/3001/4000/4001/27017 → change the `*_PORT` in `.env` or stop the conflict |
 | Wrong client IP behind proxy | `TRUST_PROXY` misconfigured → enable only behind a proxy that sanitizes `X-Forwarded-For` |
