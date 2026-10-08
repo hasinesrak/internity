@@ -71,7 +71,12 @@ const NAV_DRAFTS_INSTRUCTOR: NavLeaf = {
 
 const ADMIN_LEAVES: NavLeaf[] = [
   { id: "overview", label: "Overview", icon: HouseIcon, path: "/admin" },
-  { id: "all-users", label: "All users", icon: UsersIcon, path: "/admin/users" },
+  {
+    id: "all-users",
+    label: "All users",
+    icon: UsersIcon,
+    path: "/admin/users",
+  },
   {
     id: "hr-accounts",
     label: "HR accounts",
@@ -92,7 +97,12 @@ const ADMIN_LEAVES: NavLeaf[] = [
     path: "/admin/departments",
     view: "overrides",
   },
-  { id: "activity", label: "Activity", icon: ChartLineUpIcon, path: "/admin/activity" },
+  {
+    id: "activity",
+    label: "Activity",
+    icon: ChartLineUpIcon,
+    path: "/admin/activity",
+  },
   {
     id: "platform",
     label: "Platform",
@@ -118,7 +128,12 @@ const HR_LEAVES: NavLeaf[] = [
     path: "/hr/departments",
     view: "archived",
   },
-  { id: "directory", label: "Directory", icon: UsersIcon, path: "/hr/directory" },
+  {
+    id: "directory",
+    label: "Directory",
+    icon: UsersIcon,
+    path: "/hr/directory",
+  },
   {
     id: "invitations-pending",
     label: "Pending",
@@ -205,6 +220,13 @@ const SUPERVISOR_LEAVES: NavLeaf[] = [
     view: "upcoming",
   },
   {
+    id: "department-calendar",
+    label: "Calendar",
+    icon: CalendarBlankIcon,
+    path: "/classes",
+    view: "calendar",
+  },
+  {
     id: "department-assignments",
     label: "Assignments",
     icon: ClipboardTextIcon,
@@ -230,6 +252,13 @@ const INSTRUCTOR_LEAVES: NavLeaf[] = [
     icon: CalendarBlankIcon,
     path: "/classes",
     view: "upcoming",
+  },
+  {
+    id: "classes-calendar",
+    label: "Calendar",
+    icon: CalendarBlankIcon,
+    path: "/classes",
+    view: "calendar",
   },
   {
     id: "classes-past",
@@ -285,10 +314,10 @@ const SUPERVISOR_TREE: NavEntry[] = [
     id: "department",
     label: "Department",
     icon: BuildingsIcon,
-    children: SUPERVISOR_LEAVES.slice(2, 6),
+    children: SUPERVISOR_LEAVES.slice(2, 7),
   },
-  { kind: "leaf", ...SUPERVISOR_LEAVES[6] },
   { kind: "leaf", ...SUPERVISOR_LEAVES[7] },
+  { kind: "leaf", ...SUPERVISOR_LEAVES[8] },
 ]
 
 const INSTRUCTOR_TREE: NavEntry[] = [
@@ -298,24 +327,24 @@ const INSTRUCTOR_TREE: NavEntry[] = [
     id: "classes",
     label: "Classes",
     icon: CalendarBlankIcon,
-    children: INSTRUCTOR_LEAVES.slice(1, 3),
+    children: INSTRUCTOR_LEAVES.slice(1, 4),
   },
   {
     kind: "group",
     id: "assignments",
     label: "Assignments",
     icon: ClipboardTextIcon,
-    children: INSTRUCTOR_LEAVES.slice(3, 6),
+    children: INSTRUCTOR_LEAVES.slice(4, 7),
   },
   {
     kind: "group",
     id: "submissions",
     label: "Submissions",
     icon: LinkSimpleIcon,
-    children: INSTRUCTOR_LEAVES.slice(6, 8),
+    children: INSTRUCTOR_LEAVES.slice(7, 9),
   },
-  { kind: "leaf", ...INSTRUCTOR_LEAVES[8] },
   { kind: "leaf", ...INSTRUCTOR_LEAVES[9] },
+  { kind: "leaf", ...INSTRUCTOR_LEAVES[10] },
 ]
 
 const TREES: Record<StaffRole, NavEntry[]> = {

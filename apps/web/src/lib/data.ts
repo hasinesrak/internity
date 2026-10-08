@@ -7,9 +7,11 @@ import type {
   InternDashboard,
   OrganizationBrief,
   PublicAssignment,
+  PublicAttendance,
   PublicClass,
   PublicSubmission,
   PublicUser,
+  PublicVerificationRun,
 } from "./types"
 
 // ---------------------------------------------------------------------------
@@ -149,7 +151,30 @@ export function getDashboard(): Promise<InternDashboard> {
   return request<InternDashboard>("/api/intern/dashboard")
 }
 
-export function getClasses(when: "upcoming" | "past"): Promise<PublicClass[]> {
+export function getAttendance(range: {
+  from: string
+  to: string
+}): Promise<PublicAttendance[]> {
+  const params = new URLSearchParams(range)
+  return request<{ data: PublicAttendance[] }>(
+    `/api/attendance?${params.toString()}`
+  ).then((body) => body.data)
+}
+
+export function markOwnAttendance(input: {
+  date: string
+  status: PublicAttendance["status"]
+  note?: string
+}): Promise<PublicAttendance> {
+  return request<{ attendance: PublicAttendance }>("/api/attendance/self", {
+    method: "POST",
+    body: JSON.stringify(input),
+  }).then((body) => body.attendance)
+}
+
+export function getClasses(
+  when: "upcoming" | "past" | "all"
+): Promise<PublicClass[]> {
   return request<{ data: PublicClass[] }>(
     `/api/intern/classes?when=${when}`
   ).then((body) => body.data)
@@ -182,6 +207,14 @@ export async function getAssignment(id: string): Promise<AssignmentRow> {
     submission:
       submissions.data.find((item) => item.assignmentId === id) ?? null,
   }
+}
+
+export function getLatestVerificationRun(
+  assignmentId: string
+): Promise<PublicVerificationRun | null> {
+  return request<{ run: PublicVerificationRun | null }>(
+    `/api/cli/assignments/${assignmentId}/verification-runs/latest`
+  ).then((body) => body.run)
 }
 
 export function submitAssignment(

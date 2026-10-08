@@ -4,6 +4,7 @@ import type { Icon } from "@phosphor-icons/react"
 import {
   BookmarkSimpleIcon,
   CalendarBlankIcon,
+  CheckSquareIcon,
   ChatsCircleIcon,
   ClipboardTextIcon,
   ClockIcon,
@@ -49,6 +50,12 @@ export const NAV_CLASSES: NavGroup = {
   icon: CalendarBlankIcon,
   children: [
     {
+      id: "classes-calendar",
+      label: "Calendar",
+      icon: CalendarBlankIcon,
+      view: "calendar",
+    },
+    {
       id: "classes-upcoming",
       label: "Upcoming",
       icon: ClockIcon,
@@ -85,6 +92,12 @@ export const NAV_FEEDBACK: NavLeaf = {
   icon: ChatsCircleIcon,
 }
 
+export const NAV_ATTENDANCE: NavLeaf = {
+  id: "attendance",
+  label: "Attendance",
+  icon: CheckSquareIcon,
+}
+
 export const NAV_COPILOT: NavLeaf = {
   id: "copilot",
   label: "Copilot",
@@ -103,6 +116,7 @@ export const NAV_LEAVES: NavLeaf[] = [
   ...NAV_CLASSES.children,
   ...NAV_ASSIGNMENTS.children,
   NAV_FEEDBACK,
+  NAV_ATTENDANCE,
   NAV_COPILOT,
   NAV_SETTINGS,
 ]
@@ -175,6 +189,7 @@ export function navResources(): SidebarResource[] {
     group(NAV_CLASSES),
     group(NAV_ASSIGNMENTS),
     { id: NAV_FEEDBACK.id, label: NAV_FEEDBACK.label, kind: "file" },
+    { id: NAV_ATTENDANCE.id, label: NAV_ATTENDANCE.label, kind: "file" },
     { id: NAV_COPILOT.id, label: NAV_COPILOT.label, kind: "file" },
     { id: NAV_SETTINGS.id, label: NAV_SETTINGS.label, kind: "file" },
   ]

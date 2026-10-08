@@ -1,3 +1,5 @@
+import { APP_TIMEZONE, appDayNumber } from "@/lib/date"
+
 const DAY = 86_400_000
 
 export function toDate(value: string | number | Date): Date {
@@ -5,41 +7,38 @@ export function toDate(value: string | number | Date): Date {
 }
 
 export function formatDate(value: string | number | Date): string {
-  return toDate(value).toLocaleDateString("en-GB", {
+  return new Intl.DateTimeFormat("en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
-  })
+    timeZone: APP_TIMEZONE,
+  }).format(toDate(value))
 }
 
 export function formatDateLong(value: string | number | Date): string {
-  return toDate(value).toLocaleDateString("en-GB", {
+  return new Intl.DateTimeFormat("en-GB", {
     weekday: "long",
     day: "numeric",
     month: "long",
-  })
+    timeZone: APP_TIMEZONE,
+  }).format(toDate(value))
 }
 
 export function formatTime(value: string | number | Date): string {
-  return toDate(value).toLocaleTimeString("en-GB", {
+  return new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
-  })
+    timeZone: APP_TIMEZONE,
+  }).format(toDate(value))
 }
 
 export function formatTimeRange(start: string | number | Date, end: string | number | Date): string {
   return `${formatTime(start)} – ${formatTime(end)}`
 }
 
-function startOfDay(value: Date): number {
-  const copy = new Date(value)
-  copy.setHours(0, 0, 0, 0)
-  return copy.getTime()
-}
-
 /** Whole days from today until the value. Negative when the value has passed. */
 export function daysUntil(value: string | number | Date): number {
-  return Math.round((startOfDay(toDate(value)) - startOfDay(new Date())) / DAY)
+  return Math.round((appDayNumber(toDate(value)) - appDayNumber(new Date())) / DAY)
 }
 
 /** "Due tomorrow", "Due in 3 days", "Due Friday", "Closed 2 weeks ago". */

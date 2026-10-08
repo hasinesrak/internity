@@ -1,6 +1,9 @@
 // `/supervisor/interns`: the interns placed in the department, read-only.
+import { useState } from "react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { CopyIcon, GraduationCapIcon, MagnifyingGlassIcon } from "@phosphor-icons/react"
+import { CopyIcon, FileTextIcon, GraduationCapIcon, MagnifyingGlassIcon, UserCircleIcon } from "@phosphor-icons/react"
+import { Card, CardContent, CardHeader } from "@workspace/ui/components/card"
+import { Button } from "@workspace/ui/components/motion/button/base"
 import { Table } from "@workspace/ui/components/motion/table/index"
 import type { TableColumn } from "@workspace/ui/components/motion/table/types"
 import { Input } from "@workspace/ui/components/motion/input"
@@ -15,7 +18,8 @@ import {
 } from "@/components/row-actions"
 import type { RowActionEntry } from "@/components/row-actions"
 import { UserStatusChip } from "@/components/status-chip"
-import { currentUserSync, getDepartmentPeople } from "@/lib/data"
+import { AttendanceCalendar, rangeFor } from "@/components/attendance-calendar"
+import { currentUserSync, documentFileUrl, getAttendance, getDepartmentPeople, getInternProfile, markAttendance } from "@/lib/data"
 import { requireRole } from "@/lib/guards"
 import { copyText } from "@/lib/clipboard"
 import { formatDate } from "@/lib/format"
@@ -40,8 +44,18 @@ function SupervisorInternsPage() {
   const search = Route.useSearch()
   const departmentName = currentUserSync()?.department?.name ?? "your department"
   const query = search.search ?? ""
+  const [selected, setSelected] = useState<PublicUser | null>(null)
+  const [range, setRange] = useState(() => rangeFor("month", new Date().toISOString().slice(0, 7)))
 
   const interns = useResource(() => getDepartmentPeople("intern"), [])
+  const profile = useResource(
+    () => (selected ? getInternProfile(selected.id) : Promise.resolve(null)),
+    [selected?.id],
+  )
+  const attendance = useResource(
+    () => getAttendance({ ...range, internId: selected?.id }),
+    [range.from, range.to, selected?.id],
+  )
   const rows = (interns.data ?? []).filter((user) =>
     `${user.name} ${user.email} ${user.profile.program}`
       .toLowerCase()
@@ -49,6 +63,11 @@ function SupervisorInternsPage() {
   )
 
   const actionsFor = (user: PublicUser): RowActionEntry[] => [
+    {
+      label: "Open profile",
+      icon: UserCircleIcon,
+      onSelect: () => setSelected(user),
+    },
     {
       label: "Copy email",
       icon: CopyIcon,
@@ -72,11 +91,7 @@ function SupervisorInternsPage() {
             label={`${user.name} actions`}
             title={user.name}
             subtitle={user.email}
-            onOpen={() =>
-              void copyText(user.email).then((ok) =>
-                toast.info(ok ? `Copied ${user.email}` : "Could not copy the address"),
-              )
-            }
+            onOpen={() => setSelected(user)}
           />
         </RowContextMenu>
       ),
@@ -203,6 +218,53 @@ function SupervisorInternsPage() {
           />
         )}
       </Reveal>
+
+      {selected ? (
+        <Reveal index={3}>
+          <div className="flex flex-col gap-6">
+            <Card>
+              <CardHeader className="flex-row items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="grid size-10 place-items-center rounded-full bg-muted text-muted-foreground">
+                    <UserCircleIcon weight="duotone" className="size-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-base font-medium">{selected.name}</h2>
+                    <p className="text-sm text-muted-foreground">{selected.email} · Intern profile</p>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setSelected(null)}>Close</Button>
+              </CardHeader>
+              <CardContent className="flex flex-wrap items-center gap-4">
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">Institution:</span> {selected.profile.institution || "—"}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">Program:</span> {selected.profile.program || "—"}
+                </div>
+                {profile.data?.cv ? (
+                  <a className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted" href={documentFileUrl(profile.data.cv)} target="_blank" rel="noreferrer">
+                    <FileTextIcon weight="duotone" className="size-4" />
+                    View CV · {profile.data.cv.originalName}
+                  </a>
+                ) : (
+                  <span className="text-sm text-muted-foreground">No CV uploaded by HR yet.</span>
+                )}
+              </CardContent>
+            </Card>
+            {attendance.status === "error" ? <p className="text-sm text-destructive">Attendance could not load. Try again.</p> : null}
+            <AttendanceCalendar
+              interns={[selected]}
+              attendance={attendance.data ?? []}
+              onRangeChange={setRange}
+              editable
+              onMark={(internId, date, status) => {
+                void markAttendance(internId, date, { status }).then(() => attendance.refetch()).catch((error) => toast.error(error instanceof Error ? error.message : "Attendance could not be saved."))
+              }}
+            />
+          </div>
+        </Reveal>
+      ) : null}
     </div>
   )
 }

@@ -1,7 +1,7 @@
 // The dashboard shell from docs/dashboard-design.md: a 56px topbar over a
 // 264px sidebar and the content column. Below 768px the sidebar becomes a
 // bottom sheet and detail drawers become bottom sheets.
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { ReactNode } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { AnimatedToastStack } from "@workspace/ui/components/motion/animated-toast-stack"
@@ -22,6 +22,9 @@ import { useToastStore } from "@/lib/toast"
 import { useResource } from "@/lib/use-resource"
 
 export function AppShell({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    void useShellStore.persist.rehydrate()
+  }, [])
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const toasts = useToastStore((state) => state.toasts)

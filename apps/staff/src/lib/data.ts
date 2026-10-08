@@ -12,23 +12,30 @@ import type {
   AssignmentDraft,
   AssignmentRosterRow,
   AssignmentStatus,
+  AssignmentVerification,
   HrDashboard,
   InstructorDashboard,
   InvitationResult,
   PageResult,
   PublicAssignment,
   PublicAttachment,
+  PublicAttendance,
   PublicClass,
   PublicDepartment,
   PublicInvitation,
+  PublicInternDocument,
+  InternProfileResponse,
   PublicSubmission,
   PublicUser,
+  PublicVerificationRun,
   ReviewInput,
   Role,
   RubricCriterion,
   StaffRole,
   SubmissionStatus,
   SupervisorDashboard,
+  VerificationDraft,
+  VerificationMode,
 } from "./types"
 import { rubricMaxScore } from "./types"
 
@@ -78,7 +85,7 @@ function remember(user: PublicUser | null): void {
   if (user)
     window.sessionStorage.setItem(
       SESSION_KEY,
-      JSON.stringify({ v: SNAPSHOT_VERSION, user }),
+      JSON.stringify({ v: SNAPSHOT_VERSION, user })
     )
   else window.sessionStorage.removeItem(SESSION_KEY)
 }
@@ -101,7 +108,7 @@ function requireStaff(user: PublicUser): PublicUser {
     throw new ApiError(
       403,
       "NOT_STAFF",
-      "That account signs in to the intern app, not the staff app.",
+      "That account signs in to the intern app, not the staff app."
     )
   }
   return user
@@ -165,7 +172,7 @@ export interface InvitationPreview {
 
 export function previewInvitation(token: string): Promise<InvitationPreview> {
   return request<{ invitation: InvitationPreview }>(
-    `/api/auth/invitation?token=${encodeURIComponent(token)}`,
+    `/api/auth/invitation?token=${encodeURIComponent(token)}`
   ).then((body) => body.invitation)
 }
 
@@ -222,7 +229,9 @@ export function getAdminDashboard(): Promise<AdminDashboard> {
       departments: number
       pendingInvitations: number
     }>(`${scope()}/summary`),
-    request<PageResult<PublicUser>>(`${scope()}/users?status=pending&pageSize=1`),
+    request<PageResult<PublicUser>>(
+      `${scope()}/users?status=pending&pageSize=1`
+    ),
     request<PageResult<PublicUser>>(`${scope()}/users?pageSize=20`),
     request<PageResult<ActivityEntry>>(`${scope()}/activity?pageSize=100`),
   ]).then(([summary, pending, recent, activity]) => {
@@ -243,28 +252,28 @@ export function getAdminDashboard(): Promise<AdminDashboard> {
 export function getHrDashboard(): Promise<HrDashboard> {
   return Promise.all([
     request<PageResult<PublicDepartment>>(
-      `${scope()}/departments?status=all&pageSize=100`,
+      `${scope()}/departments?status=all&pageSize=100`
     ),
     request<PageResult<PublicUser>>(
-      `${scope()}/directory?role=intern&status=active&pageSize=1`,
+      `${scope()}/directory?role=intern&status=active&pageSize=1`
     ),
     request<PageResult<PublicInvitation>>(
-      `${scope()}/invitations?status=pending&pageSize=100`,
+      `${scope()}/invitations?status=pending&pageSize=100`
     ),
   ]).then(([departments, interns, invitations]) => {
     const pending = invitations.data
     return {
       departments: departments.data.filter(
-        (department) => department.status === "active",
+        (department) => department.status === "active"
       ).length,
       internsActive: interns.total,
       invitationsPending: pending.length,
       invitationsExpiring: pending.filter((invitation) =>
-        expiresWithin(invitation.expiresAt, 7),
+        expiresWithin(invitation.expiresAt, 7)
       ).length,
       departmentRows: [...departments.data].sort(byDepartmentName),
       pendingInvitations: [...pending].sort((a, b) =>
-        a.expiresAt.localeCompare(b.expiresAt),
+        a.expiresAt.localeCompare(b.expiresAt)
       ),
     }
   })
@@ -297,18 +306,18 @@ function toSearchParams(query: UserQuery): string {
 }
 
 export function getUsers(
-  query: UserQuery = {},
+  query: UserQuery = {}
 ): Promise<PageResult<PublicUser>> {
   return request<PageResult<PublicUser>>(
-    `${scope()}/users?${toSearchParams(query)}`,
+    `${scope()}/users?${toSearchParams(query)}`
   )
 }
 
 export function getDirectory(
-  query: UserQuery = {},
+  query: UserQuery = {}
 ): Promise<PageResult<PublicUser>> {
   return request<PageResult<PublicUser>>(
-    `/api/hr/directory?${toSearchParams(query)}`,
+    `/api/hr/directory?${toSearchParams(query)}`
   )
 }
 
@@ -326,18 +335,16 @@ export interface CreateUserResult {
   invitation: PublicInvitation | null
 }
 
-export function createUser(
-  input: CreateUserInput,
-): Promise<CreateUserResult> {
+export function createUser(input: CreateUserInput): Promise<CreateUserResult> {
   return request<{ user?: PublicUser; invitation?: PublicInvitation }>(
     `${scope()}/users`,
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body: JSON.stringify(input) }
   ).then((body) => {
     if (!body.user) {
       throw new ApiError(
         502,
         "BAD_RESPONSE",
-        "The account could not be created. Try again.",
+        "The account could not be created. Try again."
       )
     }
     return { user: body.user, invitation: body.invitation ?? null }
@@ -351,7 +358,7 @@ export function updateUser(
     role?: Role
     status?: PublicUser["status"]
     departmentId?: string | null
-  },
+  }
 ): Promise<PublicUser> {
   return request<{ user: PublicUser }>(`${scope()}/users/${id}`, {
     method: "PATCH",
@@ -392,24 +399,24 @@ export interface AiProviderOption {
 
 export function getAiModels(): Promise<AiModelOption[]> {
   return request<{ models: AiModelOption[] }>("/api/admin/ai/models").then(
-    (body) => body.models,
+    (body) => body.models
   )
 }
 
 export function getAiProviders(model: string): Promise<AiProviderOption[]> {
   return request<{ providers: AiProviderOption[] }>(
-    `/api/admin/ai/providers?model=${encodeURIComponent(model)}`,
+    `/api/admin/ai/providers?model=${encodeURIComponent(model)}`
   ).then((body) => body.providers)
 }
 
 export function getPlatformSettings(): Promise<PlatformSettings> {
   return request<{ settings: PlatformSettings }>("/api/admin/settings").then(
-    (body) => body.settings,
+    (body) => body.settings
   )
 }
 
 export function updatePlatformSettings(
-  patch: Partial<PlatformSettings>,
+  patch: Partial<PlatformSettings>
 ): Promise<PlatformSettings> {
   return request<{ settings: PlatformSettings }>("/api/admin/settings", {
     method: "PATCH",
@@ -434,13 +441,13 @@ export interface DepartmentQuery {
 }
 
 export function getDepartments(
-  query: DepartmentQuery = {},
+  query: DepartmentQuery = {}
 ): Promise<PublicDepartment[]> {
   const params = new URLSearchParams({ pageSize: "100" })
   params.set("status", query.status ?? "all")
   if (query.search) params.set("search", query.search)
   return request<PageResult<PublicDepartment>>(
-    `${scope()}/departments?${params.toString()}`,
+    `${scope()}/departments?${params.toString()}`
   ).then((page) => [...page.data].sort(byDepartmentName))
 }
 
@@ -485,23 +492,23 @@ export function createDepartment(input: {
 
 export function updateDepartment(
   id: string,
-  patch: { name?: string; description?: string },
+  patch: { name?: string; description?: string }
 ): Promise<PublicDepartment> {
   return request<{ department: PublicDepartment }>(
     `${scope()}/departments/${id}`,
-    { method: "PATCH", body: JSON.stringify(patch) },
+    { method: "PATCH", body: JSON.stringify(patch) }
   ).then((body) => body.department)
 }
 
 export function setDepartmentStatus(
   id: string,
-  status: "active" | "archived",
+  status: "active" | "archived"
 ): Promise<PublicDepartment> {
   return request<{ department: PublicDepartment }>(
     `${scope()}/departments/${id}/${
       status === "archived" ? "archive" : "restore"
     }`,
-    { method: "POST" },
+    { method: "POST" }
   ).then((body) => body.department)
 }
 
@@ -515,37 +522,37 @@ export function mergeDepartments(input: {
 }): Promise<PublicDepartment> {
   return request<{ department: PublicDepartment }>(
     `${scope()}/departments/merge`,
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body: JSON.stringify(input) }
   ).then((body) => body.department)
 }
 
 export function assignSupervisor(
   departmentId: string,
-  userId: string,
+  userId: string
 ): Promise<PublicDepartment> {
   return request<{ department: PublicDepartment }>(
     `${scope()}/departments/${departmentId}/supervisor`,
-    { method: "POST", body: JSON.stringify({ userId }) },
+    { method: "POST", body: JSON.stringify({ userId }) }
   ).then((body) => body.department)
 }
 
 export function assignInstructor(
   departmentId: string,
-  userId: string,
+  userId: string
 ): Promise<PublicUser> {
   return request<{ user: PublicUser }>(
     `${scope()}/departments/${departmentId}/instructors`,
-    { method: "POST", body: JSON.stringify({ userId }) },
+    { method: "POST", body: JSON.stringify({ userId }) }
   ).then((body) => body.user)
 }
 
 export function unassignInstructor(
   departmentId: string,
-  userId: string,
+  userId: string
 ): Promise<void> {
   return request<void>(
     `${scope()}/departments/${departmentId}/instructors/${userId}`,
-    { method: "DELETE" },
+    { method: "DELETE" }
   )
 }
 
@@ -561,7 +568,7 @@ export interface InvitationQuery {
 }
 
 export function getInvitations(
-  query: InvitationQuery = {},
+  query: InvitationQuery = {}
 ): Promise<PageResult<PublicInvitation>> {
   const params = new URLSearchParams({
     page: String(query.page ?? 1),
@@ -570,7 +577,7 @@ export function getInvitations(
   if (query.status) params.set("status", query.status)
   if (query.search) params.set("search", query.search)
   return request<PageResult<PublicInvitation>>(
-    `/api/hr/invitations?${params.toString()}`,
+    `/api/hr/invitations?${params.toString()}`
   )
 }
 
@@ -607,7 +614,7 @@ export function resendInvitation(id: string): Promise<InvitationResult> {
 export function revokeInvitation(id: string): Promise<PublicInvitation> {
   return request<{ invitation: PublicInvitation }>(
     `/api/hr/invitations/${id}/revoke`,
-    { method: "POST" },
+    { method: "POST" }
   ).then((body) => body.invitation)
 }
 
@@ -619,13 +626,13 @@ export type ClassWhen = "upcoming" | "past" | "all"
 
 export function getClass(id: string): Promise<PublicClass> {
   return request<{ class: PublicClass }>(`/api/instructor/classes/${id}`).then(
-    (body) => body.class,
+    (body) => body.class
   )
 }
 
 export function getClasses(when: ClassWhen): Promise<PublicClass[]> {
   return request<{ data: PublicClass[] }>(
-    `/api/instructor/classes?when=${when}`,
+    `/api/instructor/classes?when=${when}`
   ).then((body) => body.data)
 }
 
@@ -647,7 +654,7 @@ export function uploadAttachment(file: File): Promise<PublicAttachment> {
   form.append("file", file, file.name)
   return apiUpload<{ attachment: PublicAttachment }>(
     "/api/instructor/uploads",
-    form,
+    form
   ).then((body) => body.attachment)
 }
 
@@ -664,7 +671,7 @@ export function createClass(input: ClassInput): Promise<PublicClass> {
 
 export function updateClass(
   id: string,
-  patch: Partial<ClassInput>,
+  patch: Partial<ClassInput>
 ): Promise<PublicClass> {
   return request<{ class: PublicClass }>(`/api/instructor/classes/${id}`, {
     method: "PATCH",
@@ -676,16 +683,35 @@ export function deleteClass(id: string): Promise<void> {
   return request<void>(`/api/instructor/classes/${id}`, { method: "DELETE" })
 }
 
+export function cancelClass(id: string, reason?: string): Promise<PublicClass> {
+  return request<{ class: PublicClass }>(
+    `/api/instructor/classes/${id}/cancel`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }
+  ).then((body) => body.class)
+}
+
+export function restoreClass(id: string): Promise<PublicClass> {
+  return request<{ class: PublicClass }>(
+    `/api/instructor/classes/${id}/restore`,
+    {
+      method: "POST",
+    }
+  ).then((body) => body.class)
+}
+
 // ---------------------------------------------------------------------------
 // Assignments
 // ---------------------------------------------------------------------------
 
 export function getAssignments(
-  status?: AssignmentStatus,
+  status?: AssignmentStatus
 ): Promise<PublicAssignment[]> {
   const query = status ? `?status=${status}` : ""
   return request<{ data: PublicAssignment[] }>(
-    `/api/instructor/assignments${query}`,
+    `/api/instructor/assignments${query}`
   ).then((body) => body.data)
 }
 
@@ -695,18 +721,19 @@ export interface AssignmentInput {
   rubric?: RubricCriterion[]
   deadline?: string | null
   attachments?: string[]
+  verification?: AssignmentVerification | null
   status?: "draft" | "published"
 }
 
 export function getAssignment(id: string): Promise<PublicAssignment> {
   return request<{ assignment: PublicAssignment }>(
-    `/api/instructor/assignments/${id}`,
+    `/api/instructor/assignments/${id}`
   ).then((body) => body.assignment)
 }
 
 function publishedNeedsDeadline(
   deadline: string | null | undefined,
-  status: string | undefined,
+  status: string | undefined
 ) {
   if (status === "published" && !deadline) {
     throw validation("Add a deadline before publishing.", "deadline")
@@ -714,38 +741,38 @@ function publishedNeedsDeadline(
 }
 
 export function createAssignment(
-  input: AssignmentInput,
+  input: AssignmentInput
 ): Promise<PublicAssignment> {
   publishedNeedsDeadline(input.deadline, input.status)
   return request<{ assignment: PublicAssignment }>(
     "/api/instructor/assignments",
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body: JSON.stringify(input) }
   ).then((body) => body.assignment)
 }
 
 export function updateAssignment(
   id: string,
-  patch: Partial<AssignmentInput>,
+  patch: Partial<AssignmentInput>
 ): Promise<PublicAssignment> {
   if (patch.status !== undefined && patch.status !== "draft") {
     publishedNeedsDeadline(patch.deadline, patch.status)
   }
   return request<{ assignment: PublicAssignment }>(
     `/api/instructor/assignments/${id}`,
-    { method: "PATCH", body: JSON.stringify(patch) },
+    { method: "PATCH", body: JSON.stringify(patch) }
   ).then((body) => body.assignment)
 }
 
 /** Publish or close: the two status moves an assignment makes. */
 export function setAssignmentStatus(
   id: string,
-  status: "published" | "closed",
+  status: "published" | "closed"
 ): Promise<PublicAssignment> {
   return request<{ assignment: PublicAssignment }>(
     `/api/instructor/assignments/${id}/${
       status === "published" ? "publish" : "close"
     }`,
-    { method: "POST" },
+    { method: "POST" }
   ).then((body) => body.assignment)
 }
 
@@ -761,9 +788,17 @@ export interface AssignmentRoster {
 }
 
 export function getAssignmentRoster(id: string): Promise<AssignmentRoster> {
-  return request<AssignmentRoster>(
-    `/api/instructor/assignments/${id}/roster`,
-  )
+  return request<AssignmentRoster>(`/api/instructor/assignments/${id}/roster`)
+}
+
+export function getVerificationRuns(
+  assignmentId: string,
+  internId?: string
+): Promise<PublicVerificationRun[]> {
+  const query = internId ? `?internId=${encodeURIComponent(internId)}` : ""
+  return request<{ data: PublicVerificationRun[] }>(
+    `/api/instructor/assignments/${assignmentId}/verification-runs${query}`
+  ).then((body) => body.data)
 }
 
 // ---------------------------------------------------------------------------
@@ -771,39 +806,39 @@ export function getAssignmentRoster(id: string): Promise<AssignmentRoster> {
 // ---------------------------------------------------------------------------
 
 export function getSubmissions(
-  query: { status?: SubmissionStatus; assignmentId?: string } = {},
+  query: { status?: SubmissionStatus; assignmentId?: string } = {}
 ): Promise<PublicSubmission[]> {
   const params = new URLSearchParams()
   if (query.status) params.set("status", query.status)
   if (query.assignmentId) params.set("assignmentId", query.assignmentId)
   const suffix = params.toString() ? `?${params.toString()}` : ""
   return request<{ data: PublicSubmission[] }>(
-    `/api/instructor/submissions${suffix}`,
+    `/api/instructor/submissions${suffix}`
   ).then((body) => body.data)
 }
 
 export function getSubmission(id: string): Promise<PublicSubmission> {
   return request<{ submission: PublicSubmission }>(
-    `/api/instructor/submissions/${id}`,
+    `/api/instructor/submissions/${id}`
   ).then((body) => body.submission)
 }
 
 export function reviewSubmission(
   id: string,
-  input: ReviewInput,
+  input: ReviewInput
 ): Promise<PublicSubmission> {
   return request<{ submission: PublicSubmission }>(
     `/api/instructor/submissions/${id}/review`,
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body: JSON.stringify(input) }
   ).then((body) => body.submission)
 }
 
 export function automatedReviewSubmission(
-  id: string,
+  id: string
 ): Promise<AutomatedReview> {
   return request<{ review: AutomatedReview }>(
     `/api/instructor/submissions/${id}/ai-review`,
-    { method: "POST" },
+    { method: "POST" }
   ).then((body) => body.review)
 }
 
@@ -813,10 +848,25 @@ export function automatedReviewSubmission(
 
 export function draftAssignment(
   learningGoal: string,
+  verificationMode: VerificationMode = "auto"
 ): Promise<AssignmentDraft> {
   return request<{ draft: AssignmentDraft }>(
     "/api/instructor/ai/assignment-draft",
-    { method: "POST", body: JSON.stringify({ learningGoal }) },
+    { method: "POST", body: JSON.stringify({ learningGoal, verificationMode }) }
+  ).then((body) => body.draft)
+}
+
+export function draftVerification(input: {
+  title: string
+  instructions: string
+  allowedOS: string[]
+}): Promise<VerificationDraft> {
+  return request<{ draft: VerificationDraft }>(
+    "/api/instructor/ai/verification-draft",
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    }
   ).then((body) => body.draft)
 }
 
@@ -826,7 +876,7 @@ export function draftClassAgenda(input: {
 }): Promise<AgendaDraft> {
   return request<{ draft: AgendaDraft }>(
     "/api/instructor/ai/class-agenda-draft",
-    { method: "POST", body: JSON.stringify(input) },
+    { method: "POST", body: JSON.stringify(input) }
   ).then((body) => body.draft)
 }
 
@@ -843,7 +893,7 @@ export function getActivity(query: {
     pageSize: String(query.pageSize ?? 20),
   })
   return request<PageResult<ActivityEntry>>(
-    `/api/admin/activity?${params.toString()}`,
+    `/api/admin/activity?${params.toString()}`
   )
 }
 
@@ -852,11 +902,54 @@ export function getActivity(query: {
 // ---------------------------------------------------------------------------
 
 export function getDepartmentPeople(
-  role: "instructor" | "intern",
+  role: "instructor" | "intern"
 ): Promise<PublicUser[]> {
   return request<{ data: PublicUser[] }>(
-    `/api/supervisor/${role === "instructor" ? "instructors" : "interns"}`,
+    `/api/supervisor/${role === "instructor" ? "instructors" : "interns"}`
   ).then((body) => body.data)
+}
+
+export function getAttendance(range: {
+  from: string
+  to: string
+  internId?: string
+}): Promise<PublicAttendance[]> {
+  const params = new URLSearchParams({ from: range.from, to: range.to })
+  if (range.internId) params.set("internId", range.internId)
+  return request<{ data: PublicAttendance[] }>(
+    `/api/attendance?${params.toString()}`
+  ).then((body) => body.data)
+}
+
+export function markAttendance(
+  internId: string,
+  date: string,
+  input: { status: PublicAttendance["status"]; note?: string }
+): Promise<PublicAttendance> {
+  return request<{ attendance: PublicAttendance }>(
+    `/api/attendance/${internId}/${date}`,
+    { method: "PUT", body: JSON.stringify(input) }
+  ).then((body) => body.attendance)
+}
+
+export function getInternProfile(id: string): Promise<InternProfileResponse> {
+  return request<InternProfileResponse>(`/api/documents/interns/${id}`)
+}
+
+export function uploadInternCv(
+  id: string,
+  file: File
+): Promise<PublicInternDocument> {
+  const form = new FormData()
+  form.append("file", file, file.name)
+  return apiUpload<{ cv: PublicInternDocument }>(
+    `/api/documents/interns/${id}/cv`,
+    form
+  ).then((body) => body.cv)
+}
+
+export function documentFileUrl(document: PublicInternDocument): string {
+  return apiUrl(document.url)
 }
 
 export interface AddInstructorResult {
@@ -865,7 +958,7 @@ export interface AddInstructorResult {
 }
 
 export function addInstructor(
-  input: { userId: string } | { name: string; email: string },
+  input: { userId: string } | { name: string; email: string }
 ): Promise<AddInstructorResult> {
   return request<AddInstructorResult>("/api/supervisor/instructors", {
     method: "POST",
@@ -912,7 +1005,7 @@ export function getShellPeople(): Promise<PublicUser[]> {
   }
   if (role === "instructor") return Promise.resolve([])
   return getUsers({ pageSize: 20, includeArchived: false }).then(
-    (page) => page.data,
+    (page) => page.data
   )
 }
 
@@ -952,28 +1045,27 @@ export async function getInstructorDashboard(): Promise<InstructorDashboard> {
 function composeInstructorDashboard(
   classes: PublicClass[],
   assignments: PublicAssignment[],
-  submissions: PublicSubmission[],
+  submissions: PublicSubmission[]
 ): InstructorDashboard {
   const upcoming = [...classes]
-    .filter(
-      (session) => new Date(session.scheduledEnd).getTime() >= Date.now(),
-    )
+    .filter((session) => new Date(session.scheduledEnd).getTime() >= Date.now())
     .sort((a, b) => a.scheduledStart.localeCompare(b.scheduledStart))
   const queue = [...submissions]
     .filter((submission) => submission.status === "submitted")
     .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt))
   const graded = submissions.filter(
-    (submission) => submission.status === "reviewed" && submission.score !== null,
+    (submission) =>
+      submission.status === "reviewed" && submission.score !== null
   )
   const gradedMaxima = graded.map((submission) => {
     const assignment = assignments.find(
-      (item) => item.id === submission.assignmentId,
+      (item) => item.id === submission.assignmentId
     )
     return assignment ? rubricMaxScore(assignment.rubric) : 0
   })
   const totalScore = graded.reduce(
     (sum, submission) => sum + (submission.score ?? 0),
-    0,
+    0
   )
   const totalMax = gradedMaxima.reduce((sum, max) => sum + max, 0)
   // Computed once: `withinThisWeek` defaults to measuring "now", which would
@@ -982,10 +1074,10 @@ function composeInstructorDashboard(
   return {
     department: null,
     classesThisWeek: classes.filter((session) =>
-      withinThisWeek(session.scheduledStart, weekStart),
+      withinThisWeek(session.scheduledStart, weekStart)
     ).length,
     publishedAssignments: assignments.filter(
-      (assignment) => assignment.status === "published",
+      (assignment) => assignment.status === "published"
     ).length,
     submissionsToReview: queue.length,
     averageScore: graded.length
@@ -996,11 +1088,11 @@ function composeInstructorDashboard(
     reviewQueue: queue.slice(0, 5),
     classesTrend: weeklyTrend(
       classes.map((session) => session.scheduledStart),
-      8,
+      8
     ),
     submissionsTrend: weeklyTrend(
       submissions.map((submission) => submission.submittedAt),
-      8,
+      8
     ),
   }
 }
@@ -1047,15 +1139,15 @@ function composeSupervisorDashboard(input: {
       .length,
     internCount: interns.filter((user) => user.status !== "archived").length,
     classesThisWeek: classes.filter((session) =>
-      withinThisWeek(session.scheduledStart, weekStart),
+      withinThisWeek(session.scheduledStart, weekStart)
     ).length,
     submissionsToReview: submissions.filter(
-      (submission) => submission.status === "submitted",
+      (submission) => submission.status === "submitted"
     ).length,
     activityByDay: timestampDays(events, 112),
     rosterTrend: weeklyTrend(
       [...instructors, ...interns].map((user) => user.createdAt),
-      8,
+      8
     ),
   }
 }
@@ -1080,7 +1172,7 @@ export function weeklyTrend(timestamps: string[], weeks: number): number[] {
   for (const timestamp of timestamps) {
     const weeksAgo = Math.floor(
       (monday.getTime() - new Date(timestamp).setUTCHours(0, 0, 0, 0)) /
-        (7 * 86_400_000),
+        (7 * 86_400_000)
     )
     const index = weeks - 1 - weeksAgo
     if (index >= 0 && index < weeks) buckets[index] += 1
@@ -1094,7 +1186,7 @@ export function weeklyTrend(timestamps: string[], weeks: number): number[] {
  */
 export function timestampDays(
   timestamps: string[],
-  days: number,
+  days: number
 ): ActivityDay[] {
   const counts = new Map<string, number>()
   for (const timestamp of timestamps) {
@@ -1119,10 +1211,10 @@ export function timestampDays(
  */
 export function activityDays(
   entries: ActivityEntry[],
-  days: number,
+  days: number
 ): ActivityDay[] {
   return timestampDays(
     entries.map((entry) => entry.createdAt),
-    days,
+    days
   )
 }

@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from "@tanstack/react-router"
 // Classes: the schedule with the agenda for each session.
 import { useMemo, useState } from "react"
 import {
@@ -10,14 +10,15 @@ import {
 import { Card } from "@workspace/ui/components/card"
 import { BouncyAccordion } from "@workspace/ui/components/motion/bouncy-accordion"
 import { OverflowActions } from "@workspace/ui/components/motion/overflow-actions"
-import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/motion/tabs"
-
 import {
-  EmptyPanel,
-  ErrorPanel,
-  LoadingPanel,
-} from "@/components/data-states"
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/motion/tabs"
+
+import { EmptyPanel, ErrorPanel, LoadingPanel } from "@/components/data-states"
 import { AttachmentList } from "@/components/attachment-list"
+import { ClassCalendar } from "@/components/class-calendar"
 import { PageHeader } from "@/components/page-header"
 import { StatusChip } from "@/components/status-chip"
 import { Reveal } from "@workspace/ui/components/reveal"
@@ -28,11 +29,18 @@ import { toast } from "@/lib/toast"
 import { useResource } from "@/lib/use-resource"
 import type { PublicClass } from "@/lib/types"
 
-type ClassView = "upcoming" | "past"
+type ClassView = "calendar" | "upcoming" | "past"
 
 export const Route = createFileRoute("/_app/classes")({
   validateSearch: (search: Record<string, unknown>): { view?: ClassView } => ({
-    view: search.view === "past" ? "past" : search.view === "upcoming" ? "upcoming" : undefined,
+    view:
+      search.view === "past"
+        ? "past"
+        : search.view === "upcoming"
+          ? "upcoming"
+          : search.view === "calendar"
+            ? "calendar"
+            : undefined,
   }),
   component: ClassesPage,
 })
@@ -40,9 +48,12 @@ export const Route = createFileRoute("/_app/classes")({
 function ClassesPage() {
   const navigate = Route.useNavigate()
   const search = Route.useSearch()
-  const view: ClassView = search.view ?? "upcoming"
+  const view: ClassView = search.view ?? "calendar"
 
-  const classes = useResource(() => getClasses(view), [view])
+  const classes = useResource(
+    () => getClasses(view === "calendar" ? "all" : view),
+    [view]
+  )
   const rows = useMemo(() => classes.data ?? [], [classes.data])
 
   return (
@@ -50,23 +61,27 @@ function ClassesPage() {
       <Reveal index={0}>
         <PageHeader
           title="Classes"
-          description="Sessions for your department, with the agenda for each."
+          description="See every session, instructor, and cancellation in one calendar. We’ll email you when the schedule changes."
         />
       </Reveal>
 
       <Reveal index={1}>
         <Tabs
-        value={view}
-        onValueChange={(next) =>
-          void navigate({ search: { view: next as ClassView }, replace: true })
-        }
-        variant="pill"
-      >
-        <TabsList>
-          <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-          <TabsTrigger value="past">Past</TabsTrigger>
-        </TabsList>
-      </Tabs>
+          value={view}
+          onValueChange={(next) =>
+            void navigate({
+              search: { view: next as ClassView },
+              replace: true,
+            })
+          }
+          variant="pill"
+        >
+          <TabsList>
+            <TabsTrigger value="calendar">Calendar</TabsTrigger>
+            <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+            <TabsTrigger value="past">Past</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </Reveal>
 
       {classes.status === "error" ? (
@@ -77,34 +92,45 @@ function ClassesPage() {
       ) : null}
 
       <Reveal index={2}>
-      {classes.status === "loading" ? (
-        <LoadingPanel label="Loading the schedule" rows={3} />
-      ) : rows.length === 0 ? (
-        <EmptyPanel
-          icon={view === "upcoming" ? CalendarBlankIcon : ExamIcon}
-          title={view === "upcoming" ? "No classes scheduled" : "No past classes"}
-          description={
-            view === "upcoming"
-              ? "Your next session shows up here when your instructor schedules it."
-              : "Sessions you attended stay here, with their agenda."
-          }
-        />
-      ) : (
-        <ol className="flex flex-col gap-4">
-          {rows.map((session) => (
-            <li key={session.id}>
-              <ClassCard session={session} isPast={view === "past"} />
-            </li>
-          ))}
-        </ol>
-      )}
+        {classes.status === "loading" ? (
+          <LoadingPanel label="Loading the schedule" rows={3} />
+        ) : view === "calendar" ? (
+          <ClassCalendar classes={rows} />
+        ) : rows.length === 0 ? (
+          <EmptyPanel
+            icon={view === "upcoming" ? CalendarBlankIcon : ExamIcon}
+            title={
+              view === "upcoming" ? "No classes scheduled" : "No past classes"
+            }
+            description={
+              view === "upcoming"
+                ? "Your next session shows up here when your instructor schedules it."
+                : "Sessions you attended stay here, with their agenda."
+            }
+          />
+        ) : (
+          <ol className="flex flex-col gap-4">
+            {rows.map((session) => (
+              <li key={session.id}>
+                <ClassCard session={session} isPast={view === "past"} />
+              </li>
+            ))}
+          </ol>
+        )}
       </Reveal>
     </>
   )
 }
 
-function ClassCard({ session, isPast }: { session: PublicClass; isPast: boolean }) {
+function ClassCard({
+  session,
+  isPast,
+}: {
+  session: PublicClass
+  isPast: boolean
+}) {
   const [open, setOpen] = useState(false)
+  const cancelled = session.status === "cancelled"
 
   return (
     <Card className="overflow-hidden p-0">
@@ -113,18 +139,21 @@ function ClassCard({ session, isPast }: { session: PublicClass; isPast: boolean 
           aria-hidden="true"
           className="flex w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-muted py-1.5 text-center"
         >
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
             {dayShort(session.scheduledStart)}
           </span>
-          <span className="text-sm font-medium tabular-nums text-foreground">
+          <span className="text-sm font-medium text-foreground tabular-nums">
             {dayNumber(session.scheduledStart)}
           </span>
         </span>
 
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
-            <StatusChip tone={isPast ? "quiet" : "positive"} label={isPast ? "Past" : "Upcoming"} />
-            <span className="text-xs tabular-nums text-muted-foreground">
+            <StatusChip
+              tone={cancelled ? "attention" : isPast ? "quiet" : "positive"}
+              label={cancelled ? "Cancelled" : isPast ? "Past" : "Upcoming"}
+            />
+            <span className="text-xs text-muted-foreground tabular-nums">
               {formatTimeRange(session.scheduledStart, session.scheduledEnd)}
               {isPast ? ` · ${relativeDue(session.scheduledStart)}` : ""}
             </span>
@@ -134,6 +163,7 @@ function ClassCard({ session, isPast }: { session: PublicClass; isPast: boolean 
           </h2>
           <p className="text-xs text-muted-foreground tabular-nums">
             {formatDate(session.scheduledStart)}
+            {session.instructor ? ` · ${session.instructor.name}` : ""}
           </p>
         </div>
 
@@ -145,9 +175,14 @@ function ClassCard({ session, isPast }: { session: PublicClass; isPast: boolean 
               label: "Open meeting link",
               icon: <LinkSimpleIcon weight="duotone" className="size-4" />,
               ariaLabel: `Open meeting link for ${session.title}`,
-              onClick: () => window.open(session.meetingUrl, "_blank", "noopener,noreferrer"),
+              onClick: () =>
+                window.open(
+                  session.meetingUrl,
+                  "_blank",
+                  "noopener,noreferrer"
+                ),
             },
-          ]}
+          ].filter(() => !cancelled)}
           overflowActions={[
             {
               id: "copy",
@@ -181,7 +216,12 @@ function ClassCard({ session, isPast }: { session: PublicClass; isPast: boolean 
                     <AttachmentList attachments={session.attachments} />
                   </span>
                 ) : null}
-                {!isPast ? (
+                {cancelled && session.cancellationReason ? (
+                  <span className="text-sm text-destructive">
+                    Cancellation reason: {session.cancellationReason}
+                  </span>
+                ) : null}
+                {!isPast && !cancelled ? (
                   <a
                     href={session.meetingUrl}
                     target="_blank"

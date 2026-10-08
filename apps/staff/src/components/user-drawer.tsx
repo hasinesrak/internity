@@ -3,7 +3,7 @@
 // HR reads.
 import { useState } from "react"
 import type { ReactNode } from "react"
-import { CopyIcon, KeyIcon, UserCircleIcon } from "@phosphor-icons/react"
+import { CopyIcon, FileTextIcon, KeyIcon, UserCircleIcon } from "@phosphor-icons/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field"
 import { Separator } from "@workspace/ui/components/separator"
@@ -14,7 +14,7 @@ import { Input } from "@workspace/ui/components/motion/input"
 import { ConfirmRow, HoldConfirm } from "@/components/confirm"
 import { DetailPanel } from "@/components/detail-panel"
 import { RoleChip, UserStatusChip } from "@/components/status-chip"
-import { archiveUser, resetPassword, revokeUser, updateUser } from "@/lib/data"
+import { archiveUser, resetPassword, revokeUser, updateUser, uploadInternCv } from "@/lib/data"
 import { copyText } from "@/lib/clipboard"
 import { formatDate, relativeTime } from "@/lib/format"
 import type { PublicUser, StaffRole } from "@/lib/types"
@@ -49,6 +49,8 @@ export function UserDrawer({
   const [resetState, setResetState] = useState<
     "idle" | "loading" | "success" | "error"
   >("idle")
+  const [cvState, setCvState] = useState<"idle" | "loading" | "success" | "error">("idle")
+  const [cvMessage, setCvMessage] = useState<string | undefined>()
 
   if (!user) return null
   const isAdmin = viewerRole === "admin"
@@ -78,6 +80,21 @@ export function UserDrawer({
     const updated = await updateUser(user.id, { status: "active" })
     toast.success(`Access restored for ${updated.name}`)
     onChanged(updated)
+  }
+
+  const uploadCv = async (file: File | undefined) => {
+    if (!file || user.role !== "intern") return
+    setCvState("loading")
+    setCvMessage(undefined)
+    try {
+      const saved = await uploadInternCv(user.id, file)
+      setCvState("success")
+      setCvMessage(`${saved.originalName} uploaded`)
+      toast.success(`CV uploaded for ${user.name}`)
+    } catch (error) {
+      setCvState("error")
+      setCvMessage(error instanceof Error ? error.message : "The CV could not be uploaded.")
+    }
   }
 
   return (
@@ -129,6 +146,34 @@ export function UserDrawer({
           Copy email
         </Button>
       </div>
+
+      {viewerRole === "hr" && user.role === "intern" ? (
+        <>
+          <Separator />
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Intern CV</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <label className="inline-flex w-fit cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-muted">
+                <FileTextIcon weight="duotone" className="size-4" />
+                {cvState === "loading" ? "Uploading…" : "Upload PDF, DOC, or DOCX"}
+                <input
+                  type="file"
+                  className="sr-only"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  disabled={cvState === "loading"}
+                  onChange={(event) => {
+                    void uploadCv(event.target.files?.[0])
+                    event.currentTarget.value = ""
+                  }}
+                />
+              </label>
+              {cvMessage ? <p className={`text-xs ${cvState === "error" ? "text-destructive" : "text-muted-foreground"}`}>{cvMessage}</p> : null}
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
 
       {isAdmin ? (
         <>

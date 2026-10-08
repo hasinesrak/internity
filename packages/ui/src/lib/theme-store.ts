@@ -66,7 +66,10 @@ export interface ThemeState {
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-  theme: typeof document === "undefined" ? "dark" : (readStored() ?? systemTheme()),
+  // Keep the first React render identical on the server and browser. The
+  // bootstrap script and initTheme() apply the stored choice immediately
+  // after hydration, then this store updates without a hydration mismatch.
+  theme: "dark",
   setTheme: (theme) => {
     store(theme);
     applyTheme(theme);

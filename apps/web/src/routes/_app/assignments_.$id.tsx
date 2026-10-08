@@ -6,33 +6,39 @@ import {
   LinkSimpleIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react"
-import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert"
 import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "@workspace/ui/components/card"
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@workspace/ui/components/field"
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/alert"
+import { Card, CardContent, CardHeader } from "@workspace/ui/components/card"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@workspace/ui/components/field"
 import { Separator } from "@workspace/ui/components/separator"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { Button } from "@workspace/ui/components/motion/button/base"
 import { StatefulButton } from "@workspace/ui/components/motion/button/stateful"
 import { Input } from "@workspace/ui/components/motion/input"
 
-import {
-  ErrorPanel,
-  InlineLoader,
-} from "@/components/data-states"
+import { ErrorPanel, InlineLoader } from "@/components/data-states"
 import { PageHeader } from "@/components/page-header"
 import { Reveal } from "@workspace/ui/components/reveal"
 import { AssignmentDetailSummary } from "@/components/assignment-list"
 import { AttachmentList } from "@/components/attachment-list"
 import { StatusChip } from "@/components/status-chip"
-import { getAssignment, submitAssignment } from "@/lib/data"
+import {
+  getAssignment,
+  getLatestVerificationRun,
+  submitAssignment,
+} from "@/lib/data"
 import { formatDateLong, formatScore, relativeDue } from "@/lib/format"
 import { toast } from "@/lib/toast"
 import { useResource } from "@/lib/use-resource"
-import type { AssignmentRow } from "@/lib/types"
+import type { AssignmentRow, PublicVerificationRun } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/assignments_/$id")({
   component: AssignmentDetailPage,
@@ -44,6 +50,13 @@ function AssignmentDetailPage() {
 
   const resource = useResource(() => getAssignment(id), [id])
   const row = resource.data
+  const verification = useResource(
+    () =>
+      row?.assignment.verification
+        ? getLatestVerificationRun(id)
+        : Promise.resolve(null),
+    [id, Boolean(row?.assignment.verification)]
+  )
 
   if (resource.status === "loading") {
     return <InlineLoader label="Loading the assignment" />
@@ -51,7 +64,10 @@ function AssignmentDetailPage() {
   if (resource.status === "error" || !row) {
     return (
       <>
-        <PageHeader title="Assignment" description="This assignment could not be loaded." />
+        <PageHeader
+          title="Assignment"
+          description="This assignment could not be loaded."
+        />
         <ErrorPanel
           message="That assignment was not found, or it is no longer available."
           onRetry={resource.refetch}
@@ -59,9 +75,15 @@ function AssignmentDetailPage() {
         <Button
           variant="outline"
           className="w-fit"
-          onClick={() => void navigate({ to: "/assignments", search: { view: "open" } })}
+          onClick={() =>
+            void navigate({ to: "/assignments", search: { view: "open" } })
+          }
         >
-          <ArrowLeftIcon data-icon="inline-start" weight="duotone" className="size-4" />
+          <ArrowLeftIcon
+            data-icon="inline-start"
+            weight="duotone"
+            className="size-4"
+          />
           View all assignments
         </Button>
       </>
@@ -72,16 +94,22 @@ function AssignmentDetailPage() {
     <AssignmentDetail
       key={row.assignment.id}
       row={row}
-      onSubmitted={resource.refetch}
+      verification={verification.data ?? null}
+      onSubmitted={() => {
+        resource.refetch()
+        verification.refetch()
+      }}
     />
   )
 }
 
 function AssignmentDetail({
   row,
+  verification,
   onSubmitted,
 }: {
   row: AssignmentRow
+  verification: PublicVerificationRun | null
   onSubmitted: () => void
 }) {
   const navigate = useNavigate()
@@ -102,9 +130,15 @@ function AssignmentDetail({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => void navigate({ to: "/assignments", search: { view: "open" } })}
+              onClick={() =>
+                void navigate({ to: "/assignments", search: { view: "open" } })
+              }
             >
-              <ArrowLeftIcon data-icon="inline-start" weight="duotone" className="size-4" />
+              <ArrowLeftIcon
+                data-icon="inline-start"
+                weight="duotone"
+                className="size-4"
+              />
               View all assignments
             </Button>
           }
@@ -117,91 +151,161 @@ function AssignmentDetail({
 
       <Reveal index={2}>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-6 lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <h2 className="text-base font-medium tracking-tight">Instructions</h2>
-              <p className="text-sm text-muted-foreground">
-                {assignment.deadline
-                  ? `Due ${formatDateLong(assignment.deadline)}`
-                  : "No deadline"}
-              </p>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm leading-relaxed text-foreground">
-                {assignment.instructions}
-              </p>
-            </CardContent>
-          </Card>
-
-          {assignment.attachments.length > 0 ? (
+          <div className="flex flex-col gap-6 lg:col-span-2">
             <Card>
               <CardHeader>
                 <h2 className="text-base font-medium tracking-tight">
-                  Materials · {assignment.attachments.length}
+                  Instructions
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Files from your instructor. Open to view, or download to keep.
+                  {assignment.deadline
+                    ? `Due ${formatDateLong(assignment.deadline)}`
+                    : "No deadline"}
                 </p>
-              </CardHeader>
-              <CardContent>
-                <AttachmentList attachments={assignment.attachments} />
-              </CardContent>
-            </Card>
-          ) : null}
-
-          <Card>
-            <CardHeader>
-              <h2 className="text-base font-medium tracking-tight">Rubric</h2>
-              <p className="text-sm text-muted-foreground">
-                How this work is scored, {assignment.maxScore} points in total.
-              </p>
-            </CardHeader>
-            <CardContent>
-              <ul className="flex flex-col divide-y divide-border">
-                {assignment.rubric.map((criterion) => (
-                  <li key={criterion.name} className="flex items-start gap-3 py-3">
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="text-sm font-medium text-foreground">
-                        {criterion.name}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {criterion.description}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-sm tabular-nums text-foreground">
-                      {criterion.points}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-
-          {submission?.feedback ? (
-            <Card>
-              <CardHeader className="flex-row items-center justify-between gap-3">
-                <h2 className="text-base font-medium tracking-tight">Feedback</h2>
-                {graded ? (
-                  <span className="text-lg font-medium tabular-nums text-foreground">
-                    {formatScore(submission.score, assignment.maxScore)}
-                  </span>
-                ) : (
-                  <StatusChip tone="attention" label="Needs changes" />
-                )}
               </CardHeader>
               <CardContent>
                 <p className="text-sm leading-relaxed text-foreground">
-                  {submission.feedback}
+                  {assignment.instructions}
                 </p>
               </CardContent>
             </Card>
-          ) : null}
-        </div>
 
-        <div className="flex flex-col gap-6">
-          <SubmissionPanel row={row} onSubmitted={onSubmitted} />
-        </div>
+            {assignment.attachments.length > 0 ? (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-medium tracking-tight">
+                    Materials · {assignment.attachments.length}
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Files from your instructor. Open to view, or download to
+                    keep.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <AttachmentList attachments={assignment.attachments} />
+                </CardContent>
+              </Card>
+            ) : null}
+
+            <Card>
+              <CardHeader>
+                <h2 className="text-base font-medium tracking-tight">Rubric</h2>
+                <p className="text-sm text-muted-foreground">
+                  How this work is scored, {assignment.maxScore} points in
+                  total.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <ul className="flex flex-col divide-y divide-border">
+                  {assignment.rubric.map((criterion) => (
+                    <li
+                      key={criterion.name}
+                      className="flex items-start gap-3 py-3"
+                    >
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="text-sm font-medium text-foreground">
+                          {criterion.name}
+                        </span>
+                        <span className="text-sm text-muted-foreground">
+                          {criterion.description}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-sm text-foreground tabular-nums">
+                        {criterion.points}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            {submission?.feedback ? (
+              <Card>
+                <CardHeader className="flex-row items-center justify-between gap-3">
+                  <h2 className="text-base font-medium tracking-tight">
+                    Feedback
+                  </h2>
+                  {graded ? (
+                    <span className="text-lg font-medium text-foreground tabular-nums">
+                      {formatScore(submission.score, assignment.maxScore)}
+                    </span>
+                  ) : (
+                    <StatusChip tone="attention" label="Needs changes" />
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm leading-relaxed text-foreground">
+                    {submission.feedback}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : null}
+          </div>
+
+          <div className="flex flex-col gap-6">
+            {assignment.verification ? (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-medium tracking-tight">
+                    CLI verification
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Run the setup checks from your project folder.
+                  </p>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  <p className="text-sm leading-6 text-foreground/90">
+                    Open a terminal in your project folder. Run the setup
+                    commands below yourself, then let the CLI check the result.
+                  </p>
+                  <ol className="flex list-decimal flex-col gap-2 pl-5 text-sm text-foreground/90">
+                    <li>
+                      Install once: <code>npm install -g @internity/cli</code>
+                    </li>
+                    <li>
+                      Sign in once: <code>internity login</code>
+                    </li>
+                    <li>
+                      Practice without submitting:{" "}
+                      <code>internity run {assignment.id}</code>
+                    </li>
+                    <li>
+                      Submit the result:{" "}
+                      <code>internity submit {assignment.id}</code>
+                    </li>
+                  </ol>
+                  <StatusChip
+                    tone={
+                      verification?.status === "passed"
+                        ? "positive"
+                        : verification?.status
+                          ? "attention"
+                          : "quiet"
+                    }
+                    label={
+                      verification?.status === "passed"
+                        ? "Checks passed"
+                        : verification?.status === "failed"
+                          ? "Checks failed"
+                          : verification?.status === "error"
+                            ? "Checks error"
+                            : "Checks not run"
+                    }
+                  />
+                  {assignment.verification.instructions ? (
+                    <p className="text-sm leading-6 whitespace-pre-wrap text-foreground/90">
+                      {assignment.verification.instructions}
+                    </p>
+                  ) : null}
+                  <p className="text-xs text-muted-foreground">
+                    Install the CLI with <code>npm i -g @internity/cli</code>,
+                    then sign in once.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : null}
+            <SubmissionPanel row={row} onSubmitted={onSubmitted} />
+          </div>
         </div>
       </Reveal>
     </>
@@ -220,8 +324,13 @@ function SubmissionPanel({
 
   const [url, setUrl] = useState(submission?.submissionUrl ?? "")
   const [notes, setNotes] = useState(submission?.notes ?? "")
-  const [fieldErrors, setFieldErrors] = useState<{ url?: string; notes?: string }>({})
-  const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle")
+  const [fieldErrors, setFieldErrors] = useState<{
+    url?: string
+    notes?: string
+  }>({})
+  const [state, setState] = useState<"idle" | "loading" | "success" | "error">(
+    "idle"
+  )
 
   const locked = graded
   const submitted = submission?.status === "submitted"
@@ -240,7 +349,7 @@ function SubmissionPanel({
       }
       return errors
     },
-    [],
+    []
   )
 
   const onSubmit = async () => {
@@ -263,7 +372,9 @@ function SubmissionPanel({
     } catch (error) {
       setState("error")
       const message =
-        error instanceof Error ? error.message : "Unable to save your submission."
+        error instanceof Error
+          ? error.message
+          : "Unable to save your submission."
       setFieldErrors((current) => ({ ...current, url: message }))
     }
   }
@@ -271,7 +382,9 @@ function SubmissionPanel({
   return (
     <Card>
       <CardHeader>
-        <h2 className="text-base font-medium tracking-tight">Your submission</h2>
+        <h2 className="text-base font-medium tracking-tight">
+          Your submission
+        </h2>
         <p className="text-sm text-muted-foreground">
           {locked
             ? "Graded work stays as it is. Wait for a request for changes to send a new link."
@@ -288,14 +401,16 @@ function SubmissionPanel({
               href={submission.submissionUrl}
               target="_blank"
               rel="noreferrer"
-              className="break-all text-sm font-medium text-primary underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="text-sm font-medium break-all text-primary underline underline-offset-4 outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               {submission.submissionUrl}
             </a>
             {submission.notes ? (
-              <p className="text-sm text-muted-foreground">{submission.notes}</p>
+              <p className="text-sm text-muted-foreground">
+                {submission.notes}
+              </p>
             ) : null}
-            <p className="text-sm tabular-nums text-muted-foreground">
+            <p className="text-sm text-muted-foreground tabular-nums">
               Score {formatScore(submission.score, assignment.maxScore)}
             </p>
           </div>
@@ -306,8 +421,8 @@ function SubmissionPanel({
                 <WarningCircleIcon data-icon aria-hidden="true" />
                 <AlertTitle>Changes requested</AlertTitle>
                 <AlertDescription>
-                  Update your link and send it again. Your instructor reviews the new
-                  version.
+                  Update your link and send it again. Your instructor reviews
+                  the new version.
                 </AlertDescription>
               </Alert>
             ) : null}
@@ -331,7 +446,9 @@ function SubmissionPanel({
             </Field>
 
             <Field data-invalid={fieldErrors.notes ? true : undefined}>
-              <FieldLabel htmlFor="submission-notes">Notes for your instructor</FieldLabel>
+              <FieldLabel htmlFor="submission-notes">
+                Notes for your instructor
+              </FieldLabel>
               <Textarea
                 id="submission-notes"
                 value={notes}
@@ -361,7 +478,7 @@ function SubmissionPanel({
             </StatefulButton>
 
             {submitted ? (
-              <p className="text-xs tabular-nums text-muted-foreground">
+              <p className="text-xs text-muted-foreground tabular-nums">
                 Sent {formatDateLong(submission.submittedAt)}
               </p>
             ) : null}
@@ -369,9 +486,11 @@ function SubmissionPanel({
         )}
 
         <Separator className="my-5" />
-        <p className="text-xs tabular-nums text-muted-foreground">
+        <p className="text-xs text-muted-foreground tabular-nums">
           Out of {assignment.maxScore} points
-          {graded ? ` · Graded ${formatScore(submission.score, assignment.maxScore)}` : null}
+          {graded
+            ? ` · Graded ${formatScore(submission.score, assignment.maxScore)}`
+            : null}
         </p>
       </CardContent>
     </Card>

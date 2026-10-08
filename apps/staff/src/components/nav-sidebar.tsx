@@ -79,6 +79,9 @@ export function useNavigateToNav(role: StaffRole) {
         case "department-classes":
           void navigate({ to: "/classes", search: { view: "upcoming" } })
           return
+        case "department-calendar":
+          void navigate({ to: "/classes", search: { view: "calendar" } })
+          return
         case "department-assignments":
           void navigate({ to: "/assignments", search: { view: "published" } })
           return
@@ -87,6 +90,9 @@ export function useNavigateToNav(role: StaffRole) {
           return
         case "classes-upcoming":
           void navigate({ to: "/classes", search: { view: "upcoming" } })
+          return
+        case "classes-calendar":
+          void navigate({ to: "/classes", search: { view: "calendar" } })
           return
         case "classes-past":
           void navigate({ to: "/classes", search: { view: "past" } })
@@ -143,7 +149,7 @@ export function useActiveNavId(role: StaffRole): string | null {
       if (pathname === "/supervisor/instructors") return "instructors"
       if (pathname === "/supervisor/interns") return "department-interns"
       if (pathname === "/supervisor/drafts" || pathname === "/drafts") return "drafts"
-      if (pathname.startsWith("/classes")) return "department-classes"
+      if (pathname.startsWith("/classes")) return view === "calendar" ? "department-calendar" : "department-classes"
       if (pathname.startsWith("/assignments")) return "department-assignments"
       if (pathname.startsWith("/submissions")) return "department-submissions"
       return null
@@ -152,7 +158,7 @@ export function useActiveNavId(role: StaffRole): string | null {
       if (pathname === "/instructor" || pathname === "/") return "overview"
       if (pathname === "/drafts" || pathname === "/supervisor/drafts") return "drafts"
       if (pathname.startsWith("/classes")) {
-        return view === "past" ? "classes-past" : "classes-upcoming"
+        return view === "past" ? "classes-past" : view === "calendar" ? "classes-calendar" : "classes-upcoming"
       }
       if (pathname.startsWith("/assignments")) {
         if (view === "closed") return "assignments-closed"

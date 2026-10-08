@@ -14,6 +14,8 @@ export type InvitationStatus = "pending" | "accepted" | "revoked" | "expired"
 
 export type AssignmentStatus = "draft" | "published" | "closed"
 
+export type ClassStatus = "scheduled" | "cancelled"
+
 export type SubmissionStatus = "submitted" | "reviewed" | "needs_changes"
 
 /** A submission row in an assignment roster, including the missing ones. */
@@ -52,6 +54,63 @@ export interface PublicUser {
   lastLoginAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export type VerificationAssertion =
+  | { type: "exitCode"; equals: number }
+  | { type: "stdoutContains"; value: string }
+  | { type: "stdoutNotContains"; value: string }
+  | { type: "stdoutRegex"; value: string }
+
+export interface VerificationStep {
+  id: string
+  description: string
+  command: string
+  shell: "default" | "sh" | "pwsh"
+  cwd: string
+  timeoutMs: number
+  assertions: VerificationAssertion[]
+}
+
+export interface AssignmentVerification {
+  version: number
+  instructions: string
+  allowedOS: string[]
+  steps: VerificationStep[]
+}
+
+export type AttendanceStatus = "present" | "absent" | "leave" | "excused"
+
+export interface PublicAttendance {
+  id: string
+  internId: string
+  departmentId: string
+  date: string
+  status: AttendanceStatus
+  note: string
+  markedBy: string
+  source: "self" | "supervisor"
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PublicInternDocument {
+  id: string
+  internId: string
+  type: "cv"
+  originalName: string
+  mimeType: string
+  size: number
+  version: number
+  uploadedBy: string
+  url: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InternProfileResponse {
+  user: PublicUser
+  cv: PublicInternDocument | null
 }
 
 export interface PublicDepartment {
@@ -146,6 +205,10 @@ export interface PublicClass {
   scheduledStart: string
   scheduledEnd: string
   attachments: PublicAttachment[]
+  instructor: { id: string; name: string; email: string } | null
+  status: ClassStatus
+  cancellationReason: string | null
+  cancelledAt: string | null
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -161,6 +224,7 @@ export interface PublicAssignment {
   attachments: PublicAttachment[]
   status: AssignmentStatus
   maxScore: number
+  verification: AssignmentVerification | null
   createdBy: string
   createdAt: string
   updatedAt: string
@@ -208,6 +272,32 @@ export interface AssignmentRosterRow {
   submission: PublicSubmission | null
 }
 
+export type VerificationRunStatus = "passed" | "failed" | "error"
+
+export interface PublicVerificationRun {
+  id: string
+  assignmentId: string
+  internId: string
+  departmentId: string
+  manifestVersion: number
+  manifestHash: string
+  status: VerificationRunStatus
+  steps: Array<{
+    id: string
+    exitCode: number | null
+    stdout: string
+    stderr: string
+    durationMs: number
+    assertions: Array<{ type: string; passed: boolean; message: string }>
+  }>
+  cliVersion: string
+  platform: string
+  nodeVersion: string
+  startedAt: string
+  completedAt: string
+  createdAt: string
+}
+
 export interface ReviewInput {
   score: number
   feedback: string
@@ -245,6 +335,15 @@ export interface AssignmentDraft {
   instructions: string
   rubric: RubricCriterion[]
   suggestedDeadline: string
+  verification?: AssignmentVerification | null
+  verificationReason?: string
+}
+
+export type VerificationMode = "auto" | "enabled" | "disabled"
+
+export interface VerificationDraft {
+  verification: AssignmentVerification | null
+  verificationReason: string
 }
 
 /** What `POST /api/instructor/ai/class-agenda-draft` returns. */

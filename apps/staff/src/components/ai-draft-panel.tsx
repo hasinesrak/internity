@@ -22,6 +22,7 @@ export interface AiDraftPanelProps {
   promptError: string
   /** The parts being drafted, in order: title, instructions, rubric. */
   steps: string[]
+  options?: ReactNode
   run: (prompt: string) => Promise<AssignmentDraft | AgendaDraft>
   /** The preview shown before the draft is applied. */
   preview: (draft: AssignmentDraft | AgendaDraft) => ReactNode
@@ -38,6 +39,7 @@ export function AiDraftPanel({
   promptPlaceholder,
   promptError,
   steps,
+  options,
   run,
   preview,
   onUse,
@@ -54,7 +56,7 @@ export function AiDraftPanel({
     () => () => {
       for (const timer of timers.current) window.clearTimeout(timer)
     },
-    [],
+    []
   )
 
   const start = async () => {
@@ -74,7 +76,10 @@ export function AiDraftPanel({
     // While the request runs, the trace walks the parts being drafted.
     timers.current.forEach((timer) => window.clearTimeout(timer))
     timers.current = steps.map((_, index) =>
-      window.setTimeout(() => setStepIndex(index + 1), STEP_INTERVAL * (index + 1)),
+      window.setTimeout(
+        () => setStepIndex(index + 1),
+        STEP_INTERVAL * (index + 1)
+      )
     )
 
     try {
@@ -89,7 +94,7 @@ export function AiDraftPanel({
       for (const timer of timers.current) window.clearTimeout(timer)
       setPhase("error")
       setError(
-        cause instanceof Error ? cause.message : "Unable to draft. Try again.",
+        cause instanceof Error ? cause.message : "Unable to draft. Try again."
       )
     }
   }
@@ -99,7 +104,11 @@ export function AiDraftPanel({
     type: "step",
     label,
     status:
-      index < stepIndex ? "complete" : index === stepIndex ? "active" : "pending",
+      index < stepIndex
+        ? "complete"
+        : index === stepIndex
+          ? "active"
+          : "pending",
   }))
 
   const activeStep = steps[Math.min(stepIndex, steps.length - 1)]
@@ -131,13 +140,16 @@ export function AiDraftPanel({
             {preview(draft)}
           </ApprovalCard>
           <p className="text-xs text-muted-foreground">
-            Nothing is saved yet. Edit the fields and use the normal save action.
+            Nothing is saved yet. Edit the fields and use the normal save
+            action.
           </p>
         </>
       ) : (
         <>
           <div className="flex flex-col gap-1">
-            <h2 className="text-base font-medium tracking-tight">Draft with AI</h2>
+            <h2 className="text-base font-medium tracking-tight">
+              Draft with AI
+            </h2>
             <p className="text-sm text-muted-foreground">
               Describe the goal and review what comes back before using it.
             </p>
@@ -145,7 +157,9 @@ export function AiDraftPanel({
 
           <FieldGroup>
             <Field data-invalid={error ? true : undefined}>
-              <FieldLabel htmlFor={`ai-prompt-${kind}`}>{promptLabel}</FieldLabel>
+              <FieldLabel htmlFor={`ai-prompt-${kind}`}>
+                {promptLabel}
+              </FieldLabel>
               <Textarea
                 id={`ai-prompt-${kind}`}
                 value={prompt}
@@ -157,8 +171,12 @@ export function AiDraftPanel({
                 aria-invalid={error ? true : undefined}
                 disabled={phase === "working"}
               />
-              {error ? <p className="text-xs text-destructive">{error}</p> : null}
+              {error ? (
+                <p className="text-xs text-destructive">{error}</p>
+              ) : null}
             </Field>
+
+            {options}
 
             {phase === "working" ? (
               <div className="flex flex-col gap-2 rounded-2xl bg-muted/60 p-3">

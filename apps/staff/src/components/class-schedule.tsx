@@ -7,12 +7,19 @@ import {
   CopyIcon,
   LinkSimpleIcon,
   PencilSimpleIcon,
+  ArrowClockwiseIcon,
   TrashIcon,
+  WarningCircleIcon,
 } from "@phosphor-icons/react"
 import { BouncyAccordion } from "@workspace/ui/components/motion/bouncy-accordion"
 import { OverflowActions } from "@workspace/ui/components/motion/overflow-actions"
 import type { OverflowActionItem } from "@workspace/ui/components/motion/overflow-actions"
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
 
 import { StatusChip } from "@/components/status-chip"
 import { AttachmentList } from "@/components/attachment-list"
@@ -26,6 +33,8 @@ export interface ClassTimelineProps {
   /** Omit for a read-only view: rows get no action rail. */
   onDelete?: (session: PublicClass) => void
   onEdit?: (session: PublicClass) => void
+  onCancel?: (session: PublicClass) => void
+  onRestore?: (session: PublicClass) => void
 }
 
 function dayLabel(iso: string): string {
@@ -36,11 +45,21 @@ function dayLabel(iso: string): string {
   return formatDateShort(iso)
 }
 
-function groupByDay(classes: PublicClass[]): Array<{ key: string; label: string; rows: PublicClass[] }> {
-  const groups = new Map<string, { key: string; label: string; rows: PublicClass[] }>()
+function groupByDay(
+  classes: PublicClass[]
+): Array<{ key: string; label: string; rows: PublicClass[] }> {
+  const groups = new Map<
+    string,
+    { key: string; label: string; rows: PublicClass[] }
+  >()
   for (const session of classes) {
-    const key = session.scheduledStart.slice(0, 10)
-    const group = groups.get(key) ?? { key, label: dayLabel(session.scheduledStart), rows: [] }
+    const date = new Date(session.scheduledStart)
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+    const group = groups.get(key) ?? {
+      key,
+      label: dayLabel(session.scheduledStart),
+      rows: [],
+    }
     group.rows.push(session)
     groups.set(key, group)
   }
@@ -51,13 +70,19 @@ function ClassAgenda({
   session,
   onDelete,
   onEdit,
+  onCancel,
+  onRestore,
 }: {
   session: PublicClass
   onDelete?: (session: PublicClass) => void
   onEdit?: (session: PublicClass) => void
+  onCancel?: (session: PublicClass) => void
+  onRestore?: (session: PublicClass) => void
 }) {
   const ended = new Date(session.scheduledEnd).getTime() < Date.now()
+  const cancelled = session.status === "cancelled"
   const thisWeek = !ended && daysUntil(session.scheduledStart) <= 7
+  const hasActions = Boolean(onDelete || onEdit || onCancel || onRestore)
 
   const actions: OverflowActionItem[] = [
     {
@@ -75,8 +100,10 @@ function ClassAgenda({
       onClick: () => {
         void copyText(session.meetingUrl).then((ok) =>
           toast.info(
-            ok ? `Copied the link for ${session.title}` : "Could not copy the link",
-          ),
+            ok
+              ? `Copied the link for ${session.title}`
+              : "Could not copy the link"
+          )
         )
       },
     },
@@ -97,18 +124,33 @@ function ClassAgenda({
       onClick: () => onDelete(session),
     })
   }
+  if (cancelled && onRestore) {
+    overflow.push({
+      id: "restore",
+      label: "Restore class",
+      icon: <ArrowClockwiseIcon weight="duotone" className="size-3.5" />,
+      onClick: () => onRestore(session),
+    })
+  } else if (!cancelled && onCancel) {
+    overflow.push({
+      id: "cancel",
+      label: "Cancel class",
+      icon: <WarningCircleIcon weight="duotone" className="size-3.5" />,
+      onClick: () => onCancel(session),
+    })
+  }
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <StatusChip
-            tone={ended ? "quiet" : "positive"}
-            label={ended ? "Completed" : "Upcoming"}
+            tone={cancelled ? "attention" : ended ? "quiet" : "positive"}
+            label={cancelled ? "Cancelled" : ended ? "Completed" : "Upcoming"}
           />
           {thisWeek ? <StatusChip tone="neutral" label="This week" /> : null}
         </div>
-        {onDelete ? (
+        {hasActions ? (
           <OverflowActions
             primaryActions={actions}
             overflowActions={overflow}
@@ -125,7 +167,19 @@ function ClassAgenda({
           </a>
         )}
       </div>
-      <p className="text-sm leading-6 text-muted-foreground">{session.agenda}</p>
+      <p className="text-sm leading-6 text-muted-foreground">
+        {session.agenda}
+      </p>
+      {session.instructor ? (
+        <p className="text-xs text-muted-foreground">
+          Instructor: {session.instructor.name}
+        </p>
+      ) : null}
+      {cancelled && session.cancellationReason ? (
+        <p className="text-sm text-destructive">
+          Reason: {session.cancellationReason}
+        </p>
+      ) : null}
       {session.attachments.length > 0 ? (
         <div className="flex flex-col gap-2">
           <span className="text-xs text-muted-foreground">
@@ -138,14 +192,22 @@ function ClassAgenda({
   )
 }
 
-export function ClassTimeline({ classes, onDelete, onEdit }: ClassTimelineProps) {
+export function ClassTimeline({
+  classes,
+  onDelete,
+  onEdit,
+  onCancel,
+  onRestore,
+}: ClassTimelineProps) {
   const groups = groupByDay(classes)
 
   return (
     <div className="flex flex-col gap-6">
       {groups.map((group) => (
         <section key={group.key} className="flex flex-col gap-3">
-          <h3 className="text-sm font-medium text-muted-foreground">{group.label}</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">
+            {group.label}
+          </h3>
           <Card className="overflow-hidden py-0">
             <CardHeader className="sr-only">
               <CardTitle className="text-base">{group.label}</CardTitle>
@@ -154,10 +216,12 @@ export function ClassTimeline({ classes, onDelete, onEdit }: ClassTimelineProps)
               <BouncyAccordion
                 items={group.rows.map((session) => ({
                   id: session.id,
-                  icon: <CalendarBlankIcon weight="duotone" className="size-4" />,
+                  icon: (
+                    <CalendarBlankIcon weight="duotone" className="size-4" />
+                  ),
                   title: (
                     <span className="flex items-baseline gap-3">
-                      <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+                      <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
                         {formatTime(session.scheduledStart)}–
                         {formatTime(session.scheduledEnd)}
                       </span>
@@ -165,7 +229,13 @@ export function ClassTimeline({ classes, onDelete, onEdit }: ClassTimelineProps)
                     </span>
                   ),
                   description: (
-                    <ClassAgenda session={session} onDelete={onDelete} onEdit={onEdit} />
+                    <ClassAgenda
+                      session={session}
+                      onDelete={onDelete}
+                      onEdit={onEdit}
+                      onCancel={onCancel}
+                      onRestore={onRestore}
+                    />
                   ),
                 }))}
                 classNames={{
@@ -195,8 +265,9 @@ export function ClassRow({
       <div className="flex min-w-0 items-center justify-between gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-muted">
         <span className="flex min-w-0 flex-col">
           <span className="truncate text-sm font-medium">{session.title}</span>
-          <span className="truncate text-xs tabular-nums text-muted-foreground">
-            {dayLabel(session.scheduledStart)} · {formatTime(session.scheduledStart)}
+          <span className="truncate text-xs text-muted-foreground tabular-nums">
+            {dayLabel(session.scheduledStart)} ·{" "}
+            {formatTime(session.scheduledStart)}
           </span>
         </span>
         {action}

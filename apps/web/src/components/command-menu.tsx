@@ -5,22 +5,23 @@ import { useMemo } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   CalendarBlankIcon,
+  CheckSquareIcon,
   ChatsCircleIcon,
   ClipboardTextIcon,
   ClockIcon,
   ExamIcon,
   GearIcon,
   HouseIcon,
+  SparkleIcon,
   TrayIcon,
 } from "@phosphor-icons/react"
-import {
-  CommandPalette
-  
-} from "@workspace/ui/components/motion/command-palette"
-import type {CommandItem} from "@workspace/ui/components/motion/command-palette";
+import { CommandPalette } from "@workspace/ui/components/motion/command-palette"
+import type { CommandItem } from "@workspace/ui/components/motion/command-palette"
 
 import {
   NAV_ASSIGNMENTS,
+  NAV_ATTENDANCE,
+  NAV_COPILOT,
   NAV_FEEDBACK,
   NAV_OVERVIEW,
   NAV_SETTINGS,
@@ -34,7 +35,11 @@ export interface CommandMenuProps {
   assignments: AssignmentRow[]
 }
 
-export function CommandMenu({ open, onOpenChange, assignments }: CommandMenuProps) {
+export function CommandMenu({
+  open,
+  onOpenChange,
+  assignments,
+}: CommandMenuProps) {
   const navigate = useNavigate()
 
   const items = useMemo<CommandItem[]>(() => {
@@ -49,6 +54,16 @@ export function CommandMenu({ open, onOpenChange, assignments }: CommandMenuProp
         onSelect: () => {
           close()
           void navigate({ to: "/dashboard" })
+        },
+      },
+      {
+        id: "go-classes-calendar",
+        label: "Class calendar",
+        group: "Go to",
+        icon: CalendarBlankIcon,
+        onSelect: () => {
+          close()
+          void navigate({ to: "/classes", search: { view: "calendar" } })
         },
       },
       {
@@ -121,18 +136,43 @@ export function CommandMenu({ open, onOpenChange, assignments }: CommandMenuProp
           void navigate({ to: "/settings" })
         },
       },
+      {
+        id: "go-attendance",
+        label: NAV_ATTENDANCE.label,
+        group: "Go to",
+        icon: CheckSquareIcon,
+        onSelect: () => {
+          close()
+          void navigate({ to: "/attendance" })
+        },
+      },
+      {
+        id: "go-copilot",
+        label: NAV_COPILOT.label,
+        group: "Go to",
+        icon: SparkleIcon,
+        onSelect: () => {
+          close()
+          void navigate({ to: "/copilot" })
+        },
+      },
     ]
 
     const work: CommandItem[] = assignments.map((row) => ({
       id: `assignment-${row.assignment.id}`,
       label: row.assignment.title,
       group: NAV_ASSIGNMENTS.label,
-      hint: row.assignment.deadline ? relativeDue(row.assignment.deadline) : undefined,
+      hint: row.assignment.deadline
+        ? relativeDue(row.assignment.deadline)
+        : undefined,
       keywords: [row.assignment.title],
       icon: ClipboardTextIcon,
       onSelect: () => {
         close()
-        void navigate({ to: "/assignments/$id", params: { id: row.assignment.id } })
+        void navigate({
+          to: "/assignments/$id",
+          params: { id: row.assignment.id },
+        })
       },
     }))
 

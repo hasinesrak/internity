@@ -2,7 +2,7 @@
 // the section menu. The profile screen pairs the ID badge (organization name on
 // the ribbon, the wearer's name and the admin-set logo on the card) with the
 // account data.
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   createFileRoute,
   useNavigate,
@@ -69,8 +69,13 @@ export const Route = createFileRoute("/_app/settings")({
 function SettingsPage() {
   const navigate = useNavigate()
   const hash = useRouterState({ select: (state) => state.location.hash })
-  const section: SettingsSection =
-    hash === "notifications" || hash === "password" ? hash : "profile"
+  const [section, setSectionState] = useState<SettingsSection>("profile")
+
+  useEffect(() => {
+    setSectionState(
+      hash === "notifications" || hash === "password" ? hash : "profile",
+    )
+  }, [hash])
 
   const me = useResource(async () => {
     const [user, organization] = await Promise.all([getMe(), getOrganization()])

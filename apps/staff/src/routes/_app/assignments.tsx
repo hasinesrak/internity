@@ -10,7 +10,11 @@ import {
 } from "@phosphor-icons/react"
 import { Table } from "@workspace/ui/components/motion/table/index"
 import type { TableColumn } from "@workspace/ui/components/motion/table/types"
-import { Tabs, TabsList, TabsTrigger } from "@workspace/ui/components/motion/tabs"
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/motion/tabs"
 import { Button } from "@workspace/ui/components/motion/button/base"
 import { Input } from "@workspace/ui/components/motion/input"
 import { Reveal } from "@workspace/ui/components/reveal"
@@ -27,17 +31,27 @@ import {
 } from "@/components/row-actions"
 import type { RowActionEntry } from "@/components/row-actions"
 import { RubricList } from "@/components/rubric-list"
-import { AssignmentStatusChip, StatusChip, SubmissionStatusChip } from "@/components/status-chip"
+import {
+  AssignmentStatusChip,
+  StatusChip,
+  SubmissionStatusChip,
+} from "@/components/status-chip"
 import {
   deleteAssignment,
   getAssignmentRoster,
   getAssignments,
+  getVerificationRuns,
   setAssignmentStatus,
 } from "@/lib/data"
 import { requireAnyRole } from "@/lib/guards"
 import { copyText } from "@/lib/clipboard"
 import { daysUntil, formatDate } from "@/lib/format"
-import type { AssignmentStatus, PublicAssignment, RosterStatus } from "@/lib/types"
+import type {
+  AssignmentStatus,
+  PublicAssignment,
+  PublicVerificationRun,
+  RosterStatus,
+} from "@/lib/types"
 import { useResource } from "@/lib/use-resource"
 import { toast } from "@/lib/toast"
 
@@ -77,13 +91,16 @@ function AssignmentsPage() {
 
   const assignments = useResource(() => getAssignments(status), [status])
   const rows = (assignments.data ?? []).filter((assignment) =>
-    assignment.title.toLowerCase().includes(query.trim().toLowerCase()),
+    assignment.title.toLowerCase().includes(query.trim().toLowerCase())
   )
 
   const setTab = (next: string) =>
     void navigate({
       to: "/assignments",
-      search: { view: next === "published" ? undefined : next, search: query || undefined },
+      search: {
+        view: next === "published" ? undefined : next,
+        search: query || undefined,
+      },
       replace: true,
     })
 
@@ -98,14 +115,16 @@ function AssignmentsPage() {
         toast.success(
           next === "published"
             ? `“${updated.title}” is published`
-            : `“${updated.title}” is closed`,
+            : `“${updated.title}” is closed`
         )
         assignments.refetch()
         setSelected(updated)
       })
       .catch((error: unknown) => {
         toast.error(
-          error instanceof Error ? error.message : "That assignment could not be updated.",
+          error instanceof Error
+            ? error.message
+            : "That assignment could not be updated."
         )
       })
   }
@@ -121,14 +140,17 @@ function AssignmentsPage() {
         label: "Edit assignment",
         icon: PencilSimpleIcon,
         onSelect: () =>
-          void navigate({ to: "/assignments/new", search: { id: assignment.id } }),
+          void navigate({
+            to: "/assignments/new",
+            search: { id: assignment.id },
+          }),
       },
       {
         label: "Copy link",
         icon: CopyIcon,
         onSelect: () => {
           void copyText(window.location.href).then((ok) =>
-            toast.info(ok ? "Link copied" : "Could not copy the link"),
+            toast.info(ok ? "Link copied" : "Could not copy the link")
           )
         },
       },
@@ -172,7 +194,7 @@ function AssignmentsPage() {
           <NameCell
             label={`Open ${assignment.title}`}
             title={assignment.title}
-            subtitle={`${assignment.maxScore} points · ${assignment.rubric.length} criteria${assignment.attachments.length > 0 ? ` · ${assignment.attachments.length} file${assignment.attachments.length === 1 ? "" : "s"}` : ""}`}
+            subtitle={`${assignment.maxScore} points · ${assignment.rubric.length} criteria${assignment.verification ? " · CLI checks" : ""}${assignment.attachments.length > 0 ? ` · ${assignment.attachments.length} file${assignment.attachments.length === 1 ? "" : "s"}` : ""}`}
             onOpen={() => openAssignment(assignment)}
           />
         </RowContextMenu>
@@ -196,7 +218,7 @@ function AssignmentsPage() {
       sortValue: (assignment) => assignment.deadline ?? "",
       cell: (assignment) =>
         assignment.deadline ? (
-          <span className="px-2 text-xs tabular-nums text-muted-foreground">
+          <span className="px-2 text-xs text-muted-foreground tabular-nums">
             {formatDate(assignment.deadline)}
           </span>
         ) : (
@@ -211,7 +233,7 @@ function AssignmentsPage() {
       width: "16%",
       sortValue: (assignment) => assignment.createdAt,
       cell: (assignment) => (
-        <span className="px-2 text-xs tabular-nums text-muted-foreground">
+        <span className="px-2 text-xs text-muted-foreground tabular-nums">
           {formatDate(assignment.createdAt)}
         </span>
       ),
@@ -361,7 +383,10 @@ function AssignmentsPage() {
         onOpenChange={setDrawerOpen}
         onMove={move}
         onEdit={(assignment) =>
-          void navigate({ to: "/assignments/new", search: { id: assignment.id } })
+          void navigate({
+            to: "/assignments/new",
+            search: { id: assignment.id },
+          })
         }
       />
     </div>
@@ -376,7 +401,8 @@ function emptyTitle(tab: TabId): string {
 
 function emptyDescription(tab: TabId): string {
   if (tab === "drafts") return "Drafts stay private until you publish them."
-  if (tab === "closed") return "Assignments move here once their deadline has passed for good."
+  if (tab === "closed")
+    return "Assignments move here once their deadline has passed for good."
   return "Publish a draft and every intern in the department sees it."
 }
 
@@ -394,14 +420,31 @@ function AssignmentDrawer({
   onEdit: (assignment: PublicAssignment) => void
 }) {
   const roster = useResource(
-    () => (assignment ? getAssignmentRoster(assignment.id) : Promise.resolve(null)),
-    [assignment?.id],
+    () =>
+      assignment ? getAssignmentRoster(assignment.id) : Promise.resolve(null),
+    [assignment?.id, open]
+  )
+  const verification = useResource(
+    () =>
+      assignment?.verification
+        ? getVerificationRuns(assignment.id)
+        : Promise.resolve([]),
+    [assignment?.id, Boolean(assignment?.verification), open]
   )
 
   if (!assignment) return null
   const rows = roster.data?.data ?? []
   const submitted = rows.filter(
-    (row) => row.status !== ("not_submitted" as RosterStatus),
+    (row) => row.status !== ("not_submitted" as RosterStatus)
+  ).length
+  const latestVerification = new Map<string, PublicVerificationRun>()
+  for (const run of verification.data ?? []) {
+    if (!latestVerification.has(run.internId)) {
+      latestVerification.set(run.internId, run)
+    }
+  }
+  const checksPassed = rows.filter(
+    (row) => latestVerification.get(row.intern.id)?.status === "passed"
   ).length
 
   return (
@@ -427,7 +470,7 @@ function AssignmentDrawer({
 
       <div className="flex flex-col gap-2">
         <span className="text-xs text-muted-foreground">Instructions</span>
-        <p className="whitespace-pre-wrap text-sm leading-6 text-foreground/90">
+        <p className="text-sm leading-6 whitespace-pre-wrap text-foreground/90">
           {assignment.instructions}
         </p>
       </div>
@@ -452,6 +495,9 @@ function AssignmentDrawer({
       <div className="flex flex-col gap-2">
         <span className="text-xs text-muted-foreground">
           Roster · {submitted} of {rows.length} submitted
+          {assignment.verification
+            ? ` · ${checksPassed} of ${rows.length} checks passed`
+            : ""}
         </span>
         {roster.status === "loading" ? (
           <LoadingPanel label="Loading the roster" rows={2} />
@@ -466,8 +512,40 @@ function AssignmentDrawer({
                 key={row.intern.id}
                 className="flex items-center justify-between gap-3 rounded-xl px-2 py-1.5"
               >
-                <span className="min-w-0 truncate text-sm">{row.intern.name}</span>
-                <SubmissionStatusChip status={row.status} />
+                <span className="min-w-0 truncate text-sm">
+                  {row.intern.name}
+                </span>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <SubmissionStatusChip status={row.status} />
+                  {assignment.verification ? (
+                    <StatusChip
+                      tone={
+                        latestVerification.get(row.intern.id)?.status ===
+                        "passed"
+                          ? "positive"
+                          : latestVerification.get(row.intern.id)?.status ===
+                              "failed"
+                            ? "attention"
+                            : latestVerification.get(row.intern.id)?.status ===
+                                "error"
+                              ? "attention"
+                              : "quiet"
+                      }
+                      label={
+                        latestVerification.get(row.intern.id)?.status ===
+                        "passed"
+                          ? "Checks passed"
+                          : latestVerification.get(row.intern.id)?.status ===
+                              "failed"
+                            ? "Checks failed"
+                            : latestVerification.get(row.intern.id)?.status ===
+                                "error"
+                              ? "Checks error"
+                              : "Checks not run"
+                      }
+                    />
+                  ) : null}
+                </div>
               </li>
             ))}
           </ul>
@@ -475,16 +553,28 @@ function AssignmentDrawer({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="secondary" size="md" onClick={() => onEdit(assignment)}>
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={() => onEdit(assignment)}
+        >
           Edit assignment
         </Button>
         {assignment.status === "draft" ? (
-          <Button variant="primary" size="md" onClick={() => onMove(assignment, "published")}>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => onMove(assignment, "published")}
+          >
             Publish assignment
           </Button>
         ) : null}
         {assignment.status === "published" ? (
-          <Button variant="secondary" size="md" onClick={() => onMove(assignment, "closed")}>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={() => onMove(assignment, "closed")}
+          >
             Close assignment
           </Button>
         ) : null}

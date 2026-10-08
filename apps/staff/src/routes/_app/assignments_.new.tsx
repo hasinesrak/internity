@@ -3,7 +3,13 @@
 import { useEffect, useRef, useState } from "react"
 import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router"
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
 import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field"
 import {
   AdaptiveStepper,
@@ -20,6 +26,7 @@ import type { TodoItem } from "@workspace/ui/components/agents/todo-list"
 import { Reveal } from "@workspace/ui/components/reveal"
 
 import { AiDraftPanel } from "@/components/ai-draft-panel"
+import { VerificationEditor } from "@/components/verification-editor"
 import { AttachmentUploader } from "@/components/attachment-uploader"
 import { DateField } from "@/components/date-field"
 import { ErrorPanel, LoadingPanel } from "@/components/data-states"
@@ -34,8 +41,10 @@ import { useDraftsStore } from "@/lib/drafts-store"
 import { requireAnyRole } from "@/lib/guards"
 import type {
   AssignmentDraft,
+  AssignmentVerification,
   PublicAttachment,
   RubricCriterion,
+  VerificationMode,
 } from "@/lib/types"
 import { rubricMaxScore } from "@/lib/types"
 import { useResource } from "@/lib/use-resource"
@@ -64,7 +73,7 @@ function NewAssignmentPage() {
   const drafts = useDraftsStore((state) => state.drafts)
   const existing = useResource(
     () => (search.id ? getAssignment(search.id) : Promise.resolve(null)),
-    [search.id ?? ""],
+    [search.id ?? ""]
   )
 
   const [title, setTitle] = useState("")
@@ -72,8 +81,14 @@ function NewAssignmentPage() {
   const [deadline, setDeadline] = useState<Date | null>(null)
   const [attachments, setAttachments] = useState<PublicAttachment[]>([])
   const [rubric, setRubric] = useState<RubricCriterion[]>([emptyCriterion()])
+  const [verification, setVerification] =
+    useState<AssignmentVerification | null>(null)
+  const [verificationMode, setVerificationMode] =
+    useState<VerificationMode>("auto")
   const [errors, setErrors] = useState<Record<string, string | undefined>>({})
-  const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle")
+  const [state, setState] = useState<"idle" | "loading" | "success" | "error">(
+    "idle"
+  )
 
   const appliedDraft = useRef<string | null>(null)
   const hydrated = useRef<string | null>(null)
@@ -86,10 +101,13 @@ function NewAssignmentPage() {
     setRubric(
       existing.data.rubric.length
         ? existing.data.rubric.map((item) => ({ ...item }))
-        : [emptyCriterion()],
+        : [emptyCriterion()]
     )
-    setDeadline(existing.data.deadline ? new Date(existing.data.deadline) : null)
+    setDeadline(
+      existing.data.deadline ? new Date(existing.data.deadline) : null
+    )
     setAttachments(existing.data.attachments)
+    setVerification(existing.data.verification)
     setErrors({})
   }, [existing.data, search.id])
 
@@ -99,9 +117,12 @@ function NewAssignmentPage() {
     setRubric(
       draft.rubric.length
         ? draft.rubric.map((item) => ({ ...item }))
-        : [emptyCriterion()],
+        : [emptyCriterion()]
     )
-    setDeadline(draft.suggestedDeadline ? new Date(draft.suggestedDeadline) : null)
+    setDeadline(
+      draft.suggestedDeadline ? new Date(draft.suggestedDeadline) : null
+    )
+    setVerification(draft.verification ?? null)
     setErrors({})
     toast.success("Draft applied to the fields")
   }
@@ -124,7 +145,9 @@ function NewAssignmentPage() {
 
   const updateRow = (index: number, patch: Partial<RubricCriterion>) =>
     setRubric((rows) =>
-      rows.map((row, position) => (position === index ? { ...row, ...patch } : row)),
+      rows.map((row, position) =>
+        position === index ? { ...row, ...patch } : row
+      )
     )
 
   const submit = async (target: "draft" | "published" | "save") => {
@@ -137,13 +160,41 @@ function NewAssignmentPage() {
     if (target === "save" && existing.data?.status !== "draft" && !deadline) {
       found.deadline = "Add a deadline before saving."
     }
-    const rows = rubric.filter((row) => row.name.trim() || row.description.trim())
+    const rows = rubric.filter(
+      (row) => row.name.trim() || row.description.trim()
+    )
     rows.forEach((row, index) => {
-      if (!row.name.trim()) found[`rubric-${index}-name`] = "Enter a criterion name."
+      if (!row.name.trim())
+        found[`rubric-${index}-name`] = "Enter a criterion name."
       if (!row.description.trim()) {
         found[`rubric-${index}-description`] = "Enter a criterion description."
       }
     })
+
+    if (verification) {
+      if (!verification.instructions.trim())
+        found.verification = "Add clear setup instructions for interns."
+      else if (!verification.allowedOS.length)
+        found.verification = "Select at least one supported platform."
+      else if (
+        !verification.steps.length ||
+        verification.steps.some(
+          (step) => !step.command.trim() || !step.description.trim()
+        )
+      )
+        found.verification =
+          "Add at least one complete check with a description and command."
+      else if (
+        verification.steps.some((step) =>
+          step.assertions.some(
+            (assertion) =>
+              assertion.type !== "exitCode" && !assertion.value.trim()
+          )
+        )
+      )
+        found.verification =
+          "Fill in the expected text for each output assertion."
+    }
 
     setErrors(found)
     if (Object.values(found).some(Boolean)) {
@@ -162,6 +213,7 @@ function NewAssignmentPage() {
       })),
       deadline: deadline ? deadline.toISOString() : null,
       attachments: attachments.map((item) => item.id),
+      verification,
     }
     try {
       const saved = search.id
@@ -170,17 +222,22 @@ function NewAssignmentPage() {
             ...payload,
             status: target === "draft" ? "draft" : "published",
           })
-      if (search.id && target === "published" && existing.data?.status === "draft") {
+      if (
+        search.id &&
+        target === "published" &&
+        existing.data?.status === "draft"
+      ) {
         await setAssignmentStatus(search.id, "published")
       }
       setState("success")
-      const published = target === "published" || existing.data?.status === "published"
+      const published =
+        target === "published" || existing.data?.status === "published"
       toast.success(
         target === "published"
           ? `“${saved.title}” is published`
           : target === "save"
             ? `Saved “${saved.title}”`
-            : `Draft saved: ${saved.title}`,
+            : `Draft saved: ${saved.title}`
       )
       const view = published
         ? "published"
@@ -195,7 +252,9 @@ function NewAssignmentPage() {
       setState("error")
       setErrors({
         instructions:
-          error instanceof Error ? error.message : "The assignment could not be saved.",
+          error instanceof Error
+            ? error.message
+            : "The assignment could not be saved.",
       })
     }
   }
@@ -225,7 +284,7 @@ function NewAssignmentPage() {
             <h1 className="text-xl font-medium tracking-tight text-balance">
               {editing ? "Edit assignment" : "Create assignment"}
             </h1>
-            <p className="text-sm text-muted-foreground text-balance">
+            <p className="text-sm text-balance text-muted-foreground">
               What interns produce, how it is graded, and when it is due.
             </p>
           </div>
@@ -256,7 +315,9 @@ function NewAssignmentPage() {
                 </Field>
 
                 <Field data-invalid={errors.instructions ? true : undefined}>
-                  <FieldLabel htmlFor="assignment-instructions">Instructions</FieldLabel>
+                  <FieldLabel htmlFor="assignment-instructions">
+                    Instructions
+                  </FieldLabel>
                   <Textarea
                     id="assignment-instructions"
                     value={instructions}
@@ -266,9 +327,20 @@ function NewAssignmentPage() {
                     disabled={state === "loading"}
                   />
                   {errors.instructions ? (
-                    <p className="text-xs text-destructive">{errors.instructions}</p>
+                    <p className="text-xs text-destructive">
+                      {errors.instructions}
+                    </p>
                   ) : null}
                 </Field>
+
+                <VerificationEditor
+                  value={verification}
+                  onChange={setVerification}
+                  title={title}
+                  instructions={instructions}
+                  disabled={state === "loading"}
+                  error={errors.verification}
+                />
 
                 <DateField
                   label="Deadline"
@@ -292,7 +364,9 @@ function NewAssignmentPage() {
                       variant="secondary"
                       size="sm"
                       disabled={state === "loading"}
-                      onClick={() => setRubric((rows) => [...rows, emptyCriterion()])}
+                      onClick={() =>
+                        setRubric((rows) => [...rows, emptyCriterion()])
+                      }
                     >
                       <PlusIcon weight="duotone" data-icon="inline-start" />
                       Add criterion
@@ -309,7 +383,9 @@ function NewAssignmentPage() {
                           <Input
                             label=""
                             value={row.name}
-                            onChange={(next) => updateRow(index, { name: next })}
+                            onChange={(next) =>
+                              updateRow(index, { name: next })
+                            }
                             placeholder="Criterion name"
                             error={errors[`rubric-${index}-name`]}
                             reserveErrorLine={false}
@@ -319,7 +395,9 @@ function NewAssignmentPage() {
                         <div className="shrink-0">
                           <AdaptiveStepper
                             value={row.points}
-                            onValueChange={(next) => updateRow(index, { points: next })}
+                            onValueChange={(next) =>
+                              updateRow(index, { points: next })
+                            }
                             min={0}
                             max={100}
                             step={5}
@@ -337,7 +415,7 @@ function NewAssignmentPage() {
                           disabled={state === "loading"}
                           onClick={() =>
                             setRubric((rows) =>
-                              rows.filter((_, position) => position !== index),
+                              rows.filter((_, position) => position !== index)
                             )
                           }
                         >
@@ -347,7 +425,9 @@ function NewAssignmentPage() {
                       <Input
                         label=""
                         value={row.description}
-                        onChange={(next) => updateRow(index, { description: next })}
+                        onChange={(next) =>
+                          updateRow(index, { description: next })
+                        }
                         placeholder="What strong work looks like"
                         error={errors[`rubric-${index}-description`]}
                         reserveErrorLine={false}
@@ -357,8 +437,9 @@ function NewAssignmentPage() {
                   ))}
 
                   <p className="px-1 text-xs text-muted-foreground tabular-nums">
-                    {rubric.length} {rubric.length === 1 ? "criterion" : "criteria"} ·{" "}
-                    {total} points total
+                    {rubric.length}{" "}
+                    {rubric.length === 1 ? "criterion" : "criteria"} · {total}{" "}
+                    points total
                   </p>
                 </div>
               </FieldGroup>
@@ -412,18 +493,79 @@ function NewAssignmentPage() {
                 promptLabel="Learning goal"
                 promptPlaceholder="Write a brief for an API integration, covering data needs and failure cases."
                 promptError="Describe what the intern should learn."
-                steps={["Title", "Instructions", "Rubric criteria"]}
-                run={(learningGoal) => draftAssignment(learningGoal)}
+                steps={[
+                  "Title",
+                  "Instructions",
+                  "Rubric criteria",
+                  "Verification recommendation",
+                ]}
+                options={
+                  <Field>
+                    <FieldLabel htmlFor="ai-verification-mode">
+                      CLI verification
+                    </FieldLabel>
+                    <select
+                      id="ai-verification-mode"
+                      className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                      value={verificationMode}
+                      onChange={(event) =>
+                        setVerificationMode(
+                          event.target.value as VerificationMode
+                        )
+                      }
+                    >
+                      <option value="auto">
+                        Let AI decide for this assignment
+                      </option>
+                      <option value="enabled">
+                        Include checks when the task can be tested
+                      </option>
+                      <option value="disabled">Keep verification off</option>
+                    </select>
+                    <p className="text-xs text-muted-foreground">
+                      AI drafts setup instructions and checks for technical
+                      tasks. You can edit the suggestion or switch verification
+                      off.
+                    </p>
+                  </Field>
+                }
+                run={(learningGoal) =>
+                  draftAssignment(learningGoal, verificationMode)
+                }
                 preview={(draft) => {
-                  const items: TodoItem[] = (draft as AssignmentDraft).rubric.map(
-                    (criterion, index) => ({
-                      id: `criterion-${index}`,
-                      title: criterion.name,
-                      status: "pending",
-                      detail: `${criterion.points} pts`,
-                    }),
+                  const items: TodoItem[] = (
+                    draft as AssignmentDraft
+                  ).rubric.map((criterion, index) => ({
+                    id: `criterion-${index}`,
+                    title: criterion.name,
+                    status: "pending",
+                    detail: `${criterion.points} pts`,
+                  }))
+                  return (
+                    <div className="flex flex-col gap-3">
+                      <TodoList
+                        items={items}
+                        title="Rubric criteria"
+                        defaultOpen
+                      />
+                      <p className="text-xs font-medium">
+                        {(draft as AssignmentDraft).verification
+                          ? `${(draft as AssignmentDraft).verification!.steps.length} CLI checks suggested`
+                          : "CLI verification off"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {(draft as AssignmentDraft).verificationReason}
+                      </p>
+                      {(draft as AssignmentDraft).verification?.instructions ? (
+                        <p className="text-xs whitespace-pre-wrap">
+                          {
+                            (draft as AssignmentDraft).verification!
+                              .instructions
+                          }
+                        </p>
+                      ) : null}
+                    </div>
                   )
-                  return <TodoList items={items} title="Rubric criteria" defaultOpen />
                 }}
                 onUse={(draft) => applyDraft(draft as AssignmentDraft)}
               />

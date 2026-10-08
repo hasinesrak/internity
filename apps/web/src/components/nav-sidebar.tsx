@@ -43,6 +43,9 @@ export function useNavigateToNav() {
         case "classes-upcoming":
           void navigate({ to: "/classes", search: { view: "upcoming" } })
           return
+        case "classes-calendar":
+          void navigate({ to: "/classes", search: { view: "calendar" } })
+          return
         case "classes-past":
           void navigate({ to: "/classes", search: { view: "past" } })
           return
@@ -87,7 +90,11 @@ export function useActiveNavId(
     if (pathname === "/copilot") return "copilot"
     if (pathname === "/settings") return "settings"
     if (pathname === "/classes") {
-      return view === "past" ? "classes-past" : "classes-upcoming"
+      return view === "past"
+        ? "classes-past"
+        : view === "calendar"
+          ? "classes-calendar"
+          : "classes-upcoming"
     }
     if (pathname === "/assignments") {
       if (view === "submitted") return "assignments-submitted"
@@ -164,6 +171,7 @@ export function NavRail({
     ...pins.map((pin) => ({ id: pin.id, label: pin.label })),
     { id: "overview", label: "Overview" },
     { id: "classes-upcoming", label: "Upcoming classes" },
+    { id: "classes-calendar", label: "Class calendar" },
     { id: "classes-past", label: "Past classes" },
     { id: "assignments-open", label: "Open assignments" },
     { id: "assignments-submitted", label: "Submitted work" },

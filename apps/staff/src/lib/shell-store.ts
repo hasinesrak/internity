@@ -24,6 +24,7 @@ export const useShellStore = create<ShellState>()(
     }),
     {
       name: "internity-staff-shell",
+      skipHydration: true,
       version: 1,
       migrate: (persisted) => {
         const saved = (persisted ?? {}) as Partial<ShellState>
