@@ -154,8 +154,22 @@ export async function updateAssignment(
       input.attachments
     )
   }
-  if (input.verification !== undefined)
+  if (input.verification !== undefined) {
+    const current = assignment.verification
+    const changed =
+      JSON.stringify(current) !== JSON.stringify(input.verification)
     assignment.verification = input.verification
+      ? {
+          ...input.verification,
+          // Every edit to a published manifest creates a fresh revision. The
+          // hash check still rejects old CLI results, while the version makes
+          // the change clear to people reading the run history.
+          version: changed
+            ? Math.max(input.verification.version, (current?.version ?? 0) + 1)
+            : Math.max(input.verification.version, current?.version ?? 1),
+        }
+      : null
+  }
   if (input.deadline !== undefined) {
     assignment.deadline = input.deadline ? new Date(input.deadline) : null
   }

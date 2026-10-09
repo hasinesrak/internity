@@ -58,6 +58,19 @@ export async function listAttendance(actor: SessionUser, range: Range): Promise<
     if (!actor.departmentId) throw forbidden()
     filter.departmentId = actor.departmentId
     if (range.internId) await targetIntern(actor, range.internId)
+  } else if (actor.role === "instructor") {
+    // Attendance is department-scoped for staff members. Instructors can
+    // read the grid for their own department but must never see another
+    // department's attendance records.
+    if (!actor.departmentId) throw forbidden()
+    filter.departmentId = actor.departmentId
+    if (range.internId) {
+      const intern = await targetIntern(actor, range.internId)
+      if (intern.departmentId?.toString() !== actor.departmentId) {
+        throw forbidden()
+      }
+      filter.internId = intern._id
+    }
   } else {
     if (range.internId) {
       const intern = await targetIntern(actor, range.internId)

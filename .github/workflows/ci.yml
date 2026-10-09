@@ -30,6 +30,16 @@ jobs:
     name: Validate
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      mongo:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand(\"ping\").ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -52,6 +62,31 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # The current dependency graph has known high-severity advisories in
+      # development tooling. Critical findings still block every change;
+      # pull requests also run dependency-review below for newly introduced
+      # vulnerable packages.
+      - name: Dependency audit
+        run: pnpm audit --prod --audit-level=critical
+
+  dependency-review:
+    name: Review dependency changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
   build-images:
     name: Build container images
     needs: validate
@@ -59,6 +94,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
+      actions: write
     strategy:
       fail-fast: false
       matrix:

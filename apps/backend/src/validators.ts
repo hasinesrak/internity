@@ -460,6 +460,7 @@ export const classListSchema = z.object({
 export const submissionWriteSchema = z.object({
   submissionUrl: httpUrlSchema,
   notes: z.string().trim().max(5000, "Use at most 5000 characters.").optional(),
+  verificationRunId: optionalId,
 })
 
 export const reviewSchema = z.object({

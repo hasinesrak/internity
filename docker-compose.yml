@@ -178,8 +178,34 @@ services:
       retries: 10
       start_period: 25s
 
+  jenkins:
+    profiles:
+      - jenkins
+    build:
+      context: ./infra/jenkins
+      dockerfile: Dockerfile
+    ports:
+      - "${JENKINS_PORT:-8080}:8080"
+      - "${JENKINS_AGENT_PORT:-50000}:50000"
+    environment:
+      JAVA_OPTS: ${JENKINS_JAVA_OPTS:--Djava.awt.headless=true}
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      # Required only for Jenkins jobs that build container images.
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      # Docker Desktop exposes the socket as root:root; Linux hosts can use
+      # DOCKER_GID for their docker group as well.
+      - "0"
+      - "${DOCKER_GID:-999}"
+    depends_on:
+      mongo:
+        condition: service_healthy
+
 volumes:
   uploads-data:
     name: internity-uploads-data
   mongo-config:
     name: internity-mongo-config
+  jenkins-home:
+    name: internity-jenkins-home

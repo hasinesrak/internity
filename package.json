@@ -9,7 +9,9 @@
     "dev:staff": "pnpm --filter staff dev",
     "dev:backend": "pnpm --filter backend dev",
     "cli:build": "pnpm --filter @internity/cli build",
+    "cli:typecheck": "pnpm --filter @internity/cli typecheck",
     "seed": "pnpm --filter backend seed",
+    "test": "turbo test",
     "lint": "turbo lint",
     "format": "turbo format",
     "typecheck": "turbo typecheck"

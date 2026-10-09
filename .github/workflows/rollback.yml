@@ -1,0 +1,67 @@
+name: Roll back deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Previously published image tag (for example, sha-abc1234)"
+        required: true
+        type: string
+
+concurrency:
+  group: rollback-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  propose-rollback:
+    name: Propose manifest rollback
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout production branch
+        uses: actions/checkout@v5
+        with:
+          ref: master
+
+      - name: Validate image tag
+        env:
+          VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          [[ "$VERSION" =~ ^sha-[0-9a-f]{7,40}$ ]] || {
+            echo "version must match sha-<7 to 40 lowercase hex characters>"
+            exit 1
+          }
+
+      - name: Point overlay at the previous images
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          test -n "$DOCKERHUB_USERNAME" || {
+            echo "Set the DOCKERHUB_USERNAME repository secret."
+            exit 1
+          }
+          python3 infra/scripts/set-image-tags.py \
+            "$DOCKERHUB_USERNAME" \
+            "$VERSION" \
+            infra/k8s/overlays/production/kustomization.yaml
+
+      - name: Open rollback pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: master
+          branch: ci/rollback-${{ inputs.version }}
+          delete-branch: true
+          commit-message: "Roll back images to ${{ inputs.version }}"
+          title: "Roll back images to ${{ inputs.version }}"
+          body: |
+            This pull request points the production overlay at the previously published `${{ inputs.version }}` images.
+
+            Merge this pull request to let Argo CD sync the rollback. The current manifest remains available in git for a further rollback.
+          add-paths: infra/k8s/overlays/production/kustomization.yaml

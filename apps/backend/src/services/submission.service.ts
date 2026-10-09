@@ -17,18 +17,32 @@ import { Assignment, maxScoreFor } from "../models/assignment.js"
 import { ClassSession } from "../models/class-session.js"
 import { Review } from "../models/review.js"
 import { Submission } from "../models/submission.js"
+import { VerificationRun } from "../models/verification-run.js"
 import { User } from "../models/user.js"
 import type { SessionUser } from "../types.js"
 import type { SubmissionStatus } from "../config/constants.js"
+import { verificationManifestHash } from "./verification.service.js"
 
 async function reviewsFor(submissionId: string) {
   return Review.find({ submissionId }).sort({ createdAt: -1 })
 }
 
+async function verificationRunFor(submission: {
+  verificationRunId?: Types.ObjectId | null
+}) {
+  return submission.verificationRunId
+    ? VerificationRun.findById(submission.verificationRunId)
+    : null
+}
+
 export async function submitWork(
   actor: SessionUser,
   assignmentId: string,
-  input: { submissionUrl: string; notes?: string }
+  input: {
+    submissionUrl: string
+    notes?: string
+    verificationRunId?: string
+  }
 ): Promise<PublicSubmission> {
   if (actor.role !== "intern") throw forbidden()
   const assignment = await getAssignment(actor, assignmentId, true)
@@ -50,6 +64,39 @@ export async function submitWork(
       "This submission has been reviewed. Wait for a request for changes before sending another link."
     )
   }
+  let verificationRunId: Types.ObjectId | null = null
+  let verificationRun = null
+  if (assignment.verification) {
+    const expectedHash = verificationManifestHash(assignment.verification)
+    verificationRun = input.verificationRunId
+      ? await VerificationRun.findOne({
+          _id: input.verificationRunId,
+          assignmentId,
+          internId: actor.id,
+          departmentId: assignment.departmentId,
+          manifestHash: expectedHash,
+        })
+      : await VerificationRun.findOne({
+          assignmentId,
+          internId: actor.id,
+          departmentId: assignment.departmentId,
+          manifestHash: expectedHash,
+          status: "passed",
+        }).sort({ createdAt: -1 })
+    if (!verificationRun || verificationRun.status !== "passed") {
+      throw new AppError(
+        409,
+        "VERIFICATION_REQUIRED",
+        "Run the current assignment checks successfully before submitting your work."
+      )
+    }
+    verificationRunId = verificationRun._id
+  } else if (input.verificationRunId) {
+    throw validation(
+      "This assignment does not use CLI verification.",
+      "verificationRunId"
+    )
+  }
   const submission = await Submission.findOneAndUpdate(
     {
       assignmentId: new Types.ObjectId(assignmentId),
@@ -60,6 +107,7 @@ export async function submitWork(
         departmentId: assignment.departmentId,
         submissionUrl: input.submissionUrl.trim(),
         notes: input.notes?.trim() ?? "",
+        verificationRunId,
         submittedAt: new Date(),
         status: "submitted",
         score: null,
@@ -78,7 +126,7 @@ export async function submitWork(
     departmentId: assignment.departmentId.toString(),
     metadata: { assignmentId },
   })
-  return serializeSubmission(submission, { assignment })
+  return serializeSubmission(submission, { assignment, verificationRun })
 }
 
 export async function listMySubmissions(
@@ -97,6 +145,7 @@ export async function listMySubmissions(
       serializeSubmission(submission, {
         assignment: byId.get(submission.assignmentId.toString()) ?? null,
         reviews: await reviewsFor(submission._id.toString()),
+        verificationRun: await verificationRunFor(submission),
       })
     )
   )
@@ -111,6 +160,7 @@ export async function getMySubmission(actor: SessionUser, id: string) {
   return serializeSubmission(submission, {
     assignment,
     reviews: await reviewsFor(submission._id.toString()),
+    verificationRun: await verificationRunFor(submission),
   })
 }
 
@@ -142,12 +192,15 @@ export async function listSubmissions(
       { id: user._id.toString(), name: user.name, email: user.email },
     ])
   )
-  return submissions.map((submission) =>
-    serializeSubmission(submission, {
-      assignment:
-        assignmentById.get(submission.assignmentId.toString()) ?? null,
-      intern: internById.get(submission.internId.toString()) ?? null,
-    })
+  return Promise.all(
+    submissions.map(async (submission) =>
+      serializeSubmission(submission, {
+        assignment:
+          assignmentById.get(submission.assignmentId.toString()) ?? null,
+        intern: internById.get(submission.internId.toString()) ?? null,
+        verificationRun: await verificationRunFor(submission),
+      })
+    )
   )
 }
 
@@ -157,10 +210,11 @@ export async function getSubmission(actor: SessionUser, id: string) {
     departmentId: ownDepartmentId(actor),
   })
   if (!submission) throw notFound("That submission was not found.")
-  const [assignment, intern, reviews] = await Promise.all([
+  const [assignment, intern, reviews, verificationRun] = await Promise.all([
     Assignment.findById(submission.assignmentId),
     User.findById(submission.internId),
     reviewsFor(submission._id.toString()),
+    verificationRunFor(submission),
   ])
   return serializeSubmission(submission, {
     assignment,
@@ -168,6 +222,7 @@ export async function getSubmission(actor: SessionUser, id: string) {
       ? { id: intern._id.toString(), name: intern.name, email: intern.email }
       : null,
     reviews,
+    verificationRun,
   })
 }
 
@@ -242,16 +297,21 @@ export async function assignmentRoster(
       assignment,
       await attachmentsFor(assignment.attachments ?? [])
     ),
-    data: interns.map((intern) => {
-      const submission = byIntern.get(intern._id.toString()) ?? null
-      return {
-        intern: serializeUser(intern, brief),
-        status: submission ? submission.status : ("not_submitted" as const),
-        submission: submission
-          ? serializeSubmission(submission, { assignment })
-          : null,
-      }
-    }),
+    data: await Promise.all(
+      interns.map(async (intern) => {
+        const submission = byIntern.get(intern._id.toString()) ?? null
+        return {
+          intern: serializeUser(intern, brief),
+          status: submission ? submission.status : ("not_submitted" as const),
+          submission: submission
+            ? serializeSubmission(submission, {
+                assignment,
+                verificationRun: await verificationRunFor(submission),
+              })
+            : null,
+        }
+      })
+    ),
   }
 }
 
@@ -282,7 +342,10 @@ export async function internDashboard(actor: SessionUser) {
           await attachmentsFor(assignment.attachments ?? [])
         ),
         submission: submission
-          ? serializeSubmission(submission, { assignment })
+          ? serializeSubmission(submission, {
+              assignment,
+              verificationRun: await verificationRunFor(submission),
+            })
           : null,
       }
     })

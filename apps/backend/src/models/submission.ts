@@ -8,6 +8,7 @@ export interface SubmissionShape {
   departmentId: Types.ObjectId
   submissionUrl: string
   notes: string
+  verificationRunId: Types.ObjectId | null
   submittedAt: Date
   status: SubmissionStatus
   score: number | null
@@ -34,6 +35,12 @@ const submissionSchema = new Schema<SubmissionShape>(
     },
     submissionUrl: { type: String, required: true, trim: true },
     notes: { type: String, default: "" },
+    verificationRunId: {
+      type: Schema.Types.ObjectId,
+      ref: "VerificationRun",
+      default: null,
+      index: true,
+    },
     submittedAt: { type: Date, required: true },
     status: {
       type: String,

@@ -398,6 +398,8 @@ export type PublicSubmission = {
   departmentId: string
   submissionUrl: string
   notes: string
+  verificationRunId: string | null
+  verificationRun: PublicVerificationRun | null
   submittedAt: string
   status: SubmissionStatus
   late: boolean
@@ -425,6 +427,7 @@ export function serializeSubmission(
     assignment?: WithId<AssignmentShape> | null
     intern?: { id: string; name: string; email: string } | null
     reviews?: Array<WithId<ReviewShape>>
+    verificationRun?: WithId<VerificationRunShape> | null
   }
 ): PublicSubmission {
   const deadline = extras?.deadline ?? extras?.assignment?.deadline ?? null
@@ -435,6 +438,10 @@ export function serializeSubmission(
     departmentId: submission.departmentId.toString(),
     submissionUrl: submission.submissionUrl,
     notes: submission.notes,
+    verificationRunId: idOf(submission.verificationRunId),
+    verificationRun: extras?.verificationRun
+      ? serializeVerificationRun(extras.verificationRun)
+      : null,
     submittedAt: submission.submittedAt.toISOString(),
     status: submission.status,
     late: Boolean(

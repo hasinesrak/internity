@@ -245,6 +245,17 @@ docker compose down        # stop (keep data)
 docker compose down -v     # stop and delete DB data
 ```
 
+### Optional Jenkins container
+
+Jenkins is available as a Compose profile and shares the project network with MongoDB:
+
+```powershell
+docker compose --profile jenkins up -d --build jenkins
+docker compose --profile jenkins logs jenkins
+```
+
+Open `http://localhost:8080`, finish the Jenkins setup, and create a Pipeline job that loads the repository's `Jenkinsfile`. The pipeline runs install, lint, typecheck, tests, build, and the critical dependency audit. Enable the `BUILD_IMAGES` parameter only when the Jenkins container can access `/var/run/docker.sock`; the Compose service mounts that socket for local Docker-based agents. Keep Jenkins disabled in normal development by omitting the `jenkins` profile.
+
 > Compose sets `STAFF_ALLOW_PRIVATE=true` so staff sign-in works from your machine through the Docker bridge. Never set `STAFF_ALLOW_PRIVATE` in production.
 
 ### Open the app from another computer on the same network
@@ -392,10 +403,10 @@ Root (`package.json`, Turborepo-orchestrated):
 
 Backend (`pnpm --filter backend <script>`): `dev` (watch), `build` → `dist/`, `start` (`node dist/index.js`), `seed`, `lint`, `typecheck`.
 
-CLI (`pnpm --filter @internity/cli <script>`): `build`, `dev`, `typecheck`, `lint`. After publishing, interns can run `npm install -g @internity/cli`, `internity login`, `internity run <assignment-id>` to practice locally, and `internity verify <assignment-id>` to submit completion from the project folder.
+CLI (`pnpm --filter @internity/cli <script>`): `build`, `dev`, `typecheck`, `lint`. After publishing, interns can run `npm install -g @internity/cli`, `internity login`, and `internity run <assignment-id>` to practice locally. `internity submit <assignment-id> --url <work-url>` sends the passing verification result and work link to staff for final review; `internity verify <assignment-id>` only uploads the verification result.
 
 The CLI has its own GitHub Actions workflow at `.github/workflows/cli.yml`.
-Pull requests and `master` changes run lint and build. Publishing is explicit:
+CLI pull requests and `master` changes run lint, typecheck, build, and package-content checks. Publishing is explicit:
 bump `packages/cli/package.json`,
 commit the change, create a matching `cli-v<version>` tag, and push the tag.
 The repository must have an `NPM_TOKEN` secret with permission to publish
@@ -450,7 +461,7 @@ The k3s deployment uses the VM IP directly. Open `http://192.168.0.103/` for the
 
 `infra/k8s/base/configmap.yaml` sets the VM IP for application links and CORS. If the VM IP changes, update its `APP_URL`, `STAFF_APP_URL`, `PUBLIC_CORS_ORIGIN`, and `STAFF_CORS_ORIGIN`. `STAFF_ALLOWED_IPS` accepts individual IPs and IPv4 CIDRs; the VM environment uses `192.168.0.0/24,127.0.0.1` so staff can sign in from this LAN. For a different office network, update the VM environment and rerun `bash infra/scripts/apply-cluster-env.sh`.
 
-Production path is GitOps. `.github/workflows/ci.yml` validates the repository, builds the three images, and publishes immutable `sha-<commit>` images to Docker Hub. It then opens a deployment pull request that updates `infra/k8s/overlays/production`; merging that pull request is the production promotion step, after which Argo CD (`infra/argocd/internity.yaml`) syncs the overlay into k3s. Separate Deployments run the intern site, the staff site, the public API, and the staff API. Both APIs are the same image with a different `API_SURFACE`. Staff access is enforced in the app from `STAFF_ALLOWED_IPS`, not by the ingress. On the VM, MongoDB is the `mongo` StatefulSet. Start it with the one-command flow in `docs/argocd-quickstart.md`.
+Production path is GitOps. `.github/workflows/ci.yml` runs lint, typecheck, the backend integration suite, the monorepo build, a critical dependency audit, and dependency review for pull requests. It then builds the three images and publishes immutable `sha-<commit>` images to Docker Hub. A deployment pull request updates `infra/k8s/overlays/production`; merging that pull request is the production promotion step, after which Argo CD (`infra/argocd/internity.yaml`) syncs the overlay into k3s. Use `.github/workflows/rollback.yml` from the Actions tab to propose a rollback to a previously published `sha-<commit>` image set. Separate Deployments run the intern site, the staff site, the public API, and the staff API. Both APIs are the same image with a different `API_SURFACE`. Staff access is enforced in the app from `STAFF_ALLOWED_IPS`, not by the ingress. On the VM, MongoDB is the `mongo` StatefulSet. Start it with the one-command flow in `docs/argocd-quickstart.md`.
 
 ---
 

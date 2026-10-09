@@ -184,9 +184,9 @@ function printHelp(): void {
 
 Commands:
   internity login [--email <email>] [--password <password>]
-  internity run [assignment-id] [--json]
-  internity submit [assignment-id] [--json]
-  internity verify [assignment-id] [--local] [--json]
+  internity run <assignment-id> [--json]
+  internity submit <assignment-id> --url <work-url> [--notes <text>] [--json]
+  internity verify <assignment-id> [--local] [--json]
   internity status
   internity logout
 
@@ -333,22 +333,42 @@ async function login(args: string[]): Promise<void> {
   console.log(`Logged in as ${result.user.email}.`)
 }
 
-async function verify(args: string[]): Promise<number> {
+async function verify(
+  args: string[],
+  allowWorkSubmission = false
+): Promise<number> {
   const config = await loadConfig()
   if (!config.token) throw new Error("Run `internity login` first.")
   const json = hasFlag(args, "--json")
   const localOnly = hasFlag(args, "--local")
-  let assignmentId = args.find((value) => !value.startsWith("-"))
+  const submissionUrl = allowWorkSubmission ? flag(args, "--url") : undefined
+  const submissionNotes = allowWorkSubmission
+    ? flag(args, "--notes")
+    : undefined
+  if (allowWorkSubmission && hasFlag(args, "--url") && !submissionUrl) {
+    throw new Error("Pass a value after `--url`.")
+  }
+  if (allowWorkSubmission && !submissionUrl) {
+    throw new Error(
+      "`submit` requires a work URL. Use `verify` when you only want to upload check results."
+    )
+  }
+  if (
+    !allowWorkSubmission &&
+    (hasFlag(args, "--url") || hasFlag(args, "--notes"))
+  ) {
+    throw new Error(
+      "Work URLs are accepted by `internity submit`, not `verify`."
+    )
+  }
+  if (localOnly && submissionUrl) {
+    throw new Error("A work URL can only be submitted with `internity submit`.")
+  }
+  const assignmentId = args.find((value) => !value.startsWith("-"))
   if (!assignmentId) {
-    const assignments = await request<{
-      data: Array<{ id: string; title: string; verification: Manifest | null }>
-    }>(config, "/api/intern/assignments")
-    const next = assignments.data.find((assignment) => assignment.verification)
-    if (!next)
-      throw new Error(
-        "No published assignment with CLI verification checks was found."
-      )
-    assignmentId = next.id
+    throw new Error(
+      "Pass the assignment id shown on the assignment page, for example `internity submit 65f...`."
+    )
   }
   const payload = await request<{
     assignment: { id: string; title: string }
@@ -384,9 +404,10 @@ async function verify(args: string[]): Promise<number> {
     (step) =>
       step.exitCode === 0 && step.assertions.every((item) => item.passed)
   )
-  let submitted: unknown = null
+  let submitted: { run: { id: string } } | null = null
+  let workSubmission: unknown = null
   if (!localOnly) {
-    submitted = await request(
+    submitted = await request<{ run: { id: string } }>(
       config,
       `/api/cli/assignments/${assignmentId}/verification-runs`,
       {
@@ -409,12 +430,36 @@ async function verify(args: string[]): Promise<number> {
         }),
       }
     )
+    if (submissionUrl && passed) {
+      if (!/^https?:\/\/\S+$/i.test(submissionUrl)) {
+        throw new Error("Use a work URL that starts with https://")
+      }
+      workSubmission = await request(
+        config,
+        `/api/intern/assignments/${assignmentId}/submission`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            submissionUrl,
+            notes: submissionNotes,
+            verificationRunId: submitted.run.id,
+          }),
+        }
+      )
+    }
   }
   if (json)
     console.log(
-      JSON.stringify({ assignmentId, passed, steps, submitted }, null, 2)
+      JSON.stringify(
+        { assignmentId, passed, steps, submitted, workSubmission },
+        null,
+        2
+      )
     )
-  else console.log(passed ? "Verification passed." : "Verification failed.")
+  else {
+    console.log(passed ? "Verification passed." : "Verification failed.")
+    if (workSubmission) console.log("Work submitted for staff review.")
+  }
   return passed ? 0 : 1
 }
 
@@ -446,7 +491,8 @@ async function main(): Promise<number> {
     await login(args)
     return 0
   }
-  if (command === "verify" || command === "submit") return verify(args)
+  if (command === "verify") return verify(args)
+  if (command === "submit") return verify(args, true)
   if (command === "run") return verify([...args, "--local"])
   if (command === "status") {
     await status()
