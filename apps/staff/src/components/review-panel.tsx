@@ -2,13 +2,14 @@
 // beside the rubric, a score on `@beui/adaptive-stepper`, feedback in a shadcn
 // textarea, and a stateful save. ⌘/Ctrl + Enter saves from anywhere here.
 import { useCallback, useEffect, useState } from "react"
-import {
-  CopyIcon,
-  LinkSimpleIcon,
-  SparkleIcon,
-} from "@phosphor-icons/react"
+import { CopyIcon, LinkSimpleIcon, SparkleIcon } from "@phosphor-icons/react"
 import { Field, FieldGroup, FieldLabel } from "@workspace/ui/components/field"
-import { AdaptiveStepper, AdaptiveStepperDecrement, AdaptiveStepperIncrement, AdaptiveStepperValue } from "@workspace/ui/components/motion/adaptive-stepper"
+import {
+  AdaptiveStepper,
+  AdaptiveStepperDecrement,
+  AdaptiveStepperIncrement,
+  AdaptiveStepperValue,
+} from "@workspace/ui/components/motion/adaptive-stepper"
 import { Button } from "@workspace/ui/components/motion/button/base"
 import { StatefulButton } from "@workspace/ui/components/motion/button/stateful"
 import { Textarea } from "@workspace/ui/components/textarea"
@@ -43,7 +44,7 @@ export function ReviewPanel({
 }: ReviewPanelProps) {
   const maxScore = assignment ? rubricMaxScore(assignment.rubric) : 0
   const [score, setScore] = useState(() =>
-    Math.min(submission.score ?? Math.round(maxScore * 0.75), maxScore),
+    Math.min(submission.score ?? Math.round(maxScore * 0.75), maxScore)
   )
   const [feedback, setFeedback] = useState(submission.feedback)
   const [error, setError] = useState<string | undefined>(undefined)
@@ -64,42 +65,47 @@ export function ReviewPanel({
       setAiError(
         cause instanceof Error
           ? cause.message
-          : "The automated review could not be completed.",
+          : "The automated review could not be completed."
       )
     } finally {
       setAiBusy(false)
     }
   }, [maxScore, submission.id])
 
-  const submit = useCallback(async (status: ReviewInput["status"]) => {
-    const trimmed = feedback.trim()
-    if (!trimmed) {
-      setError("Enter feedback for the intern.")
-      setSaving("error")
-      return
-    }
-    setSaving(status === "reviewed" ? "saving" : "changes")
-    setError(undefined)
-    try {
-      const updated = await reviewSubmission(submission.id, {
-        score,
-        feedback: trimmed,
-        status,
-      })
-      setSaving("idle")
-      onSaved(updated)
-      toast.success(
-        status === "reviewed"
-          ? `Review saved for ${updated.assignment?.title ?? "the submission"}`
-          : `Changes requested on ${updated.assignment?.title ?? "the submission"}`,
-      )
-    } catch (cause) {
-      setSaving("error")
-      setError(
-        cause instanceof Error ? cause.message : "The review could not be saved.",
-      )
-    }
-  }, [feedback, onSaved, score, submission.id])
+  const submit = useCallback(
+    async (status: ReviewInput["status"]) => {
+      const trimmed = feedback.trim()
+      if (!trimmed) {
+        setError("Enter feedback for the intern.")
+        setSaving("error")
+        return
+      }
+      setSaving(status === "reviewed" ? "saving" : "changes")
+      setError(undefined)
+      try {
+        const updated = await reviewSubmission(submission.id, {
+          score,
+          feedback: trimmed,
+          status,
+        })
+        setSaving("idle")
+        onSaved(updated)
+        toast.success(
+          status === "reviewed"
+            ? `Review saved for ${updated.assignment?.title ?? "the submission"}`
+            : `Changes requested on ${updated.assignment?.title ?? "the submission"}`
+        )
+      } catch (cause) {
+        setSaving("error")
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "The review could not be saved."
+        )
+      }
+    },
+    [feedback, onSaved, score, submission.id]
+  )
 
   // Keyboard-first review: the shortcut saves with a grade.
   useEffect(() => {
@@ -132,9 +138,13 @@ export function ReviewPanel({
           href={submission.submissionUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-sm font-medium text-primary outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2 text-sm font-medium text-primary transition-colors outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <LinkSimpleIcon weight="duotone" className="size-4 shrink-0" aria-hidden="true" />
+          <LinkSimpleIcon
+            weight="duotone"
+            className="size-4 shrink-0"
+            aria-hidden="true"
+          />
           <span className="truncate">{submission.submissionUrl}</span>
         </a>
         <Button
@@ -142,7 +152,7 @@ export function ReviewPanel({
           size="sm"
           onClick={() => {
             void copyText(submission.submissionUrl).then((ok) =>
-              toast.info(ok ? "Link copied" : "Could not copy the link"),
+              toast.info(ok ? "Link copied" : "Could not copy the link")
             )
           }}
         >
@@ -161,7 +171,8 @@ export function ReviewPanel({
         <div className="flex items-baseline justify-between gap-4">
           <span className="text-xs text-muted-foreground">Submitted</span>
           <span className="min-w-0 truncate text-sm tabular-nums">
-            {formatDate(submission.submittedAt)} · {relativeTime(submission.submittedAt)}
+            {formatDate(submission.submittedAt)} ·{" "}
+            {relativeTime(submission.submittedAt)}
           </span>
         </div>
       </div>
@@ -182,12 +193,61 @@ export function ReviewPanel({
         </div>
       ) : null}
 
+      {submission.verificationRun ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-muted/30 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium">CLI verification</span>
+            <StatusChip
+              tone={
+                submission.verificationRun.status === "passed"
+                  ? "positive"
+                  : "attention"
+              }
+              label={
+                submission.verificationRun.status === "passed"
+                  ? "Passed"
+                  : submission.verificationRun.status === "failed"
+                    ? "Failed"
+                    : "Error"
+              }
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Manifest v{submission.verificationRun.manifestVersion} ·{" "}
+            {submission.verificationRun.platform} · CLI{" "}
+            {submission.verificationRun.cliVersion}
+          </p>
+          <div className="flex flex-col gap-2">
+            {submission.verificationRun.steps.map((step) => (
+              <details
+                key={step.id}
+                className="rounded-lg border border-border/60 p-2"
+              >
+                <summary className="cursor-pointer text-xs font-medium">
+                  {step.id} ·{" "}
+                  {step.exitCode === 0 &&
+                  step.assertions.every((item) => item.passed)
+                    ? "passed"
+                    : "failed"}
+                </summary>
+                {step.stderr || step.stdout ? (
+                  <pre className="mt-2 max-h-40 overflow-auto text-xs whitespace-pre-wrap text-muted-foreground">
+                    {[step.stdout, step.stderr].filter(Boolean).join("\n")}
+                  </pre>
+                ) : null}
+              </details>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-muted/30 p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-sm font-medium">Automated assignment review</p>
             <p className="text-xs text-muted-foreground">
-              Railway checks the repository in a disposable sandbox and drafts feedback.
+              Railway checks the repository in a disposable sandbox and drafts
+              feedback.
             </p>
           </div>
           <Button
@@ -210,7 +270,11 @@ export function ReviewPanel({
               </p>
             ) : null}
             <p className="text-muted-foreground">
-              Inspected {aiDraft.filesInspected.length} file(s) · recommendation: {aiDraft.recommendation === "reviewed" ? "ready to review" : "needs changes"}
+              Inspected {aiDraft.filesInspected.length} file(s) ·
+              recommendation:{" "}
+              {aiDraft.recommendation === "reviewed"
+                ? "ready to review"
+                : "needs changes"}
             </p>
           </div>
         ) : null}
@@ -255,7 +319,13 @@ export function ReviewPanel({
 
         <div className="flex flex-wrap items-center gap-2">
           <StatefulButton
-            state={saving === "saving" ? "loading" : saving === "error" ? "error" : "idle"}
+            state={
+              saving === "saving"
+                ? "loading"
+                : saving === "error"
+                  ? "error"
+                  : "idle"
+            }
             loadingText="Saving"
             successText="Saved"
             errorText="Try again"

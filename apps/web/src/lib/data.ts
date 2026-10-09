@@ -219,7 +219,11 @@ export function getLatestVerificationRun(
 
 export function submitAssignment(
   id: string,
-  input: { submissionUrl: string; notes?: string }
+  input: {
+    submissionUrl: string
+    notes?: string
+    verificationRunId?: string
+  }
 ): Promise<PublicSubmission> {
   return request<{ submission: PublicSubmission }>(
     `/api/intern/assignments/${id}/submission`,

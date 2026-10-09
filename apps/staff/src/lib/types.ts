@@ -246,6 +246,8 @@ export interface PublicSubmission {
   departmentId: string
   submissionUrl: string
   notes: string
+  verificationRunId: string | null
+  verificationRun: PublicVerificationRun | null
   submittedAt: string
   status: SubmissionStatus
   late: boolean

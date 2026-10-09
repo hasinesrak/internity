@@ -83,8 +83,8 @@ export function VerificationEditor({
           <h3 className="text-sm font-medium">CLI verification</h3>
           <p className="text-xs leading-5 text-muted-foreground">
             Enable for assignments with setup or coding checks. Interns can
-            practice locally, then submit their results. Staff see who passed
-            and who needs help.
+            practice locally, then submit the work and passing result together.
+            Staff still review and grade the submission.
           </p>
         </div>
         <Switch

@@ -274,6 +274,14 @@ function AssignmentDetail({
                       <code>internity submit {assignment.id}</code>
                     </li>
                   </ol>
+                  <p className="text-xs text-muted-foreground">
+                    You can also send the work link and passing checks together
+                    with{" "}
+                    <code>
+                      internity submit {assignment.id} --url https://...
+                    </code>
+                    .
+                  </p>
                   <StatusChip
                     tone={
                       verification?.status === "passed"
@@ -297,6 +305,7 @@ function AssignmentDetail({
                       {assignment.verification.instructions}
                     </p>
                   ) : null}
+                  <VerificationRunDetails run={verification} />
                   <p className="text-xs text-muted-foreground">
                     Install the CLI with <code>npm i -g @internity/cli</code>,
                     then sign in once.
@@ -304,7 +313,11 @@ function AssignmentDetail({
                 </CardContent>
               </Card>
             ) : null}
-            <SubmissionPanel row={row} onSubmitted={onSubmitted} />
+            <SubmissionPanel
+              row={row}
+              verification={verification}
+              onSubmitted={onSubmitted}
+            />
           </div>
         </div>
       </Reveal>
@@ -314,9 +327,11 @@ function AssignmentDetail({
 
 function SubmissionPanel({
   row,
+  verification,
   onSubmitted,
 }: {
   row: AssignmentRow
+  verification: PublicVerificationRun | null
   onSubmitted: () => void
 }) {
   const { assignment, submission } = row
@@ -365,6 +380,7 @@ function SubmissionPanel({
       await submitAssignment(assignment.id, {
         submissionUrl: url.trim(),
         notes: notes.trim(),
+        ...(verification ? { verificationRunId: verification.id } : {}),
       })
       setState("success")
       toast.success(`Submission saved for ${assignment.title}`)
@@ -427,6 +443,17 @@ function SubmissionPanel({
               </Alert>
             ) : null}
 
+            {assignment.verification && verification?.status !== "passed" ? (
+              <Alert>
+                <WarningCircleIcon data-icon aria-hidden="true" />
+                <AlertTitle>Pass the CLI checks first</AlertTitle>
+                <AlertDescription>
+                  Run the current checks successfully, then submit the work and
+                  its verification result together for staff review.
+                </AlertDescription>
+              </Alert>
+            ) : null}
+
             <Field data-invalid={fieldErrors.url ? true : undefined}>
               <FieldLabel htmlFor="submission-url">Submission URL</FieldLabel>
               <Input
@@ -469,6 +496,9 @@ function SubmissionPanel({
 
             <StatefulButton
               state={state}
+              disabled={Boolean(
+                assignment.verification && verification?.status !== "passed"
+              )}
               loadingText="Saving"
               successText="Submitted"
               errorText="Try again"
@@ -494,5 +524,57 @@ function SubmissionPanel({
         </p>
       </CardContent>
     </Card>
+  )
+}
+
+function VerificationRunDetails({
+  run,
+}: {
+  run: PublicVerificationRun | null
+}) {
+  if (!run) return null
+  return (
+    <details className="rounded-xl border border-border/70 bg-muted/30 p-3">
+      <summary className="cursor-pointer text-sm font-medium">
+        View the latest check results
+      </summary>
+      <div className="mt-3 flex flex-col gap-3">
+        {run.steps.map((step) => (
+          <div key={step.id} className="rounded-lg border border-border/60 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-medium">{step.id}</span>
+              <StatusChip
+                tone={
+                  step.exitCode === 0 &&
+                  step.assertions.every((item) => item.passed)
+                    ? "positive"
+                    : "attention"
+                }
+                label={
+                  step.exitCode === 0 &&
+                  step.assertions.every((item) => item.passed)
+                    ? "Passed"
+                    : "Failed"
+                }
+              />
+            </div>
+            {step.stderr ? (
+              <pre className="mt-2 max-h-40 overflow-auto text-xs whitespace-pre-wrap text-destructive">
+                {step.stderr}
+              </pre>
+            ) : null}
+            {step.stdout ? (
+              <pre className="mt-2 max-h-40 overflow-auto text-xs whitespace-pre-wrap text-muted-foreground">
+                {step.stdout}
+              </pre>
+            ) : null}
+          </div>
+        ))}
+        <p className="text-xs text-muted-foreground">
+          CLI {run.cliVersion} · {run.platform} · completed{" "}
+          {formatDateLong(run.completedAt)}
+        </p>
+      </div>
+    </details>
   )
 }
