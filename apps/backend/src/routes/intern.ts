@@ -15,7 +15,7 @@ import {
 } from "../services/submission.service.js"
 import { parseBody, parseQuery, readJson, requireId } from "../lib/http.js"
 import { COPILOT_JSON_MAX_BYTES } from "../lib/copilot-files.js"
-import { enforceLimit, takeAiCopilot } from "../lib/rate-limit.js"
+import { enforceLimitShared, takeAiCopilotShared } from "../lib/rate-limit.js"
 import {
   classListSchema,
   internCopilotSchema,
@@ -29,7 +29,7 @@ internRoutes.use("*", requireAuth, requireRoles("intern"))
 
 internRoutes.post("/ai/copilot", async (c) => {
   const user = c.get("user")
-  enforceLimit(takeAiCopilot(user.id), "copilot messages")
+  await enforceLimitShared(takeAiCopilotShared(user.id), "copilot messages")
   const body = parseBody(
     internCopilotSchema,
     await readJson(c, COPILOT_JSON_MAX_BYTES)

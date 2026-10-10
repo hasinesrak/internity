@@ -3,6 +3,10 @@ kind: Service
 metadata:
   name: mongo
 spec:
+  # Headless DNS gives the driver stable mongo-0.mongo and mongo-1.mongo
+  # addresses for replica-set discovery.
+  clusterIP: None
+  publishNotReadyAddresses: true
   selector:
     app: mongo
   ports:

@@ -9,6 +9,7 @@ export type AppEnvConfig = {
   host: string
   port: number
   mongodbUri: string
+  redisUrl: string
   corsOrigins: string[]
   appUrl: string
   staffAppUrl: string
@@ -119,6 +120,8 @@ export function getEnv(): AppEnvConfig {
   )
   if (!mongodbUri) throw new Error("MONGODB_URI is required")
 
+  const redisUrl = optional("REDIS_URL")
+
   const corsOrigins = optional("CORS_ORIGIN", "http://localhost:3000")
     .split(",")
     .map((origin) => origin.trim())
@@ -203,6 +206,7 @@ export function getEnv(): AppEnvConfig {
     host,
     port,
     mongodbUri,
+    redisUrl,
     corsOrigins,
     appUrl,
     staffAppUrl,

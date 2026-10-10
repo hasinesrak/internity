@@ -22,15 +22,15 @@ import { presentUser } from "../services/user.service.js"
 import { parseBody, parseQuery, readJson } from "../lib/http.js"
 import { AppError, forbidden, tooManyAttempts } from "../lib/errors.js"
 import {
-  checkLoginAttempts,
-  checkPasswordChange,
-  enforceLimit,
-  recordLoginFailure,
-  recordLoginSuccess,
-  recordPasswordChangeFailure,
-  recordPasswordChangeSuccess,
-  takeInvitationAttempt,
-  takePasswordResetAttempt,
+  checkLoginAttemptsShared,
+  checkPasswordChangeShared,
+  enforceLimitShared,
+  recordLoginFailureShared,
+  recordLoginSuccessShared,
+  recordPasswordChangeFailureShared,
+  recordPasswordChangeSuccessShared,
+  takeInvitationAttemptShared,
+  takePasswordResetAttemptShared,
 } from "../lib/rate-limit.js"
 import {
   activateSchema,
@@ -57,7 +57,7 @@ function throttleMessage(
 authRoutes.post("/login", async (c) => {
   const body = parseBody(loginSchema, await readJson(c))
   const ip = clientIp(c)
-  const throttle = checkLoginAttempts(ip, body.email)
+  const throttle = await checkLoginAttemptsShared(ip, body.email)
   if (!throttle.allowed) {
     throw tooManyAttempts(
       throttleMessage(throttle.scope, throttle.retryAfterSeconds),
@@ -66,14 +66,14 @@ authRoutes.post("/login", async (c) => {
   }
   try {
     const result = await login(body.email, body.password, networkAllowsStaff(c))
-    recordLoginSuccess(body.email)
+    await recordLoginSuccessShared(body.email)
     setSessionCookie(c, result.token)
     return c.json({ user: result.user })
   } catch (error) {
     // Only wrong credentials count toward the window. Access and network
     // denials are not guessing and must not lock a real person out.
     if (error instanceof AppError && error.code === "INVALID_CREDENTIALS") {
-      recordLoginFailure(ip, body.email)
+      await recordLoginFailureShared(ip, body.email)
     }
     throw error
   }
@@ -84,7 +84,7 @@ authRoutes.post("/login", async (c) => {
 authRoutes.post("/cli-login", async (c) => {
   const body = parseBody(loginSchema, await readJson(c))
   const ip = clientIp(c)
-  const throttle = checkLoginAttempts(ip, body.email)
+  const throttle = await checkLoginAttemptsShared(ip, body.email)
   if (!throttle.allowed) {
     throw tooManyAttempts(
       throttleMessage(throttle.scope, throttle.retryAfterSeconds),
@@ -95,11 +95,11 @@ authRoutes.post("/cli-login", async (c) => {
     const result = await login(body.email, body.password, networkAllowsStaff(c))
     if (result.user.role !== "intern")
       throw forbidden("Only intern accounts can use the CLI.")
-    recordLoginSuccess(body.email)
+    await recordLoginSuccessShared(body.email)
     return c.json({ token: result.token, user: result.user })
   } catch (error) {
     if (error instanceof AppError && error.code === "INVALID_CREDENTIALS") {
-      recordLoginFailure(ip, body.email)
+      await recordLoginFailureShared(ip, body.email)
     }
     throw error
   }
@@ -121,19 +121,22 @@ authRoutes.get("/me", requireAuth, async (c) => {
 authRoutes.post("/change-password", requireAuth, async (c) => {
   const body = parseBody(changePasswordSchema, await readJson(c))
   const userId = c.get("user").id
-  enforceLimit(checkPasswordChange(userId), "attempts to change this password")
+  await enforceLimitShared(
+    checkPasswordChangeShared(userId),
+    "attempts to change this password"
+  )
   try {
     const result = await changePassword(
       c.get("user"),
       body.currentPassword,
       body.newPassword
     )
-    recordPasswordChangeSuccess(userId)
+    await recordPasswordChangeSuccessShared(userId)
     setSessionCookie(c, result.token)
     return c.json({ user: result.user })
   } catch (error) {
     if (error instanceof AppError && error.code === "INVALID_CREDENTIALS") {
-      recordPasswordChangeFailure(userId)
+      await recordPasswordChangeFailureShared(userId)
     }
     throw error
   }
@@ -141,13 +144,19 @@ authRoutes.post("/change-password", requireAuth, async (c) => {
 
 authRoutes.get("/invitation", async (c) => {
   const query = parseQuery(tokenQuerySchema, c.req.query())
-  enforceLimit(takeInvitationAttempt(clientIp(c)), "invitation attempts")
+  await enforceLimitShared(
+    takeInvitationAttemptShared(clientIp(c)),
+    "invitation attempts"
+  )
   return c.json({ invitation: await previewInvitation(query.token) })
 })
 
 authRoutes.post("/activate", async (c) => {
   const body = parseBody(activateSchema, await readJson(c))
-  enforceLimit(takeInvitationAttempt(clientIp(c)), "invitation attempts")
+  await enforceLimitShared(
+    takeInvitationAttemptShared(clientIp(c)),
+    "invitation attempts"
+  )
   const result = await acceptInvitation(body.token, body, networkAllowsStaff(c))
   setSessionCookie(c, result.token)
   return c.json({ user: result.user })
@@ -155,7 +164,10 @@ authRoutes.post("/activate", async (c) => {
 
 authRoutes.post("/reset-password", async (c) => {
   const body = parseBody(resetSchema, await readJson(c))
-  enforceLimit(takePasswordResetAttempt(clientIp(c)), "password reset attempts")
+  await enforceLimitShared(
+    takePasswordResetAttemptShared(clientIp(c)),
+    "password reset attempts"
+  )
   const result = await completePasswordReset(body.token, body.password)
   setSessionCookie(c, result.token)
   return c.json({ user: result.user })

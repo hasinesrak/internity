@@ -4,9 +4,12 @@ namespace: internity
 resources:
   - namespace.yaml
   - configmap.yaml
+  - redis-service.yaml
+  - redis-deployment.yaml
   - uploads-pvc.yaml
   - mongo-service.yaml
   - mongo-statefulset.yaml
+  - mongo-init-job.yaml
   - backend-public-service.yaml
   - backend-public-deployment.yaml
   - backend-staff-service.yaml
@@ -15,4 +18,5 @@ resources:
   - web-deployment.yaml
   - staff-service.yaml
   - staff-deployment.yaml
+  - hpa.yaml
   - ingress.yaml

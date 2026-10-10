@@ -76,10 +76,24 @@ if [[ -n ${env[ADMIN_PASSWORD]:-} ]]; then
   fi
 fi
 
-# Compose uses localhost. Pods reach Mongo through the mongo Service.
+# Compose uses localhost. Pods use the Mongo StatefulSet's stable DNS names.
 mongo_uri=${env[MONGODB_URI]:-mongodb://mongo:27017/internity}
 mongo_uri=${mongo_uri//:\/\/127.0.0.1/:\/\/mongo}
 mongo_uri=${mongo_uri//:\/\/localhost/:\/\/mongo}
+# The in-cluster MongoDB StatefulSet is a replica set with stable pod DNS.
+# Keep externally managed MongoDB URIs untouched.
+if [[ "$mongo_uri" == mongodb://mongo:27017 || "$mongo_uri" == mongodb://mongo:27017/* ]]; then
+  mongo_path=${mongo_uri#mongodb://mongo:27017}
+  [[ -n "$mongo_path" ]] || mongo_path=/internity
+  mongo_uri="mongodb://mongo-0.mongo:27017,mongo-1.mongo:27017${mongo_path}"
+  if [[ "$mongo_path" != *replicaSet=* ]]; then
+    if [[ "$mongo_path" == *\?* ]]; then
+      mongo_uri+="&replicaSet=rs0"
+    else
+      mongo_uri+="?replicaSet=rs0"
+    fi
+  fi
+fi
 
 tmp=$(mktemp)
 ns=$(mktemp)

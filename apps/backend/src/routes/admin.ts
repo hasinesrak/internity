@@ -29,7 +29,10 @@ import {
 } from "../services/user.service.js"
 import { validation } from "../lib/errors.js"
 import { parseBody, parseQuery, readJson, requireId } from "../lib/http.js"
-import { enforceLimit, takePasswordResetEmail } from "../lib/rate-limit.js"
+import {
+  enforceLimitShared,
+  takePasswordResetEmailShared,
+} from "../lib/rate-limit.js"
 import {
   activityListSchema,
   assignUserSchema,
@@ -113,7 +116,10 @@ adminRoutes.post("/users/:id/revoke", async (c) => {
 
 adminRoutes.post("/users/:id/reset-password", async (c) => {
   const id = requireId(c)
-  enforceLimit(takePasswordResetEmail(c.get("user").id), "password resets")
+  await enforceLimitShared(
+    takePasswordResetEmailShared(c.get("user").id),
+    "password resets"
+  )
   const body = parseBody(directResetSchema, await readJson(c))
   const result = await requestPasswordReset(c.get("user"), id, body.password)
   return c.json(result)

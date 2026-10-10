@@ -7,6 +7,7 @@ import { connectDb, databaseTarget } from "./db/connect.js"
 import { hashPassword } from "./lib/password.js"
 import { passwordSchema } from "./validators.js"
 import { User } from "./models/user.js"
+import { closeSharedRateLimitStore } from "./lib/rate-limit.js"
 
 async function ensureBootstrapAdmin(): Promise<void> {
   const env = getEnv()
@@ -61,6 +62,7 @@ async function main(): Promise<void> {
       host: env.host,
       surface: env.apiSurface,
       officeAddresses: env.staffAllowedIps.length,
+      redisRateLimits: env.redisUrl ? "on" : "off",
       email: env.resendApiKey ? "on" : "off",
       aiGateway: env.aiGatewayApiKey ? "on" : "off",
     })
@@ -69,6 +71,7 @@ async function main(): Promise<void> {
   const shutdown = async () => {
     server.close()
     await mongoose.disconnect()
+    await closeSharedRateLimitStore()
     process.exit(0)
   }
   process.on("SIGINT", () => {

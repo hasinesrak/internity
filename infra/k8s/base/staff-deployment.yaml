@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: staff
 spec:
-  replicas: 1
+  replicas: 2
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -64,7 +64,8 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["node", "-e", "setTimeout(() => process.exit(0), 5000)"]
+                command:
+                  ["node", "-e", "setTimeout(() => process.exit(0), 5000)"]
           startupProbe:
             httpGet:
               path: /health

@@ -4,7 +4,9 @@ metadata:
   name: mongo
 spec:
   serviceName: mongo
-  replicas: 1
+  # Two members provide a second copy. Three voting members are needed to
+  # remain writable after losing one member.
+  replicas: 2
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -16,6 +18,15 @@ spec:
     spec:
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: mongo
+                topologyKey: kubernetes.io/hostname
       securityContext:
         runAsNonRoot: true
         runAsUser: 999
@@ -31,6 +42,9 @@ spec:
           args:
             - "--wiredTigerCacheSizeGB"
             - "0.25"
+            - "--replSet"
+            - "rs0"
+            - "--bind_ip_all"
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
@@ -49,8 +63,8 @@ spec:
               mountPath: /data/db
             - name: configdb
               mountPath: /data/configdb
-          # mongosh inside the probe is killed on this small VM. TCP is enough
-          # for readiness; the API /health/ready check covers the database.
+          # TCP keeps probes cheap on the small lab VM. The API readiness
+          # endpoint checks the replica-set connection before serving traffic.
           startupProbe:
             tcpSocket:
               port: mongo

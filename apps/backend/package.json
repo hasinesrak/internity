@@ -10,7 +10,7 @@
     "lint": "eslint src",
     "format": "prettier --write \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --import ./src/test/env.ts --test src/lib/client-ip.test.ts src/lib/rate-limit.test.ts src/app.test.ts",
+    "test": "tsx --import ./src/test/env.ts --test src/lib/client-ip.test.ts src/lib/rate-limit.test.ts src/lib/redis-rate-limit.test.ts src/app.test.ts",
     "seed": "tsx src/scripts/seed.ts"
   },
   "dependencies": {
@@ -18,6 +18,7 @@
     "ai": "^7.0.101",
     "bcryptjs": "^2.4.3",
     "hono": "^4.13.8",
+    "ioredis": "^5.11.1",
     "jose": "^5.10.0",
     "mongoose": "^8.24.4",
     "zod": "^4.4.3"

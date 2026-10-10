@@ -46,10 +46,10 @@ import {
   requireId,
 } from "../lib/http.js"
 import {
-  enforceLimit,
-  takeAiDraft,
-  takeAiReview,
-  takeUpload,
+  enforceLimitShared,
+  takeAiDraftShared,
+  takeAiReviewShared,
+  takeUploadShared,
 } from "../lib/rate-limit.js"
 import { downloadHeaders } from "../lib/uploads.js"
 import {
@@ -195,7 +195,7 @@ instructorRoutes.post("/submissions/:id/review", async (c) => {
 // ---------------------------------------------------------------------------
 
 instructorRoutes.post("/uploads", async (c) => {
-  enforceLimit(takeUpload(c.get("user").id), "uploads")
+  await enforceLimitShared(takeUploadShared(c.get("user").id), "uploads")
   const file = await readUploadedFormFile(c)
   const bytes = new Uint8Array(await file.arrayBuffer())
   const attachment = await createUpload(c.get("user"), {
@@ -222,7 +222,7 @@ instructorRoutes.delete("/uploads/:id", async (c) => {
 
 instructorRoutes.post("/ai/assignment-draft", async (c) => {
   const body = parseBody(assignmentDraftSchema, await readJson(c))
-  enforceLimit(takeAiDraft(c.get("user").id), "drafts")
+  await enforceLimitShared(takeAiDraftShared(c.get("user").id), "drafts")
   return c.json({
     draft: await draftAssignment(
       c.get("user"),
@@ -234,13 +234,13 @@ instructorRoutes.post("/ai/assignment-draft", async (c) => {
 
 instructorRoutes.post("/ai/verification-draft", async (c) => {
   const body = parseBody(verificationDraftSchema, await readJson(c))
-  enforceLimit(takeAiDraft(c.get("user").id), "drafts")
+  await enforceLimitShared(takeAiDraftShared(c.get("user").id), "drafts")
   return c.json({ draft: await draftVerification(c.get("user"), body) })
 })
 
 instructorRoutes.post("/ai/class-agenda-draft", async (c) => {
   const body = parseBody(classAgendaDraftSchema, await readJson(c))
-  enforceLimit(takeAiDraft(c.get("user").id), "drafts")
+  await enforceLimitShared(takeAiDraftShared(c.get("user").id), "drafts")
   return c.json({ draft: await draftClassAgenda(c.get("user"), body) })
 })
 
@@ -248,7 +248,7 @@ instructorRoutes.post("/ai/class-agenda-draft", async (c) => {
 // existing human review endpoint, so an AI result can never silently grade an
 // intern's work.
 instructorRoutes.post("/submissions/:id/ai-review", async (c) => {
-  enforceLimit(takeAiReview(c.get("user").id), "reviews")
+  await enforceLimitShared(takeAiReviewShared(c.get("user").id), "reviews")
   return c.json({
     review: await automatedAssignmentReview(c.get("user"), requireId(c)),
   })

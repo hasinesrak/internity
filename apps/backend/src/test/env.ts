@@ -1,3 +1,9 @@
+import { after } from "node:test"
+
+import { closeSharedRateLimitStore } from "../lib/rate-limit.js"
+
+after(() => closeSharedRateLimitStore())
+
 const forced: Record<string, string> = {
   NODE_ENV: "test",
   JWT_SECRET: "test-secret-please-change-32chars",

@@ -3,10 +3,13 @@ kind: Deployment
 metadata:
   name: backend-public
 spec:
-  replicas: 1
+  replicas: 2
   revisionHistoryLimit: 3
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: backend-public
@@ -17,6 +20,19 @@ spec:
     spec:
       automountServiceAccountToken: false
       terminationGracePeriodSeconds: 25
+      # Uploads are backed by a local ReadWriteOnce PVC. Keep the two API
+      # surfaces together until shared storage is introduced.
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - backend-public
+                      - backend-staff
+              topologyKey: kubernetes.io/hostname
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -91,6 +107,11 @@ spec:
                 configMapKeyRef:
                   name: internity-config
                   key: TRUST_PROXY
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: internity-config
+                  key: REDIS_URL
             - name: RESEND_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -138,7 +159,8 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["node", "-e", "setTimeout(() => process.exit(0), 5000)"]
+                command:
+                  ["node", "-e", "setTimeout(() => process.exit(0), 5000)"]
           startupProbe:
             httpGet:
               path: /health

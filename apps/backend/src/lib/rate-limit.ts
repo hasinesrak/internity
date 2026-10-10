@@ -1,12 +1,13 @@
-// Sliding windows for routes that are easy to abuse. Counts stay in memory
-// on this process. Each API deployment runs one replica, so these numbers
-// are the limits a caller actually hits.
+// Sliding windows for routes that are easy to abuse. Redis is used when
+// REDIS_URL is configured so independently scaled API replicas share these
+// counters; the in-memory windows remain the development and outage fallback.
 //
 // Sign-in counts failures per account and per address. A correct password
 // clears that account. The address count stays, so one good sign-in on a
 // shared network does not lift the brake for everyone else on it.
 
 import { tooManyAttempts } from "./errors.js"
+import { RedisRateLimitStore } from "./redis-rate-limit.js"
 
 const WINDOW_MS = 15 * 60_000
 const HOUR_MS = 60 * 60_000
@@ -114,6 +115,43 @@ const aiCopilotWindow = new FailureWindow(AI_COPILOT_MAX, HOUR_MS)
 const mailWindow = new FailureWindow(MAIL_MAX_SENDS, HOUR_MS)
 const resetEmailWindow = new FailureWindow(RESET_EMAIL_MAX, HOUR_MS)
 const uploadWindow = new FailureWindow(UPLOAD_MAX_FILES, UPLOAD_WINDOW_MS)
+
+let sharedStore: RedisRateLimitStore | null | undefined
+let warnedAboutRedis = false
+let retryRedisAfter = 0
+
+function getSharedStore(): RedisRateLimitStore | null {
+  if (sharedStore !== undefined) return sharedStore
+  const url = process.env.REDIS_URL?.trim()
+  sharedStore = url ? new RedisRateLimitStore(url) : null
+  return sharedStore
+}
+
+async function withSharedStore<T>(
+  fallback: () => T,
+  operation: (store: RedisRateLimitStore) => Promise<T>
+): Promise<T> {
+  if (Date.now() < retryRedisAfter) return fallback()
+  const store = getSharedStore()
+  if (!store) return fallback()
+  try {
+    return await operation(store)
+  } catch (error) {
+    // Rate limiting must not take the whole API offline if Redis is restarting.
+    // Keep a local brake and avoid opening a connection on every request.
+    if (sharedStore === store) sharedStore = undefined
+    retryRedisAfter = Date.now() + 10_000
+    await store.close()
+    if (!warnedAboutRedis) {
+      warnedAboutRedis = true
+      console.warn(
+        "Redis rate-limit storage is unavailable; using process-local limits.",
+        error instanceof Error ? error.message : error
+      )
+    }
+    return fallback()
+  }
+}
 
 const windows = [
   accountWindow,
@@ -248,4 +286,187 @@ export function takePasswordResetEmail(
 
 export function takeUpload(userId: string, now = Date.now()): LimitDecision {
   return take(uploadWindow, userId, now)
+}
+
+/** Async variants use Redis when REDIS_URL is configured and retain the local
+ * implementation as a safe fallback for development and Redis outages. */
+export async function checkLoginAttemptsShared(
+  ip: string,
+  email: string
+): Promise<ThrottleDecision> {
+  return withSharedStore(
+    () => checkLoginAttempts(ip, email),
+    async (store) => {
+      const [address, account] = await Promise.all([
+        store.check("login-address", ip, ADDRESS_MAX_FAILURES, WINDOW_MS),
+        store.check(
+          "login-account",
+          accountKey(email),
+          ACCOUNT_MAX_FAILURES,
+          WINDOW_MS
+        ),
+      ])
+      if (!address.allowed) {
+        return {
+          allowed: false,
+          scope: "address",
+          retryAfterSeconds: address.retryAfterSeconds,
+        }
+      }
+      if (!account.allowed) {
+        return {
+          allowed: false,
+          scope: "account",
+          retryAfterSeconds: account.retryAfterSeconds,
+        }
+      }
+      return { allowed: true }
+    }
+  )
+}
+
+export async function recordLoginFailureShared(
+  ip: string,
+  email: string
+): Promise<void> {
+  await withSharedStore(
+    () => {
+      recordLoginFailure(ip, email)
+    },
+    async (store) => {
+      await Promise.all([
+        store.record("login-address", ip, WINDOW_MS),
+        store.record("login-account", accountKey(email), WINDOW_MS),
+      ])
+    }
+  )
+}
+
+export async function recordLoginSuccessShared(email: string): Promise<void> {
+  await withSharedStore(
+    () => {
+      recordLoginSuccess(email)
+    },
+    (store) => store.clear("login-account", accountKey(email))
+  )
+}
+
+export async function checkPasswordChangeShared(
+  userId: string
+): Promise<LimitDecision> {
+  return withSharedStore(
+    () => checkPasswordChange(userId),
+    async (store) =>
+      store.check(
+        "password-change",
+        userId,
+        PASSWORD_CHANGE_MAX_FAILURES,
+        WINDOW_MS
+      )
+  )
+}
+
+export async function recordPasswordChangeFailureShared(
+  userId: string
+): Promise<void> {
+  await withSharedStore(
+    () => {
+      recordPasswordChangeFailure(userId)
+    },
+    (store) => store.record("password-change", userId, WINDOW_MS)
+  )
+}
+
+export async function recordPasswordChangeSuccessShared(
+  userId: string
+): Promise<void> {
+  await withSharedStore(
+    () => {
+      recordPasswordChangeSuccess(userId)
+    },
+    (store) => store.clear("password-change", userId)
+  )
+}
+
+async function takeShared(
+  scope: string,
+  key: string,
+  max: number,
+  windowMs: number,
+  fallback: () => LimitDecision
+): Promise<LimitDecision> {
+  return withSharedStore(fallback, (store) =>
+    store.take(scope, key, max, windowMs)
+  )
+}
+
+export function takeInvitationAttemptShared(
+  ip: string
+): Promise<LimitDecision> {
+  return takeShared("invitation", ip, INVITATION_MAX_ATTEMPTS, WINDOW_MS, () =>
+    takeInvitationAttempt(ip)
+  )
+}
+
+export function takePasswordResetAttemptShared(
+  ip: string
+): Promise<LimitDecision> {
+  return takeShared("password-reset", ip, RESET_MAX_ATTEMPTS, WINDOW_MS, () =>
+    takePasswordResetAttempt(ip)
+  )
+}
+
+export function takeAiDraftShared(userId: string): Promise<LimitDecision> {
+  return takeShared("ai-draft", userId, AI_DRAFT_MAX, HOUR_MS, () =>
+    takeAiDraft(userId)
+  )
+}
+
+export function takeAiReviewShared(userId: string): Promise<LimitDecision> {
+  return takeShared("ai-review", userId, AI_REVIEW_MAX, HOUR_MS, () =>
+    takeAiReview(userId)
+  )
+}
+
+export function takeAiCopilotShared(userId: string): Promise<LimitDecision> {
+  return takeShared("ai-copilot", userId, AI_COPILOT_MAX, HOUR_MS, () =>
+    takeAiCopilot(userId)
+  )
+}
+
+export function takeMailSendShared(userId: string): Promise<LimitDecision> {
+  return takeShared("mail", userId, MAIL_MAX_SENDS, HOUR_MS, () =>
+    takeMailSend(userId)
+  )
+}
+
+export function takePasswordResetEmailShared(
+  userId: string
+): Promise<LimitDecision> {
+  return takeShared(
+    "password-reset-email",
+    userId,
+    RESET_EMAIL_MAX,
+    HOUR_MS,
+    () => takePasswordResetEmail(userId)
+  )
+}
+
+export function takeUploadShared(userId: string): Promise<LimitDecision> {
+  return takeShared("upload", userId, UPLOAD_MAX_FILES, UPLOAD_WINDOW_MS, () =>
+    takeUpload(userId)
+  )
+}
+
+export async function enforceLimitShared(
+  decision: Promise<LimitDecision>,
+  action: string
+): Promise<void> {
+  enforceLimit(await decision, action)
+}
+
+export async function closeSharedRateLimitStore(): Promise<void> {
+  const store = sharedStore
+  sharedStore = null
+  if (store) await store.close()
 }

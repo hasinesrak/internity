@@ -2,29 +2,20 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: internity
+  annotations:
+    # Keep uploads working through the same public entry point as the API.
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    # The staff-api ingress uses regex rewriting; keep this path boundary-safe
+    # when ingress-nginx applies regex mode to all paths for the host.
+    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
-  ingressClassName: traefik
+  ingressClassName: nginx
   rules:
-    # All services share the VM IP. The longer prefixes are selected before
-    # the catch-all web route by Kubernetes ingress path matching.
     - http:
         paths:
-          - path: /health
-            pathType: Prefix
-            backend:
-              service:
-                name: backend-public
-                port:
-                  name: http
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: backend-public
-                port:
-                  name: http
-          - path: /staff
-            pathType: Prefix
+          - path: /staff(/|$)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: staff
@@ -38,28 +29,86 @@ spec:
                 port:
                   name: http
 ---
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
+apiVersion: networking.k8s.io/v1
+kind: Ingress
 metadata:
-  name: staff-api-prefix
+  name: internity-public-api
+  annotations:
+    # Edge limits protect the API process before a request reaches a pod.
+    # Account- and action-specific limits remain in the backend.
+    nginx.ingress.kubernetes.io/limit-rps: "30"
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-cache-bypass: "$cookie_internity_session"
+    nginx.ingress.kubernetes.io/proxy-no-cache: "$cookie_internity_session"
 spec:
-  stripPrefix:
-    prefixes:
-      - /staff-api
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /health(/|$)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: backend-public
+                port:
+                  name: http
+          - path: /api(/|$)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: backend-public
+                port:
+                  name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: internity-public-auth
+  annotations:
+    # Authentication endpoints need a tighter per-client-IP edge limit.
+    nginx.ingress.kubernetes.io/limit-rps: "5"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-cache-bypass: "$cookie_internity_session"
+    nginx.ingress.kubernetes.io/proxy-no-cache: "$cookie_internity_session"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /api/auth(/|$)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: backend-public
+                port:
+                  name: http
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: internity-staff-api
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: internity-staff-api-prefix@kubernetescrd
+    # Nginx receives /staff-api/... while the staff API application keeps its
+    # existing /api/... routes. The regex preserves /health and /api paths.
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/limit-rps: "30"
+    nginx.ingress.kubernetes.io/limit-connections: "20"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-cache-bypass: "$cookie_internity_session"
+    nginx.ingress.kubernetes.io/proxy-no-cache: "$cookie_internity_session"
 spec:
-  ingressClassName: traefik
+  ingressClassName: nginx
   rules:
     - http:
         paths:
-          - path: /staff-api
-            pathType: Prefix
+          - path: /staff-api(/|$)(.*)
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: backend-staff

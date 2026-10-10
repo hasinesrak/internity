@@ -4,6 +4,7 @@ x-backend-environment: &backend-environment
   NODE_ENV: development
   HOME: /tmp
   MONGODB_URI: mongodb://mongo:27017/internity
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
   APP_URL: ${APP_URL:-http://${APP_HOST:-localhost}:3000}
   STAFF_APP_URL: ${STAFF_APP_URL:-http://${APP_HOST:-localhost}:3001}
   APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Dhaka}
@@ -55,6 +56,31 @@ services:
       timeout: 5s
       retries: 20
 
+  redis:
+    image: redis:7.4-alpine
+    container_name: internity-redis
+    init: true
+    restart: unless-stopped
+    command:
+      [
+        "redis-server",
+        "--save",
+        "",
+        "--appendonly",
+        "no",
+        "--maxmemory",
+        "96mb",
+        "--maxmemory-policy",
+        "noeviction",
+      ]
+    ports:
+      - "${REDIS_BIND:-127.0.0.1}:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   backend-public:
     <<: *app-hardening
     build:
@@ -73,6 +99,8 @@ services:
       - uploads-data:/data/uploads
     depends_on:
       mongo:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test:
@@ -106,6 +134,8 @@ services:
       - uploads-data:/data/uploads
     depends_on:
       mongo:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test:

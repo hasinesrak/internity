@@ -1,0 +1,70 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongo-replica-init
+spec:
+  backoffLimit: 6
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app: mongo-replica-init
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: initialize
+          image: mongo:7.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          env:
+            - name: HOME
+              value: /tmp
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          command:
+            - sh
+            - -ec
+            - |
+              for member in mongo-0.mongo mongo-1.mongo; do
+                until mongosh --quiet "mongodb://${member}:27017/?directConnection=true&serverSelectionTimeoutMS=2000" --eval 'db.adminCommand({ ping: 1 })' >/dev/null 2>&1; do
+                  sleep 2
+                done
+              done
+              mongosh --quiet 'mongodb://mongo-0.mongo:27017/?directConnection=true&serverSelectionTimeoutMS=2000' --eval '
+                try {
+                  rs.status();
+                  print("Replica set already initialized.");
+                } catch (error) {
+                  if (error.code !== 94) throw error;
+                  const result = rs.initiate({
+                    _id: "rs0",
+                    members: [
+                      { _id: 0, host: "mongo-0.mongo:27017" },
+                      { _id: 1, host: "mongo-1.mongo:27017" }
+                    ]
+                  });
+                  if (result.ok !== 1) throw new Error(JSON.stringify(result));
+                  print("Replica set initialized.");
+                }
+              '
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

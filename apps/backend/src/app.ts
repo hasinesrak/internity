@@ -31,6 +31,13 @@ function installErrors(app: Hono<AppEnv>) {
 export function createApp(): Hono<AppEnv> {
   const app = new Hono<AppEnv>()
   const env = getEnv()
+  // API responses include account data and session cookies. Keep them out of
+  // every intermediary cache; the ingress only caches immutable frontend
+  // assets served by the web and staff applications.
+  app.use("*", async (c, next) => {
+    await next()
+    c.header("Cache-Control", "no-store")
+  })
   app.use(
     "*",
     secureHeaders({

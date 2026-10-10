@@ -1,0 +1,19 @@
+# Values for the ingress-nginx Helm release used by the K3s cluster.
+# Install this release in the ingress-nginx namespace; it is intentionally
+# separate from the application Kustomization.
+controller:
+  replicaCount: 1
+  ingressClassResource:
+    name: nginx
+    enabled: true
+    default: true
+    controllerValue: k8s.io/ingress-nginx
+  service:
+    type: LoadBalancer
+    externalTrafficPolicy: Local
+  config:
+    use-forwarded-headers: "true"
+    compute-full-forwarded-for: "true"
+    forwarded-for-header: X-Forwarded-For
+    proxy-body-size: 10m
+    proxy-buffering: "on"
