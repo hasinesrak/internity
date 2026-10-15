@@ -7,7 +7,7 @@ import {
 } from "ai"
 import { z } from "zod"
 
-import { memberDepartmentId, ownDepartmentId } from "./access.js"
+import { memberDepartmentId, organizationScope, ownDepartmentId } from "./access.js"
 import { recordActivity } from "./activity.service.js"
 import { validateAiSelection } from "./ai-catalog.service.js"
 import { getSettings } from "./settings.service.js"
@@ -137,6 +137,7 @@ export function setRepositoryInspector(
 }
 
 type GatewayInput = {
+  organizationId?: string | null
   prompt?: string
   messages?: ModelMessage[]
   images?: string[]
@@ -147,7 +148,7 @@ type GatewayInput = {
 }
 
 async function generateGateway(input: GatewayInput) {
-  const settings = await getSettings()
+  const settings = await getSettings(input.organizationId ?? null)
   const model = input.model ?? settings.aiModel
   const provider = input.model ? "auto" : settings.aiProvider
   await validateAiSelection(
@@ -183,11 +184,12 @@ function logDraft(
   )
 }
 
-async function generateAssignment(prompt: string) {
+async function generateAssignment(prompt: string, organizationId: string | null) {
   if (generatorOverride) {
     return generatorOverride({ feature: "assignment-draft", prompt })
   }
   const result = await generateGateway({
+    organizationId,
     system:
       "You write concise drafts for an intern program. Return only the requested fields.",
     prompt,
@@ -196,10 +198,11 @@ async function generateAssignment(prompt: string) {
   return result.output
 }
 
-async function generateVerification(prompt: string) {
+async function generateVerification(prompt: string, organizationId: string | null) {
   if (generatorOverride)
     return generatorOverride({ feature: "verification-draft", prompt })
   const result = await generateGateway({
+    organizationId,
     system:
       "Draft practical local verification checks for an intern assignment. Return only the requested fields. Commands are suggestions for an instructor to review.",
     prompt,
@@ -220,11 +223,12 @@ function verificationPrompt(mode: "auto" | "enabled" | "disabled"): string {
   ].join("\n")
 }
 
-async function generateAgenda(prompt: string) {
+async function generateAgenda(prompt: string, organizationId: string | null) {
   if (generatorOverride) {
     return generatorOverride({ feature: "class-agenda-draft", prompt })
   }
   const result = await generateGateway({
+    organizationId,
     system:
       "You write concise drafts for an intern program. Return only the requested fields.",
     prompt,
@@ -235,12 +239,14 @@ async function generateAgenda(prompt: string) {
 
 async function generateAutomatedReview(
   prompt: string,
-  evidence: RepositoryEvidence
+  evidence: RepositoryEvidence,
+  organizationId: string | null
 ) {
   if (automatedReviewGeneratorOverride) {
     return automatedReviewGeneratorOverride({ prompt, evidence })
   }
   const result = await generateGateway({
+    organizationId,
     system:
       "You are a careful reviewer for an internship program. Grade only the supplied repository evidence against the supplied rubric. Never claim to have seen files or test results that are not present. Return a review draft for a human instructor, including actionable feedback and concrete evidence paths.",
     prompt,
@@ -259,6 +265,7 @@ type CopilotMessage = {
 async function generateCopilot(input: {
   prompt: string
   messages: CopilotMessage[]
+  organizationId: string | null
 }) {
   if (generatorOverride) {
     return generatorOverride({
@@ -291,6 +298,7 @@ async function generateCopilot(input: {
         ]
       : input.prompt
   const result = await generateGateway({
+    organizationId: input.organizationId,
     system:
       "You are Internity Copilot. Help one intern understand their own internship work using the supplied department context and any attached files. Treat attached files as user-provided source material and inspect them when the intern asks about them. Never invent assignments, classes, deadlines, scores, feedback, policies, or links. If the supplied context and attachments do not answer a question, say so and suggest asking a supervisor. Do not reveal private data about other people. Return only the requested fields.",
     messages: [{ role: "user", content }],
@@ -314,7 +322,7 @@ function draftFailed(error: unknown): never {
 
 async function loadDraftDepartment(actor: SessionUser) {
   const departmentId = ownDepartmentId(actor)
-  const department = await Department.findById(departmentId)
+  const department = await Department.findOne({ _id: departmentId, ...organizationScope(actor) })
   if (!department) throw notFound("That department was not found.")
   if (department.status !== "active") {
     throw new AppError(
@@ -359,7 +367,7 @@ export async function draftAssignment(
   ].join("\n")
   try {
     const parsed = assignmentDraftResultSchema.safeParse(
-      await generateAssignment(prompt)
+      await generateAssignment(prompt, actor.organizationId)
     )
     if (!parsed.success) draftFailed(new Error("invalid draft"))
     const deadline = new Date(parsed.data!.suggestedDeadline)
@@ -408,7 +416,7 @@ export async function draftVerification(
   ].join("\n")
   try {
     const parsed = verificationDraftResultSchema.safeParse(
-      await generateVerification(prompt)
+      await generateVerification(prompt, actor.organizationId)
     )
     if (!parsed.success) draftFailed(new Error("invalid verification draft"))
     const result = parsed.data!
@@ -441,6 +449,7 @@ export async function draftClassAgenda(
     const found = await Assignment.findOne({
       _id: input.assignmentId,
       departmentId,
+      ...organizationScope(actor),
     })
     if (!found) {
       throw notFound("That assignment was not found in your department.")
@@ -448,7 +457,7 @@ export async function draftClassAgenda(
     assignment = { title: found.title, instructions: found.instructions }
   }
   assertDraftingEnabled(actor, departmentId, "class-agenda-draft")
-  const previous = await ClassSession.findOne({ departmentId }).sort({
+  const previous = await ClassSession.findOne({ departmentId, ...organizationScope(actor) }).sort({
     scheduledStart: -1,
   })
   const prompt = [
@@ -466,7 +475,7 @@ export async function draftClassAgenda(
     .join("\n")
   try {
     const parsed = classAgendaResultSchema.safeParse(
-      await generateAgenda(prompt)
+      await generateAgenda(prompt, actor.organizationId)
     )
     if (!parsed.success) draftFailed(new Error("invalid draft"))
     await recordActivity({
@@ -535,11 +544,13 @@ export async function automatedAssignmentReview(
   const submission = await Submission.findOne({
     _id: submissionId,
     departmentId,
+    ...organizationScope(actor),
   })
   if (!submission) throw notFound("That submission was not found.")
   const assignment = await Assignment.findOne({
     _id: submission.assignmentId,
     departmentId,
+    ...organizationScope(actor),
   })
   if (!assignment) throw notFound("That assignment was not found.")
 
@@ -560,7 +571,7 @@ export async function automatedAssignmentReview(
 
   try {
     const parsed = automatedReviewResultSchema.safeParse(
-      await generateAutomatedReview(prompt, evidence)
+      await generateAutomatedReview(prompt, evidence, actor.organizationId)
     )
     if (!parsed.success || parsed.data.score > maxScore) {
       reviewFailed(new Error("invalid automated review"))
@@ -691,20 +702,21 @@ export async function internCopilot(
   const departmentId = memberDepartmentId(actor)
   const [department, assignments, classes, submissions, reviews] =
     await Promise.all([
-      Department.findById(departmentId).select({ name: 1, description: 1 }),
+      Department.findOne({ _id: departmentId, ...organizationScope(actor) }).select({ name: 1, description: 1 }),
       Assignment.find({
         departmentId,
         status: { $in: ["published", "closed"] },
+        ...organizationScope(actor),
       })
         .sort({ deadline: 1 })
         .limit(30),
-      ClassSession.find({ departmentId })
+      ClassSession.find({ departmentId, ...organizationScope(actor) })
         .sort({ scheduledStart: -1 })
         .limit(30),
-      Submission.find({ internId: actor.id, departmentId })
+      Submission.find({ internId: actor.id, departmentId, ...organizationScope(actor) })
         .sort({ submittedAt: -1 })
         .limit(30),
-      Review.find({ internId: actor.id, departmentId })
+      Review.find({ internId: actor.id, departmentId, ...organizationScope(actor) })
         .sort({ createdAt: -1 })
         .limit(40),
     ])
@@ -771,7 +783,7 @@ export async function internCopilot(
       }
     }
     const parsed = copilotResultSchema.safeParse(
-      await generateCopilot({ prompt, messages })
+      await generateCopilot({ prompt, messages, organizationId: actor.organizationId })
     )
     if (!parsed.success) throw new Error("invalid copilot response")
     await recordActivity({

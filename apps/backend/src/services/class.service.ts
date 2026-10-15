@@ -1,6 +1,6 @@
 import { Types, type FilterQuery } from "mongoose"
 
-import { memberDepartmentId, ownDepartmentId } from "./access.js"
+import { memberDepartmentId, organizationScope, ownDepartmentId } from "./access.js"
 import { recordActivity } from "./activity.service.js"
 import {
   notifyClassCancelled,
@@ -36,14 +36,22 @@ function assertSchedule(start: Date, end: Date) {
   }
 }
 
-async function classInDepartment(id: string, departmentId: string) {
-  const session = await ClassSession.findOne({ _id: id, departmentId })
+async function classInDepartment(
+  id: string,
+  departmentId: string,
+  organizationId: string | null = null
+) {
+  const session = await ClassSession.findOne({
+    _id: id,
+    departmentId,
+    ...(organizationId ? { organizationId: new Types.ObjectId(organizationId) } : {}),
+  })
   if (!session) throw notFound("That class was not found.")
   return session
 }
 
-async function instructorBrief(createdBy: Types.ObjectId) {
-  const user = await User.findById(createdBy).select("name email")
+async function instructorBrief(createdBy: Types.ObjectId, organizationId: Types.ObjectId | null) {
+  const user = await User.findOne({ _id: createdBy, organizationId }).select("name email")
   return user
     ? { id: user._id.toString(), name: user.name, email: user.email }
     : null
@@ -52,13 +60,13 @@ async function instructorBrief(createdBy: Types.ObjectId) {
 async function serializeSession(session: ClassSessionDoc) {
   return serializeClass(
     session,
-    await attachmentsFor(session.attachments ?? []),
-    await instructorBrief(session.createdBy)
+    await attachmentsFor(session.attachments ?? [], session.organizationId?.toString() ?? null),
+    await instructorBrief(session.createdBy, session.organizationId)
   )
 }
 
 async function noticeFor(session: ClassSessionDoc) {
-  const instructor = await instructorBrief(session.createdBy)
+  const instructor = await instructorBrief(session.createdBy, session.organizationId)
   return {
     title: session.title,
     agenda: session.agenda,
@@ -81,12 +89,15 @@ export async function createClass(
   }
 ): Promise<PublicClass> {
   const departmentId = ownDepartmentId(actor)
-  await requireActiveDepartment(departmentId)
+  await requireActiveDepartment(departmentId, actor.organizationId)
   const scheduledStart = new Date(input.scheduledStart)
   const scheduledEnd = new Date(input.scheduledEnd)
   assertSchedule(scheduledStart, scheduledEnd)
   const attachments = await resolveAttachmentIds(actor, input.attachments)
   const session = await ClassSession.create({
+    organizationId: actor.organizationId
+      ? new Types.ObjectId(actor.organizationId)
+      : null,
     departmentId: new Types.ObjectId(departmentId),
     title: input.title.trim(),
     agenda: input.agenda.trim(),
@@ -113,7 +124,10 @@ export async function listClasses(
   when: "upcoming" | "past" | "all"
 ): Promise<PublicClass[]> {
   const departmentId = memberDepartmentId(actor)
-  const filter: FilterQuery<ClassSessionDoc> = { departmentId }
+  const filter: FilterQuery<ClassSessionDoc> = {
+    departmentId,
+    ...organizationScope(actor),
+  }
   const now = new Date()
   if (when === "upcoming") filter.scheduledEnd = { $gte: now }
   if (when === "past") filter.scheduledEnd = { $lt: now }
@@ -127,7 +141,11 @@ export async function getClass(
   actor: SessionUser,
   id: string
 ): Promise<PublicClass> {
-  const session = await classInDepartment(id, memberDepartmentId(actor))
+  const session = await classInDepartment(
+    id,
+    memberDepartmentId(actor),
+    actor.organizationId
+  )
   return serializeSession(session)
 }
 
@@ -144,8 +162,8 @@ export async function updateClass(
   }
 ): Promise<PublicClass> {
   const departmentId = ownDepartmentId(actor)
-  await requireActiveDepartment(departmentId)
-  const session = await classInDepartment(id, departmentId)
+  await requireActiveDepartment(departmentId, actor.organizationId)
+  const session = await classInDepartment(id, departmentId, actor.organizationId)
   const changed = Boolean(
     input.title ||
     input.agenda ||
@@ -183,8 +201,8 @@ export async function cancelClass(
   reason?: string
 ): Promise<PublicClass> {
   const departmentId = ownDepartmentId(actor)
-  await requireActiveDepartment(departmentId)
-  const session = await classInDepartment(id, departmentId)
+  await requireActiveDepartment(departmentId, actor.organizationId)
+  const session = await classInDepartment(id, departmentId, actor.organizationId)
   if (session.status === "cancelled") return serializeSession(session)
   session.status = "cancelled"
   session.cancellationReason = reason?.trim() || null
@@ -211,8 +229,8 @@ export async function restoreClass(
   id: string
 ): Promise<PublicClass> {
   const departmentId = ownDepartmentId(actor)
-  await requireActiveDepartment(departmentId)
-  const session = await classInDepartment(id, departmentId)
+  await requireActiveDepartment(departmentId, actor.organizationId)
+  const session = await classInDepartment(id, departmentId, actor.organizationId)
   if (session.status === "scheduled") return serializeSession(session)
   session.status = "scheduled"
   session.cancellationReason = null
@@ -235,7 +253,7 @@ export async function deleteClass(
   id: string
 ): Promise<void> {
   const departmentId = ownDepartmentId(actor)
-  const session = await classInDepartment(id, departmentId)
+  const session = await classInDepartment(id, departmentId, actor.organizationId)
   const attachmentIds = [...(session.attachments ?? [])]
   const notice = await noticeFor(session)
   await session.deleteOne()

@@ -1,5 +1,6 @@
 import { Types } from "mongoose"
 
+import { organizationScope } from "./access.js"
 import { recordActivity } from "./activity.service.js"
 import {
   assignSupervisorSlot,
@@ -35,6 +36,8 @@ import { Invitation, type InvitationDoc } from "../models/invitation.js"
 import { User, type UserDoc } from "../models/user.js"
 import type { SessionUser } from "../types.js"
 import type { InvitationListQuery, ProfileInput } from "../validators.js"
+import { assertUserCapacity } from "./billing.service.js"
+import { withTenantWriteLock } from "./tenant-lock.service.js"
 
 function expirySentence(hours: number): string {
   if (hours % 24 === 0) {
@@ -65,9 +68,9 @@ function invitationLetter(input: {
   ].join("\n")
 }
 
-async function expireStaleInvitations() {
+async function expireStaleInvitations(actor: SessionUser) {
   await Invitation.updateMany(
-    { status: "pending", expiresAt: { $lt: new Date() } },
+    { status: "pending", expiresAt: { $lt: new Date() }, ...organizationScope(actor) },
     { $set: { status: "expired" } }
   )
 }
@@ -122,11 +125,14 @@ async function deliverInvitation(input: {
   departmentName: string | null
 }) {
   const { token, tokenHash } = createSecretToken()
-  const settings = await getSettings()
+  const settings = await getSettings(input.actor.organizationId)
   const expiresAt = new Date(
     Date.now() + settings.invitationTtlHours * 60 * 60 * 1000
   )
   const invitation = await Invitation.create({
+    organizationId: input.actor.organizationId
+      ? new Types.ObjectId(input.actor.organizationId)
+      : null,
     email: input.user.email,
     departmentId: input.departmentId
       ? new Types.ObjectId(input.departmentId)
@@ -156,6 +162,7 @@ async function deliverInvitation(input: {
     })
     await Invitation.updateMany(
       {
+        ...organizationScope(input.actor),
         email: input.user.email,
         status: "pending",
         _id: { $ne: invitation._id },
@@ -163,7 +170,7 @@ async function deliverInvitation(input: {
       { $set: { status: "revoked", revokedAt: new Date() } }
     )
     if (input.role === "supervisor" && input.departmentId) {
-      await assignSupervisorSlot(input.departmentId, input.user._id.toString())
+      await assignSupervisorSlot(input.departmentId, input.user._id.toString(), input.actor.organizationId)
     }
     await recordActivity({
       actorId: input.actor.id,
@@ -175,7 +182,7 @@ async function deliverInvitation(input: {
     })
     return {
       invitation: serializeInvitation(invitation, input.departmentName),
-      user: await presentUser(input.user._id.toString()),
+      user: await presentUser(input.user._id.toString(), input.actor.organizationId),
       delivery: sent.delivery,
       ...(sent.delivery === "logged" ? { activationUrl: url } : {}),
     }
@@ -199,11 +206,11 @@ export async function invitePerson(
   const departmentId = input.departmentId ?? null
   assertCanInvite(actor, input.role, departmentId)
   const department = departmentId
-    ? await requireActiveDepartment(departmentId)
+    ? await requireActiveDepartment(departmentId, actor.organizationId)
     : null
   const email = input.email.toLowerCase()
   const existing = await User.findOne({ email }).select("+passwordHash")
-  if (existing && existing.role !== input.role) {
+  if (existing && (existing.role !== input.role || (existing.organizationId?.toString() ?? null) !== actor.organizationId)) {
     throw new AppError(
       409,
       "EMAIL_IN_USE",
@@ -235,6 +242,9 @@ export async function invitePerson(
       email,
       role: input.role,
       status: "pending",
+      organizationId: actor.organizationId
+        ? new Types.ObjectId(actor.organizationId)
+        : null,
       departmentId: department?._id ?? null,
       createdBy: new Types.ObjectId(actor.id),
       profile: profileFromInput(input.profile),
@@ -245,6 +255,9 @@ export async function invitePerson(
     user.role = input.role
     user.status = "pending"
     user.departmentId = department?._id ?? null
+    user.organizationId = actor.organizationId
+      ? new Types.ObjectId(actor.organizationId)
+      : user.organizationId
     user.passwordHash = null
     user.tokenVersion += 1
     if (input.profile) {
@@ -279,8 +292,8 @@ export async function listInvitations(
   query: InvitationListQuery
 ) {
   if (actor.role !== "admin" && actor.role !== "hr") throw forbidden()
-  await expireStaleInvitations()
-  const filter: Record<string, unknown> = {}
+  await expireStaleInvitations(actor)
+  const filter: Record<string, unknown> = organizationScope(actor)
   if (query.status) filter.status = query.status
   if (query.departmentId) filter.departmentId = query.departmentId
   if (query.search) filter.email = new RegExp(escapeRegex(query.search), "i")
@@ -318,8 +331,8 @@ export async function resendInvitation(
   delivery: "sent" | "logged"
   activationUrl?: string
 }> {
-  await expireStaleInvitations()
-  const current = await Invitation.findById(invitationId)
+  await expireStaleInvitations(actor)
+  const current = await Invitation.findOne({ _id: invitationId, ...organizationScope(actor) })
   if (!current) throw notFound("That invitation was not found.")
   assertCanInvite(
     actor,
@@ -333,7 +346,7 @@ export async function resendInvitation(
       "This invitation has already been used. The person can sign in."
     )
   }
-  const user = await User.findById(current.userId).select("+passwordHash")
+  const user = await User.findOne({ _id: current.userId, ...organizationScope(actor) }).select("+passwordHash")
   if (!user) throw notFound("That account was not found.")
   if (user.status === "active") {
     throw new AppError(
@@ -350,7 +363,7 @@ export async function resendInvitation(
     )
   }
   const department = current.departmentId
-    ? await requireActiveDepartment(current.departmentId.toString())
+    ? await requireActiveDepartment(current.departmentId.toString(), actor.organizationId)
     : null
   await enforceLimitShared(takeMailSendShared(actor.id), "invitation emails")
   const sent = await deliverInvitation({
@@ -377,7 +390,7 @@ export async function revokeInvitation(
   invitationId: string
 ) {
   if (actor.role !== "admin" && actor.role !== "hr") throw forbidden()
-  const invitation = await Invitation.findById(invitationId)
+  const invitation = await Invitation.findOne({ _id: invitationId, ...organizationScope(actor) })
   if (!invitation) throw notFound("That invitation was not found.")
   if (invitation.status !== "pending") {
     throw new AppError(
@@ -400,7 +413,7 @@ export async function revokeInvitation(
     metadata: { email: invitation.email },
   })
   const department = invitation.departmentId
-    ? await Department.findById(invitation.departmentId)
+    ? await Department.findOne({ _id: invitation.departmentId, organizationId: invitation.organizationId ?? null })
     : null
   return serializeInvitation(invitation, department?.name ?? null)
 }
@@ -441,7 +454,7 @@ async function loadTokenInvitation(token: string): Promise<InvitationDoc> {
 export async function previewInvitation(token: string) {
   const invitation = await loadTokenInvitation(token)
   const department = invitation.departmentId
-    ? await Department.findById(invitation.departmentId)
+    ? await Department.findOne({ _id: invitation.departmentId, organizationId: invitation.organizationId ?? null })
     : null
   return {
     email: invitation.email,
@@ -461,7 +474,7 @@ export async function acceptInvitation(
   const invitation = await loadTokenInvitation(token)
   const denial = denyStaff(invitation.role, networkAllowed, "activate")
   if (denial) throw denial
-  const user = await User.findById(invitation.userId).select("+passwordHash")
+  const user = await User.findOne({ _id: invitation.userId, organizationId: invitation.organizationId ?? null }).select("+passwordHash")
   if (!user || user.status !== "pending") {
     throw new AppError(
       400,
@@ -469,6 +482,10 @@ export async function acceptInvitation(
       "This invitation link is not valid. Ask HR for a new one."
     )
   }
+  const passwordHash = await hashPassword(input.password)
+  const tokenVersion = user.tokenVersion + 1
+  await withTenantWriteLock(invitation.organizationId?.toString() ?? null, async () => {
+  await assertUserCapacity(invitation.organizationId?.toString() ?? null, user.role === "intern")
   const claimed = await Invitation.findOneAndUpdate(
     { _id: invitation._id, status: "pending", expiresAt: { $gt: new Date() } },
     { $set: { status: "accepted", acceptedAt: new Date() } },
@@ -481,12 +498,15 @@ export async function acceptInvitation(
       "This invitation link is not valid. Ask HR for a new one."
     )
   }
-  const tokenVersion = user.tokenVersion + 1
   user.name = input.name.trim()
-  user.passwordHash = await hashPassword(input.password)
+  user.passwordHash = passwordHash
   user.status = "active"
   user.tokenVersion = tokenVersion
-  await user.save()
+  try { await user.save() } catch (error) {
+    await Invitation.updateOne({ _id: invitation._id, status: "accepted" }, { $set: { status: "pending", acceptedAt: null } })
+    throw error
+  }
+  })
   const sessionToken = await signSession({
     id: user._id.toString(),
     tokenVersion,

@@ -13,3 +13,6 @@ images:
   - name: internity-staff
     newName: docker.io/1cryptic/internity-staff
     newTag: sha-698e637dfe8c224c32fee148e57aae7170f28f8e
+  - name: internity-platform
+    newName: docker.io/1cryptic/internity-platform
+    newTag: sha-698e637dfe8c224c32fee148e57aae7170f28f8e

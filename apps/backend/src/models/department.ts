@@ -3,6 +3,7 @@ import { Schema, model, type HydratedDocument, type Types } from "mongoose"
 import type { DepartmentStatus } from "../config/constants.js"
 
 export interface DepartmentShape {
+  organizationId: Types.ObjectId | null
   name: string
   description: string
   supervisorId: Types.ObjectId | null
@@ -14,7 +15,13 @@ export interface DepartmentShape {
 
 const departmentSchema = new Schema<DepartmentShape>(
   {
-    name: { type: String, required: true, trim: true, unique: true },
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+      index: true,
+    },
+    name: { type: String, required: true, trim: true },
     description: { type: String, default: "", trim: true },
     supervisorId: {
       type: Schema.Types.ObjectId,
@@ -35,6 +42,8 @@ const departmentSchema = new Schema<DepartmentShape>(
   },
   { timestamps: true }
 )
+
+departmentSchema.index({ organizationId: 1, name: 1 }, { unique: true })
 
 export type DepartmentDoc = HydratedDocument<DepartmentShape>
 export const Department = model<DepartmentShape>("Department", departmentSchema)

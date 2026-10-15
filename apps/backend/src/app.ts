@@ -16,7 +16,10 @@ import { instructorRoutes } from "./routes/instructor.js"
 import { internRoutes } from "./routes/intern.js"
 import { supervisorRoutes } from "./routes/supervisor.js"
 import { uploadRoutes } from "./routes/uploads.js"
+import { platformAuthRoutes } from "./routes/platform-auth.js"
+import { platformRoutes } from "./routes/platform.js"
 import type { AppEnv } from "./types.js"
+import { billingWebhookRoutes } from "./routes/billing-webhook.js"
 
 function installErrors(app: Hono<AppEnv>) {
   app.notFound((c) =>
@@ -60,29 +63,38 @@ export function createApp(): Hono<AppEnv> {
     })
   )
   const staffSurface = env.apiSurface === "staff"
-  const routers = [
-    healthRoutes,
-    authRoutes,
-    cliRoutes,
-    internRoutes,
-    departmentRoutes,
-    uploadRoutes,
-    attendanceRoutes,
-    documentRoutes,
-    ...(staffSurface
-      ? [adminRoutes, hrRoutes, supervisorRoutes, instructorRoutes]
-      : []),
-  ]
+  const platformSurface = env.apiSurface === "platform"
+  const routers = platformSurface
+    ? [healthRoutes, platformAuthRoutes, platformRoutes, billingWebhookRoutes]
+    : [
+        healthRoutes,
+        authRoutes,
+        cliRoutes,
+        internRoutes,
+        departmentRoutes,
+        uploadRoutes,
+        attendanceRoutes,
+        documentRoutes,
+        ...(staffSurface
+          ? [adminRoutes, hrRoutes, supervisorRoutes, instructorRoutes]
+          : []),
+      ]
   installErrors(app)
   for (const router of routers) installErrors(router)
   app.route("/health", healthRoutes)
-  app.route("/api/auth", authRoutes)
-  app.route("/api/cli", cliRoutes)
-  app.route("/api/intern", internRoutes)
-  app.route("/api/departments", departmentRoutes)
-  app.route("/api/uploads", uploadRoutes)
-  app.route("/api/attendance", attendanceRoutes)
-  app.route("/api/documents", documentRoutes)
+  if (platformSurface) {
+    app.route("/api/platform/auth", platformAuthRoutes)
+    app.route("/api/platform/billing/webhooks", billingWebhookRoutes)
+    app.route("/api/platform", platformRoutes)
+  } else {
+    app.route("/api/auth", authRoutes)
+    app.route("/api/cli", cliRoutes)
+    app.route("/api/intern", internRoutes)
+    app.route("/api/departments", departmentRoutes)
+    app.route("/api/uploads", uploadRoutes)
+    app.route("/api/attendance", attendanceRoutes)
+    app.route("/api/documents", documentRoutes)
+  }
   if (staffSurface) {
     app.route("/api/admin", adminRoutes)
     app.route("/api/hr", hrRoutes)

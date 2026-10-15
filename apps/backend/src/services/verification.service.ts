@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import { Types } from "mongoose"
 
-import { memberDepartmentId, ownDepartmentId } from "./access.js"
+import { memberDepartmentId, organizationScope, ownDepartmentId } from "./access.js"
 import { recordActivity } from "./activity.service.js"
 import { getAssignment } from "./assignment.service.js"
 import { Assignment } from "../models/assignment.js"
@@ -207,6 +207,9 @@ export async function submitVerificationRun(
   const executionError = stepResults.some((step) => step.exitCode === -2)
   const status = executionError ? "error" : passed ? "passed" : "failed"
   const run = await VerificationRun.create({
+    organizationId: actor.organizationId
+      ? new Types.ObjectId(actor.organizationId)
+      : null,
     assignmentId: new Types.ObjectId(assignmentId),
     internId: new Types.ObjectId(actor.id),
     departmentId: assignment.departmentId,
@@ -245,6 +248,7 @@ export async function listVerificationRuns(
   const assignment = await Assignment.findOne({
     _id: assignmentId,
     departmentId,
+    ...organizationScope(actor),
   })
   if (!assignment) throw notFound("That assignment was not found.")
   if (!assignment.verification) return []
@@ -254,6 +258,7 @@ export async function listVerificationRuns(
     internId?: string
     manifestHash: string
   } = {
+    ...organizationScope(actor),
     assignmentId,
     departmentId,
     manifestHash: verificationManifestHash(assignment.verification),
@@ -264,6 +269,7 @@ export async function listVerificationRuns(
     const runs = await VerificationRun.aggregate([
       {
         $match: {
+          ...organizationScope(actor),
           assignmentId: new Types.ObjectId(assignmentId),
           departmentId: new Types.ObjectId(departmentId),
           manifestHash: filter.manifestHash,
@@ -291,6 +297,7 @@ export async function latestVerificationRun(
   const assignment = await getAssignment(actor, assignmentId, true)
   if (!assignment.verification) return null
   const run = await VerificationRun.findOne({
+    ...organizationScope(actor),
     assignmentId,
     internId: actor.id,
     departmentId,

@@ -1,6 +1,6 @@
 import { Types, type FilterQuery } from "mongoose"
 
-import { assertAdmin, assertOrgManager } from "./access.js"
+import { assertAdmin, assertOrgManager, organizationScope } from "./access.js"
 import { recordActivity } from "./activity.service.js"
 import {
   departmentBrief,
@@ -24,7 +24,7 @@ import { User } from "../models/user.js"
 import type { SessionUser } from "../types.js"
 import type { DepartmentListQuery } from "../validators.js"
 
-async function loadCounts(ids: string[]) {
+async function loadCounts(ids: string[], organizationId: string | null) {
   const objectIds = ids.map((id) => new Types.ObjectId(id))
   const [instructors, interns] = await Promise.all([
     User.aggregate<{ _id: Types.ObjectId; count: number }>([
@@ -33,6 +33,7 @@ async function loadCounts(ids: string[]) {
           role: "instructor",
           status: { $ne: "archived" },
           departmentId: { $in: objectIds },
+          organizationId: organizationId ? new Types.ObjectId(organizationId) : null,
         },
       },
       { $group: { _id: "$departmentId", count: { $sum: 1 } } },
@@ -43,6 +44,7 @@ async function loadCounts(ids: string[]) {
           role: "intern",
           status: { $ne: "archived" },
           departmentId: { $in: objectIds },
+          organizationId: organizationId ? new Types.ObjectId(organizationId) : null,
         },
       },
       { $group: { _id: "$departmentId", count: { $sum: 1 } } },
@@ -57,21 +59,20 @@ async function loadCounts(ids: string[]) {
 }
 
 async function presentDepartments(
-  departments: DepartmentDoc[]
+  departments: DepartmentDoc[],
+  organizationId: string | null = null
 ): Promise<PublicDepartment[]> {
   const supervisorIds = departments.flatMap((department) =>
     department.supervisorId ? [department.supervisorId] : []
   )
-  const supervisors = await User.find({ _id: { $in: supervisorIds } })
+  const supervisors = await User.find({ _id: { $in: supervisorIds }, organizationId: organizationId ? new Types.ObjectId(organizationId) : null })
   const supervisorById = new Map(
     supervisors.map((user) => [
       user._id.toString(),
       { id: user._id.toString(), name: user.name, email: user.email },
     ])
   )
-  const counts = await loadCounts(
-    departments.map((department) => department._id.toString())
-  )
+  const counts = await loadCounts(departments.map((department) => department._id.toString()), organizationId)
   return departments.map((department) => {
     const id = department._id.toString()
     const supervisor = department.supervisorId
@@ -84,9 +85,14 @@ async function presentDepartments(
   })
 }
 
-async function assertNameAvailable(name: string, exceptId?: string) {
+async function assertNameAvailable(
+  name: string,
+  organizationId: string | null,
+  exceptId?: string
+) {
   const existing = await Department.findOne({
     name: new RegExp(`^${escapeRegex(name)}$`, "i"),
+    ...organizationScope({ organizationId }),
     ...(exceptId ? { _id: { $ne: exceptId } } : {}),
   })
   if (existing) {
@@ -98,16 +104,17 @@ async function assertNameAvailable(name: string, exceptId?: string) {
   }
 }
 
-export async function requireDepartment(id: string): Promise<DepartmentDoc> {
-  const department = await Department.findById(id)
+export async function requireDepartment(id: string, organizationId: string | null = null): Promise<DepartmentDoc> {
+  const department = await Department.findOne({ _id: id, ...organizationScope({ organizationId }) })
   if (!department) throw notFound("That department was not found.")
   return department
 }
 
 export async function requireActiveDepartment(
-  id: string
+  id: string,
+  organizationId: string | null = null
 ): Promise<DepartmentDoc> {
-  const department = await requireDepartment(id)
+  const department = await requireDepartment(id, organizationId)
   if (department.status !== "active") {
     throw new AppError(
       409,
@@ -134,7 +141,7 @@ export async function departmentBriefs(
 }
 
 function visibleFilter(actor: SessionUser, query: DepartmentListQuery) {
-  const filter: FilterQuery<DepartmentDoc> = {}
+  const filter: FilterQuery<DepartmentDoc> = organizationScope(actor)
   if (query.status && query.status !== "all") filter.status = query.status
   else if (!query.status) filter.status = "active"
   if (query.search) {
@@ -162,7 +169,7 @@ export async function listDepartments(
       .limit(query.pageSize),
   ])
   return pageResult(
-    await presentDepartments(departments),
+    await presentDepartments(departments, actor.organizationId),
     query.page,
     query.pageSize,
     total
@@ -170,13 +177,13 @@ export async function listDepartments(
 }
 
 export async function getDepartment(actor: SessionUser, id: string) {
-  const department = await Department.findById(id)
+  const department = await Department.findOne({ _id: id, ...organizationScope(actor) })
   if (!department) throw notFound("That department was not found.")
   if (actor.role !== "admin" && actor.role !== "hr") {
     if (actor.departmentId !== id)
       throw notFound("That department was not found.")
   }
-  const [presented] = await presentDepartments([department])
+  const [presented] = await presentDepartments([department], actor.organizationId)
   return presented
 }
 
@@ -186,8 +193,11 @@ export async function createDepartment(
 ) {
   assertOrgManager(actor)
   const name = cleanWhitespace(input.name)
-  await assertNameAvailable(name)
+  await assertNameAvailable(name, actor.organizationId)
   const department = await Department.create({
+    organizationId: actor.organizationId
+      ? new Types.ObjectId(actor.organizationId)
+      : null,
     name,
     description: input.description?.trim() ?? "",
     status: "active",
@@ -201,7 +211,7 @@ export async function createDepartment(
     departmentId: department._id.toString(),
     metadata: { name },
   })
-  const [presented] = await presentDepartments([department])
+  const [presented] = await presentDepartments([department], actor.organizationId)
   return presented
 }
 
@@ -211,10 +221,10 @@ export async function updateDepartment(
   input: { name?: string; description?: string }
 ) {
   assertOrgManager(actor)
-  const department = await requireDepartment(id)
+  const department = await requireDepartment(id, actor.organizationId)
   if (input.name) {
     const name = cleanWhitespace(input.name)
-    await assertNameAvailable(name, id)
+    await assertNameAvailable(name, actor.organizationId, id)
     department.name = name
   }
   if (input.description !== undefined)
@@ -227,7 +237,7 @@ export async function updateDepartment(
     entityId: id,
     departmentId: id,
   })
-  const [presented] = await presentDepartments([department])
+  const [presented] = await presentDepartments([department], actor.organizationId)
   return presented
 }
 
@@ -237,7 +247,7 @@ export async function setDepartmentStatus(
   status: "active" | "archived"
 ) {
   assertOrgManager(actor)
-  const department = await requireDepartment(id)
+  const department = await requireDepartment(id, actor.organizationId)
   department.status = status
   await department.save()
   await recordActivity({
@@ -254,11 +264,11 @@ export async function setDepartmentStatus(
 
 export async function deleteDepartment(actor: SessionUser, id: string) {
   assertAdmin(actor)
-  await requireDepartment(id)
+  await requireDepartment(id, actor.organizationId)
   const [users, classes, assignments] = await Promise.all([
-    User.countDocuments({ departmentId: id }),
-    ClassSession.countDocuments({ departmentId: id }),
-    Assignment.countDocuments({ departmentId: id }),
+    User.countDocuments({ departmentId: id, ...organizationScope(actor) }),
+    ClassSession.countDocuments({ departmentId: id, ...organizationScope(actor) }),
+    Assignment.countDocuments({ departmentId: id, ...organizationScope(actor) }),
   ])
   if (users || classes || assignments) {
     throw new AppError(
@@ -267,8 +277,8 @@ export async function deleteDepartment(actor: SessionUser, id: string) {
       "Move or remove people, classes, and assignments before deleting this department."
     )
   }
-  await Invitation.deleteMany({ departmentId: id })
-  await Department.deleteOne({ _id: id })
+  await Invitation.deleteMany({ departmentId: id, ...organizationScope(actor) })
+  await Department.deleteOne({ _id: id, ...organizationScope(actor) })
   await recordActivity({
     actorId: actor.id,
     action: "department.deleted",
@@ -280,27 +290,31 @@ export async function deleteDepartment(actor: SessionUser, id: string) {
 
 export async function assignSupervisorSlot(
   departmentId: string,
-  userId: string
+  userId: string,
+  organizationId: string | null = null
 ) {
-  const department = await requireDepartment(departmentId)
+  const department = await requireDepartment(departmentId, organizationId)
+  const scope = organizationScope({ organizationId })
+  const user = await User.findOne({ _id: userId, ...scope })
+  if (!user) throw notFound("That account was not found.")
   const supervisorId = new Types.ObjectId(userId)
   if (
     department.supervisorId &&
     !department.supervisorId.equals(supervisorId)
   ) {
     await User.updateOne(
-      { _id: department.supervisorId },
+      { _id: department.supervisorId, ...scope },
       { $set: { departmentId: null } }
     )
   }
   await Department.updateMany(
-    { supervisorId, _id: { $ne: department._id } },
+    { supervisorId, _id: { $ne: department._id }, ...scope },
     { $set: { supervisorId: null } }
   )
   department.supervisorId = supervisorId
   await department.save()
   await User.updateOne(
-    { _id: supervisorId },
+    { _id: supervisorId, ...scope },
     { $set: { departmentId: department._id, role: "supervisor" } }
   )
 }
@@ -311,8 +325,8 @@ export async function assignSupervisor(
   userId: string
 ): Promise<PublicUser> {
   assertOrgManager(actor)
-  await requireActiveDepartment(departmentId)
-  const user = await User.findById(userId)
+  await requireActiveDepartment(departmentId, actor.organizationId)
+  const user = await User.findOne({ _id: userId, ...organizationScope(actor) })
   if (!user) throw notFound("That account was not found.")
   if (user.role !== "supervisor") {
     throw validation("Choose an account with the supervisor role.", "userId")
@@ -324,7 +338,7 @@ export async function assignSupervisor(
       "Restore this account before assigning them."
     )
   }
-  await assignSupervisorSlot(departmentId, userId)
+  await assignSupervisorSlot(departmentId, userId, actor.organizationId)
   await recordActivity({
     actorId: actor.id,
     action: "department.supervisor_assigned",
@@ -333,7 +347,7 @@ export async function assignSupervisor(
     departmentId,
     metadata: { userId },
   })
-  const updated = await User.findById(userId)
+  const updated = await User.findOne({ _id: userId, ...organizationScope(actor) })
   if (!updated) throw notFound("That account was not found.")
   const briefs = await departmentBriefs([updated.departmentId])
   return serializeUser(
@@ -360,8 +374,8 @@ export async function assignInstructor(
   } else {
     assertOrgManager(actor)
   }
-  const department = await requireActiveDepartment(departmentId)
-  const user = await User.findById(userId)
+  const department = await requireActiveDepartment(departmentId, actor.organizationId)
+  const user = await User.findOne({ _id: userId, ...organizationScope(actor) })
   if (!user) throw notFound("That account was not found.")
   if (user.role !== "instructor") {
     throw validation("Choose an account with the instructor role.", "userId")
@@ -413,7 +427,7 @@ export async function unassignInstructor(
   } else {
     assertOrgManager(actor)
   }
-  const user = await User.findById(userId)
+  const user = await User.findOne({ _id: userId, ...organizationScope(actor) })
   if (!user || user.role !== "instructor") {
     throw notFound("That instructor was not found.")
   }
@@ -438,8 +452,8 @@ export async function mergeDepartments(
   targetId: string
 ) {
   assertAdmin(actor)
-  const source = await requireDepartment(sourceId)
-  const target = await requireDepartment(targetId)
+  const source = await requireDepartment(sourceId, actor.organizationId)
+  const target = await requireDepartment(targetId, actor.organizationId)
   const sourceSupervisor = source.supervisorId?.toString() ?? null
   const targetSupervisor = target.supervisorId?.toString() ?? null
   if (
@@ -448,12 +462,12 @@ export async function mergeDepartments(
     sourceSupervisor !== targetSupervisor
   ) {
     await User.updateOne(
-      { _id: sourceSupervisor },
+      { _id: sourceSupervisor, ...organizationScope(actor) },
       { $set: { departmentId: null } }
     )
   }
   await User.updateMany(
-    { departmentId: source._id },
+    { departmentId: source._id, ...organizationScope(actor) },
     { $set: { departmentId: target._id } }
   )
   if (!targetSupervisor && sourceSupervisor) {
@@ -462,27 +476,27 @@ export async function mergeDepartments(
   }
   await Promise.all([
     ClassSession.updateMany(
-      { departmentId: source._id },
+      { departmentId: source._id, ...organizationScope(actor) },
       { $set: { departmentId: target._id } }
     ),
     Assignment.updateMany(
-      { departmentId: source._id },
+      { departmentId: source._id, ...organizationScope(actor) },
       { $set: { departmentId: target._id } }
     ),
     Submission.updateMany(
-      { departmentId: source._id },
+      { departmentId: source._id, ...organizationScope(actor) },
       { $set: { departmentId: target._id } }
     ),
     Review.updateMany(
-      { departmentId: source._id },
+      { departmentId: source._id, ...organizationScope(actor) },
       { $set: { departmentId: target._id } }
     ),
     Invitation.updateMany(
-      { departmentId: source._id },
+      { departmentId: source._id, ...organizationScope(actor) },
       { $set: { departmentId: target._id } }
     ),
     ActivityLog.updateMany(
-      { departmentId: source._id },
+      { departmentId: source._id, ...organizationScope(actor) },
       { $set: { departmentId: target._id } }
     ),
   ])

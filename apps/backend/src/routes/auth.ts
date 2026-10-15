@@ -14,6 +14,7 @@ import {
   endSession,
   login,
 } from "../services/auth.service.js"
+import { recordActivity } from "../services/activity.service.js"
 import {
   acceptInvitation,
   previewInvitation,
@@ -21,6 +22,7 @@ import {
 import { presentUser } from "../services/user.service.js"
 import { parseBody, parseQuery, readJson } from "../lib/http.js"
 import { AppError, forbidden, tooManyAttempts } from "../lib/errors.js"
+import { signSession } from "../lib/session.js"
 import {
   checkLoginAttemptsShared,
   checkPasswordChangeShared,
@@ -40,8 +42,22 @@ import {
   tokenQuerySchema,
 } from "../validators.js"
 import type { AppEnv } from "../types.js"
+import { supportLoginSchema } from "../validators.js"
+import { consumeSupportToken } from "../services/support.service.js"
+import { getEnv } from "../config/env.js"
 
 export const authRoutes = new Hono<AppEnv>()
+
+authRoutes.post("/support-login", async (c) => {
+  if (getEnv().apiSurface !== "staff") return c.json({ error: { code: "NOT_FOUND", message: "That route was not found." } }, 404)
+  if (!networkAllowsStaff(c)) throw forbidden("Support access requires the staff network.")
+  await enforceLimitShared(takeInvitationAttemptShared(clientIp(c)), "support login attempts")
+  const body = parseBody(supportLoginSchema, await readJson(c)); const { session, target } = await consumeSupportToken(body.token)
+  const token = await signSession({ id: target._id.toString(), tokenVersion: target.tokenVersion, supportSessionId: session._id.toString(), expiresAt: session.expiresAt })
+  await recordActivity({ actorId: target._id.toString(), action: "auth.support_login", entityType: "support_session", entityId: session._id.toString(), departmentId: target.departmentId?.toString() ?? null, metadata: { supportSessionId: session._id.toString(), platformAdminId: session.platformAdminId.toString() } })
+  setSessionCookie(c, token)
+  return c.json({ user: { ...await presentUser(target._id.toString(), session.organizationId.toString()), supportAccess: { id: session._id.toString(), expiresAt: session.expiresAt.toISOString(), operatorId: session.platformAdminId.toString() } } })
+})
 
 function throttleMessage(
   scope: "account" | "address",
@@ -115,7 +131,7 @@ authRoutes.post("/logout", async (c) => {
 })
 
 authRoutes.get("/me", requireAuth, async (c) => {
-  return c.json({ user: await presentUser(c.get("user").id) })
+  return c.json({ user: { ...await presentUser(c.get("user").id, c.get("user").organizationId), ...(c.get("user").supportAccess ? { supportAccess: c.get("user").supportAccess } : {}) } })
 })
 
 authRoutes.post("/change-password", requireAuth, async (c) => {

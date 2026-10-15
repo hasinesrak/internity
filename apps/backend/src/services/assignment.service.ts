@@ -1,6 +1,6 @@
 import { Types } from "mongoose"
 
-import { memberDepartmentId, ownDepartmentId } from "./access.js"
+import { memberDepartmentId, organizationScope, ownDepartmentId } from "./access.js"
 import { recordActivity } from "./activity.service.js"
 import { requireActiveDepartment } from "./department.service.js"
 import { serializeAssignment, type PublicAssignment } from "./serializers.js"
@@ -20,8 +20,16 @@ import { Submission } from "../models/submission.js"
 import type { SessionUser } from "../types.js"
 import type { AssignmentStatus } from "../config/constants.js"
 
-async function assignmentInDepartment(id: string, departmentId: string) {
-  const assignment = await Assignment.findOne({ _id: id, departmentId })
+async function assignmentInDepartment(
+  id: string,
+  departmentId: string,
+  organizationId: string | null = null
+) {
+  const assignment = await Assignment.findOne({
+    _id: id,
+    departmentId,
+    ...(organizationId ? { organizationId: new Types.ObjectId(organizationId) } : {}),
+  })
   if (!assignment) throw notFound("That assignment was not found.")
   return assignment
 }
@@ -47,7 +55,7 @@ export async function createAssignment(
   }
 ): Promise<PublicAssignment> {
   const departmentId = ownDepartmentId(actor)
-  await requireActiveDepartment(departmentId)
+  await requireActiveDepartment(departmentId, actor.organizationId)
   const status = input.status ?? "draft"
   const deadline = input.deadline ? new Date(input.deadline) : null
   if (status === "published" && !deadline) {
@@ -55,6 +63,9 @@ export async function createAssignment(
   }
   const attachments = await resolveAttachmentIds(actor, input.attachments)
   const assignment = await Assignment.create({
+    organizationId: actor.organizationId
+      ? new Types.ObjectId(actor.organizationId)
+      : null,
     departmentId: new Types.ObjectId(departmentId),
     title: input.title.trim(),
     instructions: input.instructions.trim(),
@@ -75,7 +86,7 @@ export async function createAssignment(
   })
   return serializeAssignment(
     assignment,
-    await attachmentsFor(assignment.attachments)
+    await attachmentsFor(assignment.attachments, assignment.organizationId?.toString() ?? null)
   )
 }
 
@@ -89,7 +100,7 @@ export async function listAssignments(
   const filter: {
     departmentId: string
     status?: AssignmentStatus | { $in: AssignmentStatus[] }
-  } = { departmentId }
+  } = { departmentId, ...organizationScope(actor) }
   if (options.internView) filter.status = { $in: ["published", "closed"] }
   else if (options.status) filter.status = options.status
   const assignments = await Assignment.find(filter).sort({ createdAt: -1 })
@@ -97,7 +108,7 @@ export async function listAssignments(
     assignments.map(async (assignment) =>
       serializeAssignment(
         assignment,
-        await attachmentsFor(assignment.attachments ?? [])
+        await attachmentsFor(assignment.attachments ?? [], assignment.organizationId?.toString() ?? null)
       )
     )
   )
@@ -111,7 +122,7 @@ export async function getAssignment(
   const departmentId = internView
     ? memberDepartmentId(actor)
     : ownDepartmentId(actor)
-  const assignment = await assignmentInDepartment(id, departmentId)
+  const assignment = await assignmentInDepartment(id, departmentId, actor.organizationId)
   if (internView && assignment.status === "draft") {
     throw notFound("That assignment was not found.")
   }
@@ -126,7 +137,7 @@ export async function getAssignmentPublic(
   const assignment = await getAssignment(actor, id, internView)
   return serializeAssignment(
     assignment,
-    await attachmentsFor(assignment.attachments ?? [])
+    await attachmentsFor(assignment.attachments ?? [], assignment.organizationId?.toString() ?? null)
   )
 }
 
@@ -143,8 +154,8 @@ export async function updateAssignment(
   }
 ): Promise<PublicAssignment> {
   const departmentId = ownDepartmentId(actor)
-  await requireActiveDepartment(departmentId)
-  const assignment = await assignmentInDepartment(id, departmentId)
+  await requireActiveDepartment(departmentId, actor.organizationId)
+  const assignment = await assignmentInDepartment(id, departmentId, actor.organizationId)
   if (input.title) assignment.title = input.title.trim()
   if (input.instructions) assignment.instructions = input.instructions.trim()
   if (input.rubric) assignment.rubric = cleanRubric(input.rubric)
@@ -189,14 +200,14 @@ export async function updateAssignment(
   })
   return serializeAssignment(
     assignment,
-    await attachmentsFor(assignment.attachments ?? [])
+    await attachmentsFor(assignment.attachments ?? [], assignment.organizationId?.toString() ?? null)
   )
 }
 
 export async function publishAssignment(actor: SessionUser, id: string) {
   const departmentId = ownDepartmentId(actor)
-  await requireActiveDepartment(departmentId)
-  const assignment = await assignmentInDepartment(id, departmentId)
+  await requireActiveDepartment(departmentId, actor.organizationId)
+  const assignment = await assignmentInDepartment(id, departmentId, actor.organizationId)
   if (assignment.status === "closed") {
     throw new AppError(
       409,
@@ -217,13 +228,13 @@ export async function publishAssignment(actor: SessionUser, id: string) {
   })
   return serializeAssignment(
     assignment,
-    await attachmentsFor(assignment.attachments ?? [])
+    await attachmentsFor(assignment.attachments ?? [], assignment.organizationId?.toString() ?? null)
   )
 }
 
 export async function closeAssignment(actor: SessionUser, id: string) {
   const departmentId = ownDepartmentId(actor)
-  const assignment = await assignmentInDepartment(id, departmentId)
+  const assignment = await assignmentInDepartment(id, departmentId, actor.organizationId)
   if (assignment.status !== "published") {
     throw validation("Publish the assignment before closing it.", "status")
   }
@@ -238,14 +249,17 @@ export async function closeAssignment(actor: SessionUser, id: string) {
   })
   return serializeAssignment(
     assignment,
-    await attachmentsFor(assignment.attachments ?? [])
+    await attachmentsFor(assignment.attachments ?? [], assignment.organizationId?.toString() ?? null)
   )
 }
 
 export async function deleteAssignment(actor: SessionUser, id: string) {
   const departmentId = ownDepartmentId(actor)
-  const assignment = await assignmentInDepartment(id, departmentId)
-  const submissions = await Submission.countDocuments({ assignmentId: id })
+  const assignment = await assignmentInDepartment(id, departmentId, actor.organizationId)
+  const submissions = await Submission.countDocuments({
+    assignmentId: id,
+    ...organizationScope(actor),
+  })
   if (submissions > 0) {
     throw new AppError(
       409,

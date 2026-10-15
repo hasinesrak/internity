@@ -1,6 +1,32 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: internity-platform
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "2m"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: platform.internity.local
+      http:
+        paths:
+          - path: /api/platform
+            pathType: Prefix
+            backend:
+              service: { name: backend-platform, port: { name: http } }
+          - path: /health
+            pathType: Prefix
+            backend:
+              service: { name: backend-platform, port: { name: http } }
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: platform, port: { name: http } }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
   name: internity
   annotations:
     # Keep uploads working through the same public entry point as the API.

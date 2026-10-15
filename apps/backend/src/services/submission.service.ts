@@ -1,6 +1,6 @@
 import { Types } from "mongoose"
 
-import { memberDepartmentId, ownDepartmentId } from "./access.js"
+import { memberDepartmentId, organizationScope, ownDepartmentId } from "./access.js"
 import { recordActivity } from "./activity.service.js"
 import { getAssignment } from "./assignment.service.js"
 import { departmentBriefs } from "./department.service.js"
@@ -56,6 +56,7 @@ export async function submitWork(
   const existing = await Submission.findOne({
     assignmentId,
     internId: actor.id,
+    ...organizationScope(actor),
   })
   if (existing?.status === "reviewed") {
     throw new AppError(
@@ -75,6 +76,7 @@ export async function submitWork(
           internId: actor.id,
           departmentId: assignment.departmentId,
           manifestHash: expectedHash,
+          ...organizationScope(actor),
         })
       : await VerificationRun.findOne({
           assignmentId,
@@ -82,6 +84,7 @@ export async function submitWork(
           departmentId: assignment.departmentId,
           manifestHash: expectedHash,
           status: "passed",
+          ...organizationScope(actor),
         }).sort({ createdAt: -1 })
     if (!verificationRun || verificationRun.status !== "passed") {
       throw new AppError(
@@ -101,9 +104,13 @@ export async function submitWork(
     {
       assignmentId: new Types.ObjectId(assignmentId),
       internId: new Types.ObjectId(actor.id),
+      ...organizationScope(actor),
     },
     {
       $set: {
+        organizationId: actor.organizationId
+          ? new Types.ObjectId(actor.organizationId)
+          : null,
         departmentId: assignment.departmentId,
         submissionUrl: input.submissionUrl.trim(),
         notes: input.notes?.trim() ?? "",
@@ -133,11 +140,15 @@ export async function listMySubmissions(
   actor: SessionUser
 ): Promise<PublicSubmission[]> {
   if (actor.role !== "intern") throw forbidden()
-  const submissions = await Submission.find({ internId: actor.id }).sort({
+  const submissions = await Submission.find({
+    internId: actor.id,
+    ...organizationScope(actor),
+  }).sort({
     submittedAt: -1,
   })
   const assignments = await Assignment.find({
     _id: { $in: submissions.map((item) => item.assignmentId) },
+    ...organizationScope(actor),
   })
   const byId = new Map(assignments.map((item) => [item._id.toString(), item]))
   const withReviews = await Promise.all(
@@ -154,9 +165,16 @@ export async function listMySubmissions(
 
 export async function getMySubmission(actor: SessionUser, id: string) {
   if (actor.role !== "intern") throw forbidden()
-  const submission = await Submission.findOne({ _id: id, internId: actor.id })
+  const submission = await Submission.findOne({
+    _id: id,
+    internId: actor.id,
+    ...organizationScope(actor),
+  })
   if (!submission) throw notFound("That submission was not found.")
-  const assignment = await Assignment.findById(submission.assignmentId)
+  const assignment = await Assignment.findOne({
+    _id: submission.assignmentId,
+    ...organizationScope(actor),
+  })
   return serializeSubmission(submission, {
     assignment,
     reviews: await reviewsFor(submission._id.toString()),
@@ -171,17 +189,22 @@ export async function listSubmissions(
   const departmentId = ownDepartmentId(actor)
   const filter: {
     departmentId: string
+    organizationId?: Types.ObjectId | null
     assignmentId?: string
     status?: SubmissionStatus
-  } = { departmentId }
+  } = { departmentId, ...organizationScope(actor) }
   if (query.assignmentId) filter.assignmentId = query.assignmentId
   if (query.status) filter.status = query.status
   const submissions = await Submission.find(filter).sort({ submittedAt: -1 })
   const [assignments, interns] = await Promise.all([
     Assignment.find({
       _id: { $in: submissions.map((item) => item.assignmentId) },
+      ...organizationScope(actor),
     }),
-    User.find({ _id: { $in: submissions.map((item) => item.internId) } }),
+    User.find({
+      _id: { $in: submissions.map((item) => item.internId) },
+      ...organizationScope(actor),
+    }),
   ])
   const assignmentById = new Map(
     assignments.map((item) => [item._id.toString(), item])
@@ -208,11 +231,12 @@ export async function getSubmission(actor: SessionUser, id: string) {
   const submission = await Submission.findOne({
     _id: id,
     departmentId: ownDepartmentId(actor),
+    ...organizationScope(actor),
   })
   if (!submission) throw notFound("That submission was not found.")
   const [assignment, intern, reviews, verificationRun] = await Promise.all([
-    Assignment.findById(submission.assignmentId),
-    User.findById(submission.internId),
+    Assignment.findOne({ _id: submission.assignmentId, ...organizationScope(actor) }),
+    User.findOne({ _id: submission.internId, ...organizationScope(actor) }),
     reviewsFor(submission._id.toString()),
     verificationRunFor(submission),
   ])
@@ -236,9 +260,16 @@ export async function reviewSubmission(
   }
 ) {
   const departmentId = ownDepartmentId(actor)
-  const submission = await Submission.findOne({ _id: id, departmentId })
+  const submission = await Submission.findOne({
+    _id: id,
+    departmentId,
+    ...organizationScope(actor),
+  })
   if (!submission) throw notFound("That submission was not found.")
-  const assignment = await Assignment.findById(submission.assignmentId)
+  const assignment = await Assignment.findOne({
+    _id: submission.assignmentId,
+    ...organizationScope(actor),
+  })
   if (!assignment) throw notFound("That assignment was not found.")
   const maxScore = maxScoreFor(assignment.rubric)
   if (input.score > maxScore) {
@@ -252,6 +283,9 @@ export async function reviewSubmission(
   submission.reviewedAt = reviewedAt
   await submission.save()
   await Review.create({
+    organizationId: actor.organizationId
+      ? new Types.ObjectId(actor.organizationId)
+      : null,
     submissionId: submission._id,
     assignmentId: submission.assignmentId,
     departmentId: submission.departmentId,
@@ -279,10 +313,10 @@ export async function assignmentRoster(
   const assignment = await getAssignment(actor, assignmentId)
   const departmentId = assignment.departmentId.toString()
   const [interns, submissions, briefs] = await Promise.all([
-    User.find({ role: "intern", departmentId, status: "active" }).sort({
+    User.find({ role: "intern", departmentId, status: "active", ...organizationScope(actor) }).sort({
       name: 1,
     }),
-    Submission.find({ assignmentId }),
+    Submission.find({ assignmentId, ...organizationScope(actor) }),
     departmentBriefs([assignment.departmentId]),
   ])
   const brief = briefs.get(departmentId) ?? null
@@ -295,7 +329,7 @@ export async function assignmentRoster(
   return {
     assignment: serializeAssignment(
       assignment,
-      await attachmentsFor(assignment.attachments ?? [])
+      await attachmentsFor(assignment.attachments ?? [], assignment.organizationId?.toString() ?? null)
     ),
     data: await Promise.all(
       interns.map(async (intern) => {
@@ -324,8 +358,9 @@ export async function internDashboard(actor: SessionUser) {
     Assignment.find({
       departmentId,
       status: { $in: ["published", "closed"] },
+      ...organizationScope(actor),
     }).sort({ deadline: 1 }),
-    Submission.find({ internId: actor.id }),
+    Submission.find({ internId: actor.id, ...organizationScope(actor) }),
   ])
   const submissionByAssignment = new Map(
     submissions.map((submission) => [
@@ -339,7 +374,7 @@ export async function internDashboard(actor: SessionUser) {
       return {
         assignment: serializeAssignment(
           assignment,
-          await attachmentsFor(assignment.attachments ?? [])
+          await attachmentsFor(assignment.attachments ?? [], assignment.organizationId?.toString() ?? null)
         ),
         submission: submission
           ? serializeSubmission(submission, {
@@ -374,9 +409,10 @@ export async function instructorSummary(actor: SessionUser) {
       ClassSession.countDocuments({
         departmentId,
         scheduledEnd: { $gte: now },
+        ...organizationScope(actor),
       }),
-      Assignment.countDocuments({ departmentId, status: "published" }),
-      Submission.countDocuments({ departmentId, status: "submitted" }),
+      Assignment.countDocuments({ departmentId, status: "published", ...organizationScope(actor) }),
+      Submission.countDocuments({ departmentId, status: "submitted", ...organizationScope(actor) }),
     ])
   return { upcomingClasses, publishedAssignments, submissionsToReview }
 }
@@ -390,11 +426,13 @@ export async function supervisorOverview(actor: SessionUser) {
       role: "instructor",
       departmentId,
       status: { $ne: "archived" },
+      ...organizationScope(actor),
     }),
     User.countDocuments({
       role: "intern",
       departmentId,
       status: { $ne: "archived" },
+      ...organizationScope(actor),
     }),
     departmentBriefs([new Types.ObjectId(departmentId)]),
   ])

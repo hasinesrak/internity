@@ -12,7 +12,8 @@ import { readSession, signSession } from "../lib/session.js"
 import { createSecretToken, hashToken } from "../lib/tokens.js"
 import { User } from "../models/user.js"
 import type { SessionUser } from "../types.js"
-import { assertAdmin } from "./access.js"
+import { assertAdmin, organizationScope } from "./access.js"
+import { SupportSession } from "../models/support-session.js"
 
 export async function login(
   email: string,
@@ -89,6 +90,10 @@ export async function endSession(token: string | undefined): Promise<void> {
   if (!token) return
   try {
     const session = await readSession(token)
+    if (session.supportSessionId) {
+      await SupportSession.updateOne({ _id: session.supportSessionId }, { $set: { revokedAt: new Date() } })
+      return
+    }
     await User.updateOne(
       { _id: session.userId, tokenVersion: session.tokenVersion },
       { $inc: { tokenVersion: 1 } }
@@ -104,7 +109,7 @@ export async function changePassword(
   currentPassword: string,
   newPassword: string
 ) {
-  const user = await User.findById(actor.id).select("+passwordHash")
+  const user = await User.findOne({ _id: actor.id, ...organizationScope(actor) }).select("+passwordHash")
   if (!user) throw new AppError(401, "UNAUTHENTICATED", "Sign in to continue.")
   const matches = await verifyPassword(currentPassword, user.passwordHash)
   if (!matches) {
@@ -134,7 +139,7 @@ export async function changePassword(
     entityId: actor.id,
     departmentId: actor.departmentId,
   })
-  return { token, user: await presentUser(actor.id) }
+  return { token, user: await presentUser(actor.id, actor.organizationId) }
 }
 
 export async function requestPasswordReset(
@@ -143,7 +148,7 @@ export async function requestPasswordReset(
   password?: string
 ) {
   assertAdmin(actor)
-  const user = await User.findById(userId)
+  const user = await User.findOne({ _id: userId, ...organizationScope(actor) })
   if (!user) throw notFound("That account was not found.")
   if (user.status === "archived") {
     throw new AppError(

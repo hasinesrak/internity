@@ -3,6 +3,7 @@ import { Schema, model, type HydratedDocument, type Types } from "mongoose"
 export type ActivityValue = string | number | boolean | null
 
 export interface ActivityLogShape {
+  organizationId: Types.ObjectId | null
   actorId: Types.ObjectId | null
   action: string
   entityType: string
@@ -15,6 +16,12 @@ export interface ActivityLogShape {
 
 const activityLogSchema = new Schema<ActivityLogShape>(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+      index: true,
+    },
     actorId: { type: Schema.Types.ObjectId, ref: "User", default: null },
     action: { type: String, required: true },
     entityType: { type: String, required: true },

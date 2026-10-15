@@ -38,6 +38,7 @@ export interface AssignmentVerification {
 }
 
 export interface AssignmentShape {
+  organizationId: Types.ObjectId | null
   departmentId: Types.ObjectId
   title: string
   instructions: string
@@ -117,6 +118,12 @@ const verificationSchema = new Schema<AssignmentVerification>(
 
 const assignmentSchema = new Schema<AssignmentShape>(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+      index: true,
+    },
     departmentId: {
       type: Schema.Types.ObjectId,
       ref: "Department",

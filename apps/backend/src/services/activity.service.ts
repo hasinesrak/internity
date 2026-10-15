@@ -1,6 +1,6 @@
 import { Types, type FilterQuery } from "mongoose"
 
-import { assertAdmin } from "./access.js"
+import { assertAdmin, organizationScope } from "./access.js"
 import { pageResult } from "./serializers.js"
 import type { ActivityValue } from "../models/activity-log.js"
 import { ActivityLog } from "../models/activity-log.js"
@@ -16,7 +16,9 @@ export async function recordActivity(input: {
   metadata?: Record<string, ActivityValue>
 }): Promise<void> {
   try {
+    const actor = input.actorId ? await User.findById(input.actorId).select("organizationId") : null
     await ActivityLog.create({
+      organizationId: actor?.organizationId ?? null,
       actorId: input.actorId ? new Types.ObjectId(input.actorId) : null,
       action: input.action,
       entityType: input.entityType,
@@ -42,7 +44,7 @@ export async function listActivity(
   query: { page: number; pageSize: number; departmentId?: string }
 ) {
   assertAdmin(actor)
-  const filter: FilterQuery<unknown> = {}
+  const filter: FilterQuery<unknown> = organizationScope(actor)
   if (query.departmentId) filter.departmentId = query.departmentId
   const [total, rows] = await Promise.all([
     ActivityLog.countDocuments(filter),
@@ -52,7 +54,7 @@ export async function listActivity(
       .limit(query.pageSize),
   ])
   const actorIds = rows.flatMap((row) => (row.actorId ? [row.actorId] : []))
-  const actors = await User.find({ _id: { $in: actorIds } })
+  const actors = await User.find({ _id: { $in: actorIds }, ...organizationScope(actor) })
   const names = new Map(actors.map((user) => [user._id.toString(), user.name]))
   return pageResult(
     rows.map((row) => ({

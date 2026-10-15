@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
-export type ApiSurface = "public" | "staff"
+export type ApiSurface = "public" | "staff" | "platform"
 
 export type AppEnvConfig = {
   nodeEnv: "development" | "test" | "production"
@@ -13,8 +13,16 @@ export type AppEnvConfig = {
   corsOrigins: string[]
   appUrl: string
   staffAppUrl: string
+  platformAppUrl: string
   jwtSecret: string
   jwtMaxAgeSeconds: number
+  platformSessionSeconds: number
+  platformMfaRequired: boolean
+  mfaEncryptionKey: string
+  stripeSecretKey: string
+  stripeWebhookSecret: string
+  stripeStarterPriceId: string
+  stripeGrowthPriceId: string
   cookieSecure: boolean
   staffAllowedIps: string[]
   staffAllowPrivate: boolean
@@ -31,6 +39,9 @@ export type AppEnvConfig = {
   adminName: string
   adminEmail: string
   adminPassword: string
+  platformAdminName: string
+  platformAdminEmail: string
+  platformAdminPassword: string
   uploadDir: string
   uploadMaxMb: number
 }
@@ -149,10 +160,18 @@ export function getEnv(): AppEnvConfig {
     "API_SURFACE",
     nodeEnv === "production" ? "" : "staff"
   ).toLowerCase()
-  if (surfaceRaw !== "public" && surfaceRaw !== "staff") {
-    throw new Error("API_SURFACE must be public or staff")
+  if (
+    surfaceRaw !== "public" &&
+    surfaceRaw !== "staff" &&
+    surfaceRaw !== "platform"
+  ) {
+    throw new Error("API_SURFACE must be public, staff, or platform")
   }
   const apiSurface = surfaceRaw
+  const mfaEncryptionKey = optional("MFA_ENCRYPTION_KEY", nodeEnv === "production" ? "" : jwtSecret)
+  if (apiSurface === "platform" && nodeEnv === "production" && mfaEncryptionKey.length < 32) {
+    throw new Error("MFA_ENCRYPTION_KEY must be at least 32 characters for the production platform API")
+  }
 
   const appUrl = optional(
     "APP_URL",
@@ -176,6 +195,17 @@ export function getEnv(): AppEnvConfig {
       throw new Error("STAFF_APP_URL is required")
     }
     staffAppUrl = appUrl
+  }
+
+  let platformAppUrl = optional(
+    "PLATFORM_APP_URL",
+    nodeEnv === "production" ? "" : "http://localhost:3002"
+  ).replace(/\/$/, "")
+  if (!platformAppUrl) {
+    if (nodeEnv === "production" && apiSurface === "platform") {
+      throw new Error("PLATFORM_APP_URL is required")
+    }
+    platformAppUrl = appUrl
   }
 
   const staffAllowedIps = optional("STAFF_ALLOWED_IPS")
@@ -210,8 +240,16 @@ export function getEnv(): AppEnvConfig {
     corsOrigins,
     appUrl,
     staffAppUrl,
+    platformAppUrl,
     jwtSecret,
     jwtMaxAgeSeconds: parseDurationSeconds(optional("JWT_EXPIRES_IN", "8h")),
+    platformSessionSeconds: parseDurationSeconds(optional("PLATFORM_SESSION_EXPIRES_IN", "30m")),
+    platformMfaRequired: ["true", "1"].includes(optional("PLATFORM_MFA_REQUIRED", nodeEnv === "production" ? "true" : "false")),
+    mfaEncryptionKey,
+    stripeSecretKey: optional("STRIPE_SECRET_KEY"),
+    stripeWebhookSecret: optional("STRIPE_WEBHOOK_SECRET"),
+    stripeStarterPriceId: optional("STRIPE_STARTER_PRICE_ID"),
+    stripeGrowthPriceId: optional("STRIPE_GROWTH_PRICE_ID"),
     cookieSecure: cookieRaw === "true" || cookieRaw === "1",
     staffAllowedIps,
     staffAllowPrivate: ["true", "1"].includes(
@@ -233,6 +271,9 @@ export function getEnv(): AppEnvConfig {
     adminName: optional("ADMIN_NAME", "Admin"),
     adminEmail: optional("ADMIN_EMAIL").toLowerCase(),
     adminPassword: optional("ADMIN_PASSWORD"),
+    platformAdminName: optional("PLATFORM_ADMIN_NAME", "Platform admin"),
+    platformAdminEmail: optional("PLATFORM_ADMIN_EMAIL").toLowerCase(),
+    platformAdminPassword: optional("PLATFORM_ADMIN_PASSWORD"),
     uploadDir,
     uploadMaxMb,
   }
@@ -240,10 +281,15 @@ export function getEnv(): AppEnvConfig {
 
 export function appLink(
   path: string,
-  audience: "intern" | "staff" = "intern"
+  audience: "intern" | "staff" | "platform" = "intern"
 ): string {
   const env = getEnv()
-  const base = audience === "staff" ? env.staffAppUrl : env.appUrl
+  const base =
+    audience === "staff"
+      ? env.staffAppUrl
+      : audience === "platform"
+        ? env.platformAppUrl
+        : env.appUrl
   const normalized = path.startsWith("/") ? path : `/${path}`
   return `${base}${normalized}`
 }

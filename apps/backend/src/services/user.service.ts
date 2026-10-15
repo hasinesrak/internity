@@ -1,6 +1,6 @@
 import { Types, type FilterQuery } from "mongoose"
 
-import { assertAdmin } from "./access.js"
+import { assertAdmin, organizationScope } from "./access.js"
 import { recordActivity } from "./activity.service.js"
 import {
   assignSupervisorSlot,
@@ -16,14 +16,16 @@ import { Department } from "../models/department.js"
 import { Invitation } from "../models/invitation.js"
 import { User, type UserDoc } from "../models/user.js"
 import type { SessionUser } from "../types.js"
+import { assertUserCapacity } from "./billing.service.js"
+import { withTenantWriteLock } from "./tenant-lock.service.js"
 import type {
   CreateUserInput,
   UpdateUserInput,
   UserListQuery,
 } from "../validators.js"
 
-export async function presentUser(id: string): Promise<PublicUser> {
-  const user = await User.findById(id)
+export async function presentUser(id: string, organizationId?: string | null): Promise<PublicUser> {
+  const user = await User.findOne({ _id: id, ...(organizationId === undefined ? {} : { organizationId: organizationId ? new Types.ObjectId(organizationId) : null }) })
   if (!user) throw notFound("That account was not found.")
   const briefs = await departmentBriefs([user.departmentId])
   return serializeUser(
@@ -46,8 +48,8 @@ async function presentMany(users: UserDoc[]) {
   )
 }
 
-function listFilter(query: UserListQuery): FilterQuery<UserDoc> {
-  const filter: FilterQuery<UserDoc> = {}
+function listFilter(actor: SessionUser, query: UserListQuery): FilterQuery<UserDoc> {
+  const filter: FilterQuery<UserDoc> = organizationScope(actor)
   if (query.role) filter.role = query.role
   if (query.status) filter.status = query.status
   else if (query.includeArchived !== "true") filter.status = { $ne: "archived" }
@@ -67,7 +69,7 @@ function listFilter(query: UserListQuery): FilterQuery<UserDoc> {
 
 export async function listUsers(actor: SessionUser, query: UserListQuery) {
   if (actor.role !== "admin" && actor.role !== "hr") throw forbidden()
-  const filter = listFilter(query)
+  const filter = listFilter(actor, query)
   const [total, users] = await Promise.all([
     User.countDocuments(filter),
     User.find(filter)
@@ -79,10 +81,12 @@ export async function listUsers(actor: SessionUser, query: UserListQuery) {
 }
 
 export async function listDepartmentPeople(
+  actor: SessionUser,
   departmentId: string,
   role: "intern" | "instructor"
 ) {
   const users = await User.find({
+    ...organizationScope(actor),
     role,
     departmentId,
     status: { $ne: "archived" },
@@ -90,8 +94,9 @@ export async function listDepartmentPeople(
   return presentMany(users)
 }
 
-async function assertNotLastAdmin(userId: string) {
+async function assertNotLastAdmin(actor: SessionUser, userId: string) {
   const others = await User.countDocuments({
+    ...organizationScope(actor),
     role: "admin",
     status: "active",
     _id: { $ne: userId },
@@ -127,7 +132,7 @@ export async function createActiveUser(
   assertAdmin(actor)
   const email = input.email.toLowerCase()
   const existing = await User.findOne({ email }).select("+passwordHash")
-  if (existing && existing.status !== "archived") {
+  if (existing && (existing.status !== "archived" || (existing.organizationId?.toString() ?? null) !== actor.organizationId)) {
     throw new AppError(
       409,
       "EMAIL_IN_USE",
@@ -136,13 +141,16 @@ export async function createActiveUser(
   }
   const departmentId = input.departmentId ?? null
   assertRoleDepartment(input.role, departmentId)
-  if (departmentId) await requireActiveDepartment(departmentId)
+  if (departmentId) await requireActiveDepartment(departmentId, actor.organizationId)
   const profile = profileFromInput(input.profile)
   const passwordHash = await hashPassword(input.password)
   const user =
     existing ??
     new User({
       email,
+      organizationId: actor.organizationId
+        ? new Types.ObjectId(actor.organizationId)
+        : null,
       createdBy: new Types.ObjectId(actor.id),
     })
   user.name = input.name
@@ -150,12 +158,18 @@ export async function createActiveUser(
   user.role = input.role
   user.status = "active"
   user.departmentId = departmentId ? new Types.ObjectId(departmentId) : null
+  user.organizationId = actor.organizationId
+    ? new Types.ObjectId(actor.organizationId)
+    : user.organizationId
   user.profile = profile
   user.passwordHash = passwordHash
   user.tokenVersion += 1
-  await user.save()
+  await withTenantWriteLock(actor.organizationId, async () => {
+    await assertUserCapacity(actor.organizationId, input.role === "intern")
+    await user.save()
+  })
   if (input.role === "supervisor" && departmentId) {
-    await assignSupervisorSlot(departmentId, user._id.toString())
+    await assignSupervisorSlot(departmentId, user._id.toString(), actor.organizationId)
   }
   await recordActivity({
     actorId: actor.id,
@@ -165,7 +179,7 @@ export async function createActiveUser(
     departmentId,
     metadata: { email, role: input.role },
   })
-  return presentUser(user._id.toString())
+  return presentUser(user._id.toString(), actor.organizationId)
 }
 
 export async function updateUser(
@@ -185,7 +199,7 @@ export async function updateUser(
       "Choose a different account for this action."
     )
   }
-  const user = await User.findById(userId).select("+passwordHash")
+  const user = await User.findOne({ _id: userId, ...organizationScope(actor) }).select("+passwordHash")
   if (!user) throw notFound("That account was not found.")
 
   const nextRole = patch.role ?? user.role
@@ -199,7 +213,7 @@ export async function updateUser(
   if (nextStatus === "archived") {
     // Archived accounts can keep a department for history.
   } else if (nextDepartmentId) {
-    const department = await Department.findById(nextDepartmentId)
+    const department = await Department.findOne({ _id: nextDepartmentId, ...organizationScope(actor) })
     if (!department) throw notFound("That department was not found.")
     if (
       department.status !== "active" &&
@@ -216,7 +230,7 @@ export async function updateUser(
     user.role === "admin" &&
     (nextRole !== "admin" || nextStatus !== "active")
   ) {
-    await assertNotLastAdmin(userId)
+    await assertNotLastAdmin(actor, userId)
   }
 
   const previousRole = user.role
@@ -229,7 +243,12 @@ export async function updateUser(
     ? new Types.ObjectId(nextDepartmentId)
     : null
   if (nextStatus !== "active") user.tokenVersion += 1
-  await user.save()
+  await withTenantWriteLock(actor.organizationId, async () => {
+    if (nextStatus === "active" && (user.isModified("status") || (nextRole === "intern" && user.isModified("role")))) {
+      await assertUserCapacity(actor.organizationId, nextRole === "intern", user._id.toString())
+    }
+    await user.save()
+  })
 
   if (
     previousRole === "supervisor" &&
@@ -246,7 +265,7 @@ export async function updateUser(
     nextDepartmentId &&
     nextStatus !== "archived"
   ) {
-    await assignSupervisorSlot(nextDepartmentId, user._id.toString())
+    await assignSupervisorSlot(nextDepartmentId, user._id.toString(), actor.organizationId)
   }
 
   await recordActivity({
@@ -257,7 +276,7 @@ export async function updateUser(
     departmentId: nextDepartmentId,
     metadata: { role: nextRole, status: nextStatus },
   })
-  return presentUser(userId)
+  return presentUser(userId, actor.organizationId)
 }
 
 export async function revokeUser(
@@ -272,9 +291,9 @@ export async function revokeUser(
       "Choose a different account for this action."
     )
   }
-  const user = await User.findById(userId)
+  const user = await User.findOne({ _id: userId, ...organizationScope(actor) })
   if (!user) throw notFound("That account was not found.")
-  if (user.role === "admin") await assertNotLastAdmin(userId)
+  if (user.role === "admin") await assertNotLastAdmin(actor, userId)
   user.status = "suspended"
   user.tokenVersion += 1
   await user.save()
@@ -285,7 +304,7 @@ export async function revokeUser(
     entityId: userId,
     departmentId: user.departmentId ? user.departmentId.toString() : null,
   })
-  return presentUser(userId)
+  return presentUser(userId, actor.organizationId)
 }
 
 export async function archiveUser(
@@ -300,10 +319,10 @@ export async function archiveUser(
       "Choose a different account for this action."
     )
   }
-  const user = await User.findById(userId)
+  const user = await User.findOne({ _id: userId, ...organizationScope(actor) })
   if (!user) throw notFound("That account was not found.")
   if (user.role === "admin" && user.status === "active")
-    await assertNotLastAdmin(userId)
+    await assertNotLastAdmin(actor, userId)
   user.status = "archived"
   user.tokenVersion += 1
   await user.save()
@@ -320,7 +339,7 @@ export async function archiveUser(
     entityId: userId,
     departmentId: user.departmentId ? user.departmentId.toString() : null,
   })
-  return presentUser(userId)
+  return presentUser(userId, actor.organizationId)
 }
 
 export async function adminSummary(actor: SessionUser) {
@@ -334,13 +353,13 @@ export async function adminSummary(actor: SessionUser) {
     departments,
     pendingInvitations,
   ] = await Promise.all([
-    User.countDocuments({ role: "admin", status: { $ne: "archived" } }),
-    User.countDocuments({ role: "hr", status: { $ne: "archived" } }),
-    User.countDocuments({ role: "supervisor", status: { $ne: "archived" } }),
-    User.countDocuments({ role: "instructor", status: { $ne: "archived" } }),
-    User.countDocuments({ role: "intern", status: { $ne: "archived" } }),
-    Department.countDocuments({ status: "active" }),
-    Invitation.countDocuments({ status: "pending" }),
+    User.countDocuments({ role: "admin", status: { $ne: "archived" }, ...organizationScope(actor) }),
+    User.countDocuments({ role: "hr", status: { $ne: "archived" }, ...organizationScope(actor) }),
+    User.countDocuments({ role: "supervisor", status: { $ne: "archived" }, ...organizationScope(actor) }),
+    User.countDocuments({ role: "instructor", status: { $ne: "archived" }, ...organizationScope(actor) }),
+    User.countDocuments({ role: "intern", status: { $ne: "archived" }, ...organizationScope(actor) }),
+    Department.countDocuments({ status: "active", ...organizationScope(actor) }),
+    Invitation.countDocuments({ status: "pending", ...organizationScope(actor) }),
   ])
   return {
     users: { admin, hr, supervisor, instructor, intern },

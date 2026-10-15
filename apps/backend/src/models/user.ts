@@ -17,6 +17,7 @@ export interface UserShape {
   role: Role
   status: UserStatus
   departmentId: Types.ObjectId | null
+  organizationId: Types.ObjectId | null
   createdBy: Types.ObjectId | null
   lastLoginAt: Date | null
   profile: UserProfile
@@ -66,6 +67,12 @@ const userSchema = new Schema<UserShape>(
       default: null,
       index: true,
     },
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+      index: true,
+    },
     createdBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -81,6 +88,7 @@ const userSchema = new Schema<UserShape>(
 )
 
 userSchema.index({ role: 1, status: 1 })
+userSchema.index({ organizationId: 1, role: 1, status: 1 })
 userSchema.index({ "profile.studentId": 1 })
 
 export type UserDoc = HydratedDocument<UserShape>

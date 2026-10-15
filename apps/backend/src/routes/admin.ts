@@ -48,6 +48,9 @@ import {
 } from "../validators.js"
 import type { AppEnv } from "../types.js"
 import type { InvitationRole } from "../config/constants.js"
+import { changeCustomerPlan, getBillingOverview, listInvoices } from "../services/billing.service.js"
+import { customerPlanSchema } from "../validators.js"
+import { createCheckoutSession, createBillingPortal } from "../services/stripe-billing.service.js"
 
 export const adminRoutes = new Hono<AppEnv>()
 
@@ -56,6 +59,16 @@ adminRoutes.use("*", requireAuth, requireRoles("admin"))
 adminRoutes.get("/summary", async (c) =>
   c.json(await adminSummary(c.get("user")))
 )
+adminRoutes.get("/billing", async (c) => c.json({ billing: await getBillingOverview(c.get("user").organizationId ?? "") }))
+adminRoutes.get("/billing/invoices", async (c) => c.json({ invoices: await listInvoices(c.get("user").organizationId ?? "") }))
+adminRoutes.patch("/billing/plan", async (c) => {
+  const body = parseBody(customerPlanSchema, await readJson(c)); return c.json(await changeCustomerPlan(c.get("user").organizationId ?? "", body, c.get("user").id))
+})
+adminRoutes.post("/billing/checkout", async (c) => {
+  const body = parseBody(customerPlanSchema, await readJson(c))
+  return c.json(await createCheckoutSession(c.get("user").organizationId ?? "", body.planCode))
+})
+adminRoutes.post("/billing/portal", async (c) => c.json(await createBillingPortal(c.get("user").organizationId ?? "")))
 
 adminRoutes.get("/ai/models", async (c) => {
   return c.json({ models: await getAiModels() })
@@ -95,7 +108,7 @@ adminRoutes.post("/users", async (c) => {
 })
 
 adminRoutes.get("/users/:id", async (c) => {
-  return c.json({ user: await presentUser(requireId(c)) })
+  return c.json({ user: await presentUser(requireId(c), c.get("user").organizationId) })
 })
 
 adminRoutes.patch("/users/:id", async (c) => {
@@ -208,7 +221,7 @@ adminRoutes.get("/activity", async (c) => {
 })
 
 adminRoutes.get("/settings", async (c) => {
-  return c.json({ settings: await getSettings() })
+  return c.json({ settings: await getSettings(c.get("user").organizationId) })
 })
 
 adminRoutes.patch("/settings", async (c) => {

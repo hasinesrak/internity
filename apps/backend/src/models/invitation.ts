@@ -3,6 +3,7 @@ import { Schema, model, type HydratedDocument, type Types } from "mongoose"
 import type { InvitationRole, InvitationStatus } from "../config/constants.js"
 
 export interface InvitationShape {
+  organizationId: Types.ObjectId | null
   email: string
   departmentId: Types.ObjectId | null
   role: InvitationRole
@@ -19,6 +20,12 @@ export interface InvitationShape {
 
 const invitationSchema = new Schema<InvitationShape>(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+      index: true,
+    },
     email: { type: String, required: true, lowercase: true, trim: true },
     departmentId: {
       type: Schema.Types.ObjectId,

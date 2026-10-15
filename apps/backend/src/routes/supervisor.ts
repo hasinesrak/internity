@@ -34,6 +34,7 @@ supervisorRoutes.get("/overview", async (c) => {
 
 supervisorRoutes.get("/instructors", async (c) => {
   const data = await listDepartmentPeople(
+    c.get("user"),
     departmentIdOf(c.get("user")),
     "instructor"
   )
@@ -70,6 +71,7 @@ supervisorRoutes.delete("/instructors/:id", async (c) => {
 
 supervisorRoutes.get("/interns", async (c) => {
   const data = await listDepartmentPeople(
+    c.get("user"),
     departmentIdOf(c.get("user")),
     "intern"
   )

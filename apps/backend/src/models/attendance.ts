@@ -10,6 +10,7 @@ export const ATTENDANCE_STATUSES = [
 export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number]
 
 export interface AttendanceShape {
+  organizationId: Types.ObjectId | null
   internId: Types.ObjectId
   departmentId: Types.ObjectId
   /** Calendar date in the organisation timezone, formatted YYYY-MM-DD. */
@@ -24,6 +25,12 @@ export interface AttendanceShape {
 
 const attendanceSchema = new Schema<AttendanceShape>(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+      index: true,
+    },
     internId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     departmentId: { type: Schema.Types.ObjectId, ref: "Department", required: true, index: true },
     date: { type: String, required: true, match: /^\d{4}-\d{2}-\d{2}$/ },

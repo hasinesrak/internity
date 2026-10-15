@@ -3,6 +3,7 @@ import { Schema, model, type HydratedDocument, type Types } from "mongoose"
 export type ClassSessionStatus = "scheduled" | "cancelled"
 
 export interface ClassSessionShape {
+  organizationId: Types.ObjectId | null
   departmentId: Types.ObjectId
   title: string
   agenda: string
@@ -21,6 +22,12 @@ export interface ClassSessionShape {
 
 const classSessionSchema = new Schema<ClassSessionShape>(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+      index: true,
+    },
     departmentId: {
       type: Schema.Types.ObjectId,
       ref: "Department",

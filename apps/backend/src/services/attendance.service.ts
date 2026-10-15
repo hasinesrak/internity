@@ -8,6 +8,7 @@ import { serializeAttendance, type PublicAttendance } from "./serializers.js"
 import type { SessionUser } from "../types.js"
 import type { AttendanceStatus } from "../models/attendance.js"
 import { getEnv } from "../config/env.js"
+import { organizationScope } from "./access.js"
 
 type Range = { from: string; to: string; internId?: string; departmentId?: string }
 
@@ -38,7 +39,12 @@ function assertNotFuture(date: string): void {
 }
 
 async function targetIntern(actor: SessionUser, internId: string) {
-  const intern = await User.findOne({ _id: internId, role: "intern", status: { $ne: "archived" } })
+  const intern = await User.findOne({
+    _id: internId,
+    role: "intern",
+    status: { $ne: "archived" },
+    ...organizationScope(actor),
+  })
   if (!intern) throw notFound("That intern was not found.")
   if (actor.role === "intern" && intern._id.toString() !== actor.id) throw forbidden()
   if (actor.role === "supervisor" && intern.departmentId?.toString() !== actor.departmentId) throw forbidden()
@@ -51,7 +57,10 @@ function canReadDepartment(actor: SessionUser, departmentId: string): boolean {
 
 export async function listAttendance(actor: SessionUser, range: Range): Promise<PublicAttendance[]> {
   assertRange(range)
-  const filter: Record<string, unknown> = { date: { $gte: range.from, $lte: range.to } }
+  const filter: Record<string, unknown> = {
+    date: { $gte: range.from, $lte: range.to },
+    ...organizationScope(actor),
+  }
   if (actor.role === "intern") {
     filter.internId = actor.id
   } else if (actor.role === "supervisor") {
@@ -96,11 +105,18 @@ async function saveOne(
   const intern = await targetIntern(actor, internId)
   if (!intern.departmentId) throw validation("Assign the intern to a department first.", "internId")
   if (source === "supervisor" && actor.role !== "supervisor" && actor.role !== "admin") throw forbidden()
-  const previous = await Attendance.findOne({ internId: intern._id, date: input.date })
+  const previous = await Attendance.findOne({
+    internId: intern._id,
+    date: input.date,
+    ...organizationScope(actor),
+  })
   const row = await Attendance.findOneAndUpdate(
-    { internId: intern._id, date: input.date },
+    { internId: intern._id, date: input.date, ...organizationScope(actor) },
     {
       $set: {
+        organizationId: actor.organizationId
+          ? new Types.ObjectId(actor.organizationId)
+          : null,
         departmentId: intern.departmentId,
         status: input.status,
         note: input.note ?? "",

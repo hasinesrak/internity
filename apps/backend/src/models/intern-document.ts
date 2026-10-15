@@ -1,6 +1,7 @@
 import { Schema, model, type HydratedDocument, type Types } from "mongoose"
 
 export interface InternDocumentShape {
+  organizationId: Types.ObjectId | null
   internId: Types.ObjectId
   departmentId: Types.ObjectId
   type: "cv"
@@ -17,6 +18,12 @@ export interface InternDocumentShape {
 
 const internDocumentSchema = new Schema<InternDocumentShape>(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+      index: true,
+    },
     internId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     departmentId: { type: Schema.Types.ObjectId, ref: "Department", required: true, index: true },
     type: { type: String, enum: ["cv"], required: true },

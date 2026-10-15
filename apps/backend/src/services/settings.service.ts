@@ -3,6 +3,8 @@ import { validateAiSelection } from "./ai-catalog.service.js"
 import { recordActivity } from "./activity.service.js"
 import { getEnv } from "../config/env.js"
 import { PlatformSettings } from "../models/platform-settings.js"
+import { OrganizationSettings } from "../models/organization-settings.js"
+import { Types } from "mongoose"
 import type { SessionUser } from "../types.js"
 
 export type PublicSettings = {
@@ -14,8 +16,35 @@ export type PublicSettings = {
   groqModel: string
 }
 
-export async function getSettings(): Promise<PublicSettings> {
+export async function getSettings(
+  organizationId: string | null = null
+): Promise<PublicSettings> {
   const fallbackModel = getEnv().aiModel
+  if (organizationId) {
+    const settings = await OrganizationSettings.findOneAndUpdate(
+      { organizationId },
+      {
+        $setOnInsert: {
+          organizationId: new Types.ObjectId(organizationId),
+          timezone: getEnv().appTimezone,
+          organizationName: "Internity",
+          invitationTtlHours: 168,
+          aiModel: fallbackModel,
+          aiProvider: "auto",
+        },
+      },
+      { upsert: true, new: true }
+    )
+    if (settings) {
+      return {
+        organizationName: settings.organizationName,
+        invitationTtlHours: settings.invitationTtlHours,
+        aiModel: settings.aiModel || fallbackModel,
+        aiProvider: settings.aiProvider || "auto",
+        groqModel: settings.aiModel || fallbackModel,
+      }
+    }
+  }
   const settings = await PlatformSettings.findOneAndUpdate(
     { key: "default" },
     {
@@ -59,7 +88,7 @@ export async function updateSettings(
   }
 ): Promise<PublicSettings> {
   assertAdmin(actor)
-  const current = await getSettings()
+  const current = await getSettings(actor.organizationId)
   const next = {
     organizationName: patch.organizationName ?? current.organizationName,
     invitationTtlHours: patch.invitationTtlHours ?? current.invitationTtlHours,
@@ -74,7 +103,26 @@ export async function updateSettings(
   if (patch.aiModel !== undefined || patch.aiProvider !== undefined) {
     await validateAiSelection(next.aiModel, next.aiProvider)
   }
-  await PlatformSettings.updateOne({ key: "default" }, { $set: next })
+  if (actor.organizationId) {
+    await OrganizationSettings.updateOne(
+      { organizationId: actor.organizationId },
+      {
+        $set: {
+          organizationName: next.organizationName,
+          invitationTtlHours: next.invitationTtlHours,
+          aiModel: next.aiModel,
+          aiProvider: next.aiProvider,
+        },
+        $setOnInsert: {
+          organizationId: new Types.ObjectId(actor.organizationId),
+          timezone: getEnv().appTimezone,
+        },
+      },
+      { upsert: true }
+    )
+  } else {
+    await PlatformSettings.updateOne({ key: "default" }, { $set: next })
+  }
   await recordActivity({
     actorId: actor.id,
     action: "settings.updated",

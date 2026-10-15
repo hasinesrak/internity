@@ -3,12 +3,16 @@ import { deleteCookie, setCookie } from "hono/cookie"
 
 import { getEnv } from "../config/env.js"
 import {
+  PLATFORM_SESSION_COOKIE,
   SESSION_COOKIE,
   STAFF_SESSION_COOKIE,
 } from "../config/constants.js"
 
 export function sessionCookieName(): string {
-  return getEnv().apiSurface === "staff" ? STAFF_SESSION_COOKIE : SESSION_COOKIE
+  const surface = getEnv().apiSurface
+  if (surface === "staff") return STAFF_SESSION_COOKIE
+  if (surface === "platform") return PLATFORM_SESSION_COOKIE
+  return SESSION_COOKIE
 }
 
 function cookieOptions() {
@@ -24,7 +28,7 @@ function cookieOptions() {
 export function setSessionCookie(c: Context, token: string): void {
   setCookie(c, sessionCookieName(), token, {
     ...cookieOptions(),
-    maxAge: getEnv().jwtMaxAgeSeconds,
+    maxAge: getEnv().apiSurface === "platform" ? getEnv().platformSessionSeconds : getEnv().jwtMaxAgeSeconds,
   })
 }
 

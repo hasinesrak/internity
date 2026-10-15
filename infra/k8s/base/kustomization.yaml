@@ -14,9 +14,13 @@ resources:
   - backend-public-deployment.yaml
   - backend-staff-service.yaml
   - backend-staff-deployment.yaml
+  - backend-platform-service.yaml
+  - backend-platform-deployment.yaml
   - web-service.yaml
   - web-deployment.yaml
   - staff-service.yaml
   - staff-deployment.yaml
+  - platform-service.yaml
+  - platform-deployment.yaml
   - hpa.yaml
   - ingress.yaml

@@ -7,6 +7,7 @@ x-backend-environment: &backend-environment
   REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
   APP_URL: ${APP_URL:-http://${APP_HOST:-localhost}:3000}
   STAFF_APP_URL: ${STAFF_APP_URL:-http://${APP_HOST:-localhost}:3001}
+  PLATFORM_APP_URL: ${PLATFORM_APP_URL:-http://${APP_HOST:-localhost}:3002}
   APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Dhaka}
   JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-please-32}
   JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
@@ -22,6 +23,9 @@ x-backend-environment: &backend-environment
   ADMIN_NAME: ${ADMIN_NAME:-Admin}
   ADMIN_EMAIL: ${ADMIN_EMAIL:-}
   ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+  PLATFORM_ADMIN_NAME: ${PLATFORM_ADMIN_NAME:-Platform admin}
+  PLATFORM_ADMIN_EMAIL: ${PLATFORM_ADMIN_EMAIL:-}
+  PLATFORM_ADMIN_PASSWORD: ${PLATFORM_ADMIN_PASSWORD:-}
   UPLOAD_DIR: /data/uploads
   UPLOAD_MAX_MB: ${UPLOAD_MAX_MB:-10}
 
@@ -150,6 +154,48 @@ services:
       retries: 10
       start_period: 25s
 
+  backend-platform:
+    <<: *app-hardening
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    ports:
+      - "${PLATFORM_API_BIND:-127.0.0.1}:${PLATFORM_API_PORT:-4002}:${API_CONTAINER_PORT:-4000}"
+    environment:
+      <<: *backend-environment
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${API_CONTAINER_PORT:-4000}
+      API_SURFACE: platform
+      CORS_ORIGIN: ${PLATFORM_CORS_ORIGIN:-http://${APP_HOST:-localhost}:3002}
+      STAFF_ALLOWED_IPS: ""
+      STAFF_ALLOW_PRIVATE: "false"
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      PLATFORM_MFA_REQUIRED: ${PLATFORM_MFA_REQUIRED:-false}
+      PLATFORM_SESSION_EXPIRES_IN: ${PLATFORM_SESSION_EXPIRES_IN:-30m}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_STARTER_PRICE_ID: ${STRIPE_STARTER_PRICE_ID:-}
+      STRIPE_GROWTH_PRICE_ID: ${STRIPE_GROWTH_PRICE_ID:-}
+    volumes:
+      - uploads-data:/data/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+
   web:
     <<: *app-hardening
     build:
@@ -202,6 +248,33 @@ services:
           "node",
           "-e",
           "fetch('http://127.0.0.1:3001/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+
+  platform:
+    <<: *app-hardening
+    build:
+      context: .
+      dockerfile: apps/platform/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_PLATFORM_API_URL:-http://${APP_HOST:-localhost}:4002}
+    ports:
+      - "${PLATFORM_HOST:-127.0.0.1}:${PLATFORM_PORT:-3002}:3002"
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3002"
+      HOME: /tmp
+      NODE_ENV: production
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3002/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s

@@ -8,6 +8,12 @@ export const ROLES = [
 
 export type Role = (typeof ROLES)[number]
 
+/** Platform operators are authenticated on a separate API surface and are
+ * intentionally not part of the company-role union above. */
+export const PLATFORM_ADMIN_STATUSES = ["active", "suspended"] as const
+
+export type PlatformAdminStatus = (typeof PLATFORM_ADMIN_STATUSES)[number]
+
 export const STAFF_ROLES = ["admin", "hr", "supervisor", "instructor"] as const
 
 export type StaffRole = (typeof STAFF_ROLES)[number]
@@ -57,6 +63,7 @@ export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number]
 
 export const SESSION_COOKIE = "internity_session"
 export const STAFF_SESSION_COOKIE = "internity_staff_session"
+export const PLATFORM_SESSION_COOKIE = "internity_platform_session"
 
 export const RESET_TTL_HOURS = 2
 

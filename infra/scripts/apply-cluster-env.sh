@@ -17,7 +17,7 @@ esac
 root=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$root"
 
-if command -v kubectl >/dev/null 2>&1; then
+if command -v kubectl >/dev/null 2>&1 && kubectl --request-timeout=5s get nodes >/dev/null 2>&1; then
   kctl=(kubectl)
 elif command -v k3s >/dev/null 2>&1; then
   kctl=(sudo k3s kubectl)
@@ -63,9 +63,14 @@ require() {
 
 require JWT_SECRET
 require STAFF_ALLOWED_IPS
+require MFA_ENCRYPTION_KEY
 
 if ((${#env[JWT_SECRET]} < 32)); then
   echo "JWT_SECRET must be at least 32 characters." >&2
+  exit 1
+fi
+if ((${#env[MFA_ENCRYPTION_KEY]} < 32)); then
+  echo "MFA_ENCRYPTION_KEY must be at least 32 characters." >&2
   exit 1
 fi
 
@@ -110,7 +115,14 @@ emit() {
 
 emit MONGODB_URI "$mongo_uri"
 emit JWT_SECRET "${env[JWT_SECRET]}"
+emit MFA_ENCRYPTION_KEY "${env[MFA_ENCRYPTION_KEY]}"
 emit STAFF_ALLOWED_IPS "${env[STAFF_ALLOWED_IPS]}"
+emit PLATFORM_ADMIN_EMAIL "${env[PLATFORM_ADMIN_EMAIL]:-}"
+emit PLATFORM_ADMIN_PASSWORD "${env[PLATFORM_ADMIN_PASSWORD]:-}"
+emit STRIPE_SECRET_KEY "${env[STRIPE_SECRET_KEY]:-}"
+emit STRIPE_WEBHOOK_SECRET "${env[STRIPE_WEBHOOK_SECRET]:-}"
+emit STRIPE_STARTER_PRICE_ID "${env[STRIPE_STARTER_PRICE_ID]:-}"
+emit STRIPE_GROWTH_PRICE_ID "${env[STRIPE_GROWTH_PRICE_ID]:-}"
 emit ADMIN_NAME "${env[ADMIN_NAME]:-}"
 emit ADMIN_EMAIL "${env[ADMIN_EMAIL]:-}"
 emit ADMIN_PASSWORD "${env[ADMIN_PASSWORD]:-}"

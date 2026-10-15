@@ -4,7 +4,7 @@
 import sys
 from pathlib import Path
 
-IMAGES = ("internity-backend", "internity-web", "internity-staff")
+IMAGES = ("internity-backend", "internity-web", "internity-staff", "internity-platform")
 
 
 def fail(message: str) -> None:

@@ -2,7 +2,7 @@
 
 Internity is a role-based intern management platform for onboarding interns, organizing departments, scheduling classes, publishing assignments, collecting submissions, and reviewing intern work.
 
-One monorepo contains the full system: an **intern web app** (`apps/web`), a **staff web app** (`apps/staff`), a shared **design system** (`packages/ui`), and a single **API codebase** (`apps/backend`) that runs as two isolated surfaces (public + staff) against one MongoDB database.
+One monorepo contains the full system: an **intern web app** (`apps/web`), a **staff web app** (`apps/staff`), a **platform control-plane app** (`apps/platform`), a shared **design system** (`packages/ui`), and a single **API codebase** (`apps/backend`) that runs as three isolated surfaces (public + staff + platform) against one MongoDB database.
 
 **Roles:** Admin · HR · Supervisor · Instructor · Intern
 
@@ -51,6 +51,7 @@ One monorepo contains the full system: an **intern web app** (`apps/web`), a **s
 | Monorepo | pnpm workspaces + Turborepo |
 | Intern frontend (`apps/web`) | TanStack Start, TanStack Router, React 19, Tailwind CSS v4, Zustand |
 | Staff frontend (`apps/staff`) | TanStack Start, TanStack Router, React 19, Tailwind CSS v4, Zustand |
+| Platform frontend (`apps/platform`) | TanStack Start, TanStack Router, React 19, Tailwind CSS v4 |
 | Shared UI (`packages/ui`) | shadcn-style components on Base UI primitives, beUI motion blocks (installed as source), Phosphor Icons (duotone), Manrope |
 | Backend (`apps/backend`) | Hono.js, TypeScript, Mongoose, Zod, `jose` (JWT), `bcryptjs` |
 | AI features (optional) | Vercel AI Gateway + Vercel AI SDK (`ai`), default model `deepseek/deepseek-v4.1-flash` |
@@ -70,13 +71,15 @@ Package manager is **pnpm** (`10.33.4`). Node `>= 20` is required. Dependency ve
 Intern browser ──► apps/web (:3000) ──► Backend API_SURFACE=public (:4000) ──┐
                                                                               ├─► MongoDB 7.x (:27017)
 Staff browser ──► apps/staff (:3001) ──► Backend API_SURFACE=staff (:4001) ───┘
+Platform browser ─► apps/platform (:3002) ─► Backend API_SURFACE=platform (:4002)
                         (office IP or VPN only)
 ```
 
-There are **two frontends and two API processes**, but **one backend image and one database**:
+There are **three frontends and three API processes**, but **one backend image and one database**:
 
 - `apps/web` (intern site) talks only to the **public API**. Reachable from any address.
 - `apps/staff` (staff site) talks only to the **staff API**. Published on loopback and gated by `STAFF_ALLOWED_IPS`.
+- `apps/platform` (platform site) talks only to the **platform API**. It authenticates separate `PlatformAdmin` records and manages customer organizations.
 - Both API processes share `MONGODB_URI` and `JWT_SECRET`. Session cookie (`internity_session`) works against both.
 
 ### 3.2 Dual-surface backend (the core isolation mechanism)
@@ -87,6 +90,7 @@ There are **two frontends and two API processes**, but **one backend image and o
 |---|---|---|---|
 | Public | `public` | `GET /health`, `/api/auth` (intern only), `/api/intern`, `/api/departments` (read) | Intern traffic. Staff routes are **not registered** — the URLs do not exist here. Staff sign-in is refused. |
 | Staff | `staff` | Everything above **plus** `/api/admin`, `/api/hr`, `/api/supervisor`, `/api/instructor` | All staff operations. Staff sign-in requires the client IP to be in `STAFF_ALLOWED_IPS`. |
+| Platform | `platform` | `/health`, `/api/platform/auth`, `/api/platform` | Internity subscription and customer control plane. Platform sign-in uses a separate cookie and model. |
 
 Isolation is by **route absence**, not just role checks: an attacker on the public address cannot reach staff handlers because they are never mounted. Role and department checks still run on every mounted route as defense in depth (`apps/backend/src/app.ts:51-72`).
 
@@ -156,8 +160,9 @@ Submissions are **external links + notes** (no file hosting in MVP).
 internity/
   apps/
     web/            # Intern TanStack Start app (public)
-    staff/          # Staff TanStack Start app (office/VPN)
-    backend/        # Hono API — one image, API_SURFACE=public|staff
+    staff/          # Staff TanStack Start app (organization operations)
+    platform/       # Platform-admin TanStack Start app
+    backend/        # Hono API — one image, API_SURFACE=public|staff|platform
       src/          # config, db, middleware, models, routes, services, validators, lib
       Dockerfile
       env.example
@@ -198,7 +203,7 @@ node --version && pnpm --version && docker --version && docker compose version
 
 ## 6. Run Locally
 
-Two supported paths. **Option A (Docker Compose)** is recommended — it starts MongoDB, both APIs, and both sites with correct wiring. **Option B (manual)** is for frontend/backend iteration with hot reload.
+Two supported paths. **Option A (Docker Compose)** is recommended — it starts MongoDB, all three API surfaces, and all three sites with correct wiring. **Option B (manual)** is for frontend/backend iteration with hot reload.
 
 ### Option A — Full stack via Docker Compose (recommended)
 
@@ -232,8 +237,10 @@ Open:
 |---|---|---|
 | Intern site | http://localhost:3000 | Sign in as intern |
 | Staff site | http://localhost:3001 | Sign in as admin/HR/supervisor/instructor |
+| Platform site | http://localhost:3002 | Sign in as a seeded platform administrator |
 | Public API | http://localhost:4000 | `GET /health`, `GET /health/ready` |
 | Staff API | http://localhost:4001 | Staff routes live here only |
+| Platform API | http://localhost:4002 | Platform routes live here only |
 | MongoDB | mongodb://127.0.0.1:27017/internity | Data volume `internity_mongo` |
 
 Useful Compose commands:
@@ -324,6 +331,10 @@ pnpm --filter web dev      # http://localhost:3000
 # Terminal 4 — staff site
 copy apps\staff\env.example apps\staff\.env
 pnpm --filter staff dev    # http://localhost:3001
+
+# Terminal 5 — platform control plane
+copy apps\platform\env.example apps\platform\.env
+pnpm --filter platform dev # http://localhost:3002
 ```
 
 ```bash
@@ -347,7 +358,7 @@ Or start everything at once (after env files exist):
 pnpm dev
 ```
 
-**Backend surface note:** `pnpm --filter backend dev` runs a single process defaulting to `API_SURFACE=staff` (reads `PORT`/`HOST` from `apps/backend/.env`). To run the public copy manually, set `API_SURFACE=public` in that file or env. In Compose you get both automatically.
+**Backend surface note:** `pnpm --filter backend dev` runs a single process defaulting to `API_SURFACE=staff` (reads `PORT`/`HOST` from `apps/backend/.env`). To run the public or platform copy manually, set `API_SURFACE=public` or `API_SURFACE=platform` and use the corresponding port/CORS values. In Compose you get all three automatically.
 
 ---
 
@@ -356,13 +367,14 @@ pnpm dev
 | File | Purpose | Key values |
 |---|---|---|
 | `.env` (root) | Docker Compose wiring | `APP_HOST`, `PUBLIC_API_PORT` (4000), `STAFF_API_PORT` (4001), `WEB_PORT` (3000), `STAFF_PORT` (3001), `APP_URL`, `STAFF_APP_URL`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, `TRUST_PROXY`, `RESEND_API_KEY`, `AI_GATEWAY_API_KEY`, `AI_MODEL`, `AI_FILE_MODEL` (defaults to `google/gemini-3.5-flash-lite` for Copilot attachments), optional `RAILWAY_NEW_SSH_PRIVATE_KEY_B64`/`RAILWAY_NEW_SSH_KEY_PATH`, `ADMIN_*` bootstrap |
-| `apps/backend/.env` | Manual `pnpm --filter backend dev` | `HOST`, `PORT`, `MONGODB_URI`, `CORS_ORIGIN`, `API_SURFACE=staff\|public`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, mail + Groq keys |
+| `apps/backend/.env` | Manual `pnpm --filter backend dev` | `HOST`, `PORT`, `MONGODB_URI`, `CORS_ORIGIN`, `API_SURFACE=staff\|public\|platform`, `JWT_SECRET`, `STAFF_ALLOWED_IPS`, mail + AI keys |
 | `apps/web/.env` | Intern site | `WEB_HOST`, `WEB_PORT`, `VITE_API_URL=http://localhost:4000` (public API) |
 | `apps/staff/.env` | Staff site | `STAFF_HOST`, `STAFF_PORT`, `VITE_API_URL=http://localhost:4001` (staff API), `STAFF_ALLOWED_IPS` mirror |
+| `apps/platform/.env` | Platform site | `PLATFORM_HOST`, `PLATFORM_PORT`, `VITE_API_URL=http://localhost:4002` (platform API) |
 
 Rules that matter:
 
-- `JWT_SECRET` and `MONGODB_URI` must be identical across both API processes.
+- `JWT_SECRET` and `MONGODB_URI` must be identical across all API processes.
 - `APP_HOST` is the address other computers use to reach this server. Compose derives `APP_URL`, `STAFF_APP_URL`, CORS origins, and both frontend API URLs from it when those values are blank.
 - `APP_URL` builds intern links; `STAFF_APP_URL` builds staff links — keep them aligned with the site ports.
 - `STAFF_ALLOWED_IPS` controls which client addresses may use the staff surface. Use `127.0.0.1` for the localhost deployment. **Production staff API refuses to start until it is set.**
@@ -383,7 +395,15 @@ AI Gateway and returns an editable draft.
 
 ## 8. Seed Data and Admin Account
 
-`pnpm --filter backend seed` creates or updates only the configured admin account from `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`. It does not create demo HR, supervisor, instructor, or intern accounts. On the staff API's first startup, the same `ADMIN_*` values are used to bootstrap the admin automatically when no active admin exists.
+`pnpm --filter backend seed` creates or updates only the configured admin account from `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`. It does not create demo HR, supervisor, instructor, or intern accounts. On the staff API's first startup, the same `ADMIN_*` values bootstrap the admin and a first `internity` workspace when no organization exists; later customer workspaces are created from the platform control plane.
+
+The platform control plane uses a separate administrator collection and short-lived session. Set `PLATFORM_ADMIN_EMAIL` and `PLATFORM_ADMIN_PASSWORD`, then run `pnpm --filter backend seed:platform` before signing in at `http://localhost:3002`. The platform administrator is intentionally not a company `admin` account. Enable MFA from the platform dashboard; production requires a separate `MFA_ENCRYPTION_KEY` and `PLATFORM_MFA_REQUIRED=true`.
+
+For online subscriptions, set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_STARTER_PRICE_ID`, and `STRIPE_GROWTH_PRICE_ID` in the platform API environment. Configure Stripe to deliver signed events to `/api/platform/billing/webhooks/stripe`; subscription and invoice state is applied only after signature verification and is safe to retry. Without those values, company admins can still submit a manual plan request for platform-operator activation.
+
+From the platform dashboard, create each customer workspace with its first organization owner. The owner is provisioned as an organization-scoped `admin`; platform operators can then change the trial/plan state and suspend or restore the workspace without entering the customer staff surface.
+
+After taking a database backup, run `pnpm --filter backend migrate:tenant` once to create the first organization and backfill existing customer records with its `organizationId`. Set `MIGRATION_CONFIRM=yes` for production migrations. Use `MIGRATION_DRY_RUN=yes pnpm --filter backend migrate:tenant` to inspect pending records first, then run `pnpm --filter backend validate:tenant`; validation exits non-zero if any customer record is unowned, orphaned, or violates tenant-scoped department uniqueness. The migration is designed to be safe to rerun and reports the number of records updated per collection.
 
 Set `ADMIN_PASSWORD` to a value with at least eight characters, including a letter and a number. Keep the credentials in the VM environment files and never commit them.
 
@@ -396,12 +416,12 @@ Root (`package.json`, Turborepo-orchestrated):
 | Command | Effect |
 |---|---|
 | `pnpm dev` | `turbo dev` — all apps in dev mode |
-| `pnpm dev:web` / `dev:staff` / `dev:backend` | Single app in dev mode |
+| `pnpm dev:web` / `dev:staff` / `dev:platform` / `dev:backend` | Single app in dev mode |
 | `pnpm build` | Build all apps |
-| `pnpm seed` | Seed or update the configured admin account via the backend |
+| `pnpm seed` / `pnpm seed:platform` / `pnpm migrate:tenant` / `pnpm validate:tenant` | Seed company admin, seed platform admin, backfill organization ownership, or validate tenant data |
 | `pnpm lint` / `typecheck` / `format` | Quality gates across the workspace |
 
-Backend (`pnpm --filter backend <script>`): `dev` (watch), `build` → `dist/`, `start` (`node dist/index.js`), `seed`, `lint`, `typecheck`.
+Backend (`pnpm --filter backend <script>`): `dev` (watch), `build` → `dist/`, `start` (`node dist/index.js`), `seed`, `seed:platform`, `migrate:tenant`, `validate:tenant`, `lint`, `typecheck`.
 
 CLI (`pnpm --filter @internity/cli <script>`): `build`, `dev`, `typecheck`, `lint`. After publishing, interns can run `npm install -g @internity/cli`, `internity login`, and `internity run <assignment-id>` to practice locally. `internity submit <assignment-id> --url <work-url>` sends the passing verification result and work link to staff for final review; `internity verify <assignment-id>` only uploads the verification result.
 
@@ -428,6 +448,8 @@ pnpm lint
 ## 11. Security Model
 
 - **HTTP-only session cookie** (`internity_session`); no JWT in `localStorage`.
+- **Platform isolation** — platform operators use a separate API surface, cookie, model, MFA-enforced control plane, and audited support sessions. Support tokens are one-use, read-only, and expire automatically.
+- **Billing authority** — company plan state and invoices are organization-scoped; Stripe webhooks are signature-checked and idempotent, and usage limits are enforced server-side.
 - **CLI credentials** — The CLI uses a Bearer token returned by the dedicated intern-only CLI login endpoint and stores it in the platform config directory with restrictive permissions. Browser sessions remain cookie-based.
 - **Dual-surface isolation** — staff handlers absent from the public process.
 - **IP gating** — staff sign-in is restricted to `STAFF_ALLOWED_IPS`; the localhost deployment uses `127.0.0.1`. Public process refuses staff accounts unconditionally.
@@ -457,15 +479,42 @@ Health probes: `GET /health` (liveness), `GET /health/ready` (readiness incl. DB
 
 ## 13. Deployment Overview
 
-The k3s deployment uses the VM IP directly. Open `http://192.168.0.103/` for the intern app and `http://192.168.0.103/staff` for staff. No hosts-file entries are needed. Public API requests use `/api/*`; staff API requests use `/staff-api/api/*`. Readiness checks are `/health/ready` and `/staff-api/health/ready`. The staff router and assets are built with `VITE_BASE_PATH=/staff`, and the production server receives `STAFF_BASE_PATH=/staff`.
+The K3s deployment targets one control-plane VM and two worker VMs. The ingress address is used directly for the intern app (`http://<INGRESS_IP>/`) and staff app (`http://<INGRESS_IP>/staff`); no hosts-file entry is needed for those hostless ingresses. Public API requests use `/api/*`; staff API requests use `/staff-api/api/*`. The platform app uses the `platform.internity.local` host by default, so create DNS or a hosts-file entry for that name. Readiness checks are `/health/ready` and `/staff-api/health/ready`. The staff router and assets are built with `VITE_BASE_PATH=/staff`, and the production server receives `STAFF_BASE_PATH=/staff`.
 
-`infra/k8s/base/configmap.yaml` sets the VM IP for application links and CORS. If the VM IP changes, update its `APP_URL`, `STAFF_APP_URL`, `PUBLIC_CORS_ORIGIN`, and `STAFF_CORS_ORIGIN`. `STAFF_ALLOWED_IPS` accepts individual IPs and IPv4 CIDRs; the VM environment uses `192.168.0.0/24,127.0.0.1` so staff can sign in from this LAN. For a different office network, update the VM environment and rerun `bash infra/scripts/apply-cluster-env.sh`.
+`infra/k8s/base/configmap.yaml` contains the application URLs and CORS origins. Before the first sync, set `APP_URL`, `STAFF_APP_URL`, `PUBLIC_CORS_ORIGIN`, and `STAFF_CORS_ORIGIN` to the same externally reachable origin; mismatched values cause browsers to report a network error even while the API is healthy. `STAFF_ALLOWED_IPS` accepts individual IPs and IPv4 CIDRs. For a different office network, update the protected environment file and rerun `bash infra/scripts/apply-cluster-env.sh`.
 
-Production path is GitOps. `.github/workflows/ci.yml` follows four stages: lint and typecheck (including the backend integration suite), build (the workspace and all three images), deploy (a full Compose smoke test), and publish. Pushes to `main` or the repository's current `master` branch publish immutable `sha-<commit>` images plus `latest` tags to Docker Hub, then open a deployment pull request that updates `infra/k8s/overlays/production`; merging that pull request is the production promotion step, after which Argo CD (`infra/argocd/internity.yaml`) syncs the overlay into k3s. Use `.github/workflows/rollback.yml` from the Actions tab to propose a rollback to a previously published `sha-<commit>` image set. Separate Deployments run the intern site, the staff site, the public API, and the staff API. Both APIs are the same image with a different `API_SURFACE`. Staff access is enforced in the app from `STAFF_ALLOWED_IPS`, not by the ingress. On the VM, Redis provides shared rate-limit counters and MongoDB is a two-member `rs0` StatefulSet; use `docs/nginx-kubernetes-deployment.md` for the ingress, metrics, and stateful storage setup.
+Production path is GitOps. The GitHub Actions graph is deliberately staged:
+
+```text
+Pull request:  Quality gates ──┬── Build images ──┐
+                               └── Compose smoke ──┴── stop
+
+master push:   Quality gates ──┬── Build images ──┐
+                               └── Compose smoke ──┴── Publish images
+                                                        │
+                                                        ▼
+                                                Deployment PR
+                                                        │ merge
+                                                        ▼
+                                                  Argo CD → K3s
+```
+
+Quality gates run lint, typecheck, Mongo-backed integration tests, a workspace
+build, manifest rendering, and a critical production dependency audit. Only a
+validated `master` push publishes the four Docker images with immutable
+`sha-<commit>` tags (plus `latest`) and creates a deployment PR. Merging that
+manifest PR is the production promotion step; Argo CD then syncs the release.
+Use `.github/workflows/rollback.yml` for rollback.
+
+For a new K3s cluster, run `infra/scripts/setup-k3s-node.sh` on the control
+plane and each worker. To add another worker later, run the same `agent`
+command on the new VM; see `docs/argocd-quickstart.md`. Once the control plane
+is ready, `infra/scripts/bootstrap-control-plane.sh --sync` installs ingress,
+Argo CD, and starts the GitOps deployment without putting secrets in Git.
 
 ---
 
 ## 14. Further Documentation
 
-- `docs/argocd-quickstart.md` — one-command Argo CD registration and sync from the Linux VM
+- `docs/argocd-quickstart.md` — scripted control-plane/worker setup, ingress-nginx, Argo CD, secrets, seed, and rollback setup
 - `docs/nginx-kubernetes-deployment.md` — ingress-nginx, Redis rate limits, and MongoDB replica-set setup

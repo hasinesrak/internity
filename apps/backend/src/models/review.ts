@@ -3,6 +3,7 @@ import { Schema, model, type HydratedDocument, type Types } from "mongoose"
 import type { SubmissionStatus } from "../config/constants.js"
 
 export interface ReviewShape {
+  organizationId: Types.ObjectId | null
   submissionId: Types.ObjectId
   assignmentId: Types.ObjectId
   departmentId: Types.ObjectId
@@ -17,6 +18,12 @@ export interface ReviewShape {
 
 const reviewSchema = new Schema<ReviewShape>(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+      index: true,
+    },
     submissionId: {
       type: Schema.Types.ObjectId,
       ref: "Submission",

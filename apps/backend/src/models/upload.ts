@@ -1,6 +1,7 @@
 import { Schema, model, type HydratedDocument, type Types } from "mongoose"
 
 export interface UploadShape {
+  organizationId: Types.ObjectId | null
   departmentId: Types.ObjectId
   originalName: string
   storedName: string
@@ -15,6 +16,12 @@ export interface UploadShape {
 
 const uploadSchema = new Schema<UploadShape>(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+      index: true,
+    },
     departmentId: {
       type: Schema.Types.ObjectId,
       ref: "Department",

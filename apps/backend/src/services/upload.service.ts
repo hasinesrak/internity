@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises"
 import { Types } from "mongoose"
 
-import { ownDepartmentId, memberDepartmentId } from "./access.js"
+import { memberDepartmentId, organizationScope, ownDepartmentId } from "./access.js"
 import { requireActiveDepartment } from "./department.service.js"
 import { serializeUpload, type PublicAttachment } from "./serializers.js"
 import { AppError, notFound, validation } from "../lib/errors.js"
@@ -18,6 +18,8 @@ import { ClassSession } from "../models/class-session.js"
 import { Upload, type UploadDoc } from "../models/upload.js"
 import type { SessionUser } from "../types.js"
 import { getEnv } from "../config/env.js"
+import { assertStorageCapacity } from "./billing.service.js"
+import { withTenantWriteLock } from "./tenant-lock.service.js"
 
 export const MAX_ATTACHMENTS = 10
 
@@ -28,9 +30,14 @@ function cleanFileName(name: string): string {
 
 async function uploadInDepartment(
   id: string,
-  departmentId: string
+  departmentId: string,
+  organizationId: string | null = null
 ): Promise<UploadDoc> {
-  const upload = await Upload.findOne({ _id: id, departmentId })
+  const upload = await Upload.findOne({
+    _id: id,
+    departmentId,
+    organizationId: organizationId ? new Types.ObjectId(organizationId) : null,
+  })
   if (!upload) throw notFound("That file was not found.")
   return upload
 }
@@ -40,7 +47,7 @@ export async function createUpload(
   input: { bytes: Uint8Array; originalName: string; mimeType: string }
 ): Promise<PublicAttachment> {
   const departmentId = ownDepartmentId(actor)
-  await requireActiveDepartment(departmentId)
+  await requireActiveDepartment(departmentId, actor.organizationId)
   const originalName = cleanFileName(input.originalName)
   const declaredMimeType = (input.mimeType || "application/octet-stream")
     .toLowerCase()
@@ -64,12 +71,18 @@ export async function createUpload(
       "file"
     )
   }
+  return withTenantWriteLock(actor.organizationId, async () => {
+  await assertStorageCapacity(actor.organizationId, input.bytes.length)
   const { relativePath, storedName } = await saveUploadFile({
     bytes: input.bytes,
     originalName,
     mimeType,
   })
+  try {
   const upload = await Upload.create({
+    organizationId: actor.organizationId
+      ? new Types.ObjectId(actor.organizationId)
+      : null,
     departmentId: new Types.ObjectId(departmentId),
     originalName,
     storedName,
@@ -79,6 +92,8 @@ export async function createUpload(
     createdBy: new Types.ObjectId(actor.id),
   })
   return serializeUpload(upload)
+  } catch (error) { await removeUploadFile(relativePath); throw error }
+  })
 }
 
 export async function readUploadFile(
@@ -86,7 +101,7 @@ export async function readUploadFile(
   id: string
 ): Promise<{ upload: UploadDoc; absolutePath: string }> {
   const departmentId = memberDepartmentId(actor)
-  const upload = await uploadInDepartment(id, departmentId)
+  const upload = await uploadInDepartment(id, departmentId, actor.organizationId)
   return { upload, absolutePath: absoluteFor(upload.relativePath) }
 }
 
@@ -120,6 +135,7 @@ export async function resolveAttachmentIds(
   const uploads = await Upload.find({
     _id: { $in: unique },
     departmentId,
+    ...organizationScope(actor),
   })
   if (uploads.length !== unique.length) {
     throw validation(
@@ -131,10 +147,11 @@ export async function resolveAttachmentIds(
 }
 
 export async function attachmentsFor(
-  ids: Array<Types.ObjectId | string>
+  ids: Array<Types.ObjectId | string>,
+  organizationId: string | null = null
 ): Promise<PublicAttachment[]> {
   if (ids.length === 0) return []
-  const uploads = await Upload.find({ _id: { $in: ids } })
+  const uploads = await Upload.find({ _id: { $in: ids }, organizationId: organizationId ? new Types.ObjectId(organizationId) : null })
   const byId = new Map(uploads.map((item) => [item._id.toString(), item]))
   return ids
     .map((id) => byId.get(id.toString()))
@@ -147,16 +164,16 @@ export async function deleteUpload(
   id: string
 ): Promise<void> {
   const departmentId = ownDepartmentId(actor)
-  const upload = await uploadInDepartment(id, departmentId)
+  const upload = await uploadInDepartment(id, departmentId, actor.organizationId)
   await upload.deleteOne()
   await removeUploadFile(upload.relativePath)
   await Promise.all([
     Assignment.updateMany(
-      { departmentId, attachments: upload._id },
+      { departmentId, attachments: upload._id, ...organizationScope(actor) },
       { $pull: { attachments: upload._id } }
     ),
     ClassSession.updateMany(
-      { departmentId, attachments: upload._id },
+      { departmentId, attachments: upload._id, ...organizationScope(actor) },
       { $pull: { attachments: upload._id } }
     ),
   ])
@@ -165,17 +182,20 @@ export async function deleteUpload(
 /** Remove files that no assignment or class references anymore. */
 export async function pruneOrphanUploads(
   departmentId: string,
-  candidateIds: string[]
+  candidateIds: string[],
+  organizationId: string | null = null
 ): Promise<void> {
   if (candidateIds.length === 0) return
   const [assignmentRefs, classRefs] = await Promise.all([
     Assignment.distinct("attachments", {
       departmentId,
       attachments: { $in: candidateIds },
+      organizationId: organizationId ? new Types.ObjectId(organizationId) : null,
     }),
     ClassSession.distinct("attachments", {
       departmentId,
       attachments: { $in: candidateIds },
+      organizationId: organizationId ? new Types.ObjectId(organizationId) : null,
     }),
   ])
   const referenced = new Set(
@@ -184,6 +204,7 @@ export async function pruneOrphanUploads(
   const orphans = await Upload.find({
     _id: { $in: candidateIds.filter((id) => !referenced.has(id)) },
     departmentId,
+    organizationId: organizationId ? new Types.ObjectId(organizationId) : null,
   })
   await Promise.all(
     orphans.map(async (upload) => {
@@ -203,7 +224,8 @@ export async function deleteUploadsForAssignment(
   void assignmentId
   await pruneOrphanUploads(
     departmentId,
-    attachmentIds.map((id) => id.toString())
+    attachmentIds.map((id) => id.toString()),
+    actor.organizationId
   )
 }
 
@@ -217,7 +239,8 @@ export async function deleteUploadsForClass(
   void classId
   await pruneOrphanUploads(
     departmentId,
-    attachmentIds.map((id) => id.toString())
+    attachmentIds.map((id) => id.toString()),
+    actor.organizationId
   )
 }
 

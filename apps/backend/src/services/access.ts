@@ -1,5 +1,15 @@
 import { AppError, forbidden } from "../lib/errors.js"
+import { Types } from "mongoose"
 import type { SessionUser } from "../types.js"
+
+/** Legacy accounts only see legacy records until the migration assigns them. */
+export function organizationScope(actor: { organizationId: string | null }): {
+  organizationId: Types.ObjectId | null
+} {
+  return actor.organizationId
+    ? { organizationId: new Types.ObjectId(actor.organizationId) }
+    : { organizationId: null }
+}
 
 export function assertAdmin(actor: SessionUser): void {
   if (actor.role !== "admin") throw forbidden()

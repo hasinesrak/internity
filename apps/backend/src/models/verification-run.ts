@@ -18,6 +18,7 @@ export interface VerificationStepResult {
 }
 
 export interface VerificationRunShape {
+  organizationId: Types.ObjectId | null
   assignmentId: Types.ObjectId
   internId: Types.ObjectId
   departmentId: Types.ObjectId
@@ -57,6 +58,12 @@ const stepResultSchema = new Schema<VerificationStepResult>(
 
 const verificationRunSchema = new Schema<VerificationRunShape>(
   {
+    organizationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Organization",
+      default: null,
+      index: true,
+    },
     assignmentId: {
       type: Schema.Types.ObjectId,
       ref: "Assignment",

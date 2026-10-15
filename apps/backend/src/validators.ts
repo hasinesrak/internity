@@ -9,6 +9,7 @@ import {
   USER_STATUSES,
 } from "./config/constants.js"
 import { ATTENDANCE_STATUSES } from "./models/attendance.js"
+import { INVOICE_STATUSES } from "./models/invoice.js"
 
 export const objectIdSchema = z
   .string()
@@ -25,6 +26,43 @@ export const emailSchema = z
   .min(1, "Enter an email address.")
   .transform((value) => value.toLowerCase())
   .pipe(z.email("Enter a valid email address."))
+
+export const platformLoginSchema = z.object({
+  email: emailSchema,
+  password: z.string().min(1, "Enter your password."),
+  code: z.string().regex(/^(\d{6}|[a-f0-9]{16})$/i).optional(),
+})
+
+export const platformMfaCodeSchema = z.object({ code: z.string().regex(/^(\d{6}|[a-f0-9]{16})$/i) })
+export const platformInvoiceSchema = z.object({
+  number: z.string().trim().min(1).max(40), amountMinor: z.number().int().min(0), currency: z.string().trim().regex(/^[a-zA-Z]{3}$/).default("usd"),
+  dueAt: z.string().datetime().optional(), lineItems: z.array(z.object({ description: z.string().trim().min(1).max(200), quantity: z.number().int().min(1), unitAmountMinor: z.number().int().min(0) })).max(50).optional(),
+})
+export const platformInvoiceStatusSchema = z.object({ status: z.enum(INVOICE_STATUSES) })
+export const supportSessionSchema = z.object({ reason: z.string().trim().min(5).max(500), ttlMinutes: z.number().int().min(5).max(60).default(30) })
+export const supportLoginSchema = z.object({ token: z.string().min(20).max(200) })
+export const customerPlanSchema = z.object({ planCode: z.enum(["starter", "growth"]) })
+
+export const platformOrganizationSchema = z.object({
+  slug: z.string().trim().min(2).max(63),
+  name: z.string().trim().min(1).max(120),
+  legalName: z.string().trim().max(200).optional(),
+  planCode: z.string().trim().min(1).max(50).optional(),
+  trialDays: z.number().int().min(0).max(90).optional(),
+  ownerName: z.string().trim().min(1).max(120).optional(),
+  ownerEmail: emailSchema.optional(),
+  ownerPassword: z.string().min(8).max(128).optional(),
+}).superRefine((value, context) => {
+  const fields = [value.ownerName, value.ownerEmail, value.ownerPassword]
+  if (fields.some(Boolean) && fields.some((item) => !item)) {
+    context.addIssue({ code: "custom", message: "Provide owner name, email, and password together.", path: ["ownerEmail"] })
+  }
+})
+
+export const platformOrganizationStatusSchema = z.object({
+  status: z.enum(["trialing", "active", "past_due", "suspended", "closed"]),
+})
+
 
 export const nameSchema = z
   .string()
@@ -56,6 +94,13 @@ export const isoDateSchema = z
   .string()
   .trim()
   .refine((value) => !Number.isNaN(Date.parse(value)), "Use a valid date.")
+
+export const platformSubscriptionSchema = z.object({
+  planCode: z.string().trim().min(1).max(50),
+  status: z.enum(["trialing", "active", "past_due", "canceled"]),
+  currentPeriodEnd: isoDateSchema.optional(),
+  cancelAtPeriodEnd: z.boolean().optional(),
+})
 
 export const dateKeySchema = z
   .string()
