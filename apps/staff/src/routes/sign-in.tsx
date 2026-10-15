@@ -19,7 +19,7 @@ import { Input } from "@workspace/ui/components/motion/input"
 import { EASE_OUT } from "@workspace/ui/lib/ease"
 
 import { AuthShell } from "@/components/auth-shell"
-import { currentUserSync, signIn } from "@/lib/data"
+import { currentUserSync, signIn, supportSignIn } from "@/lib/data"
 import { staffHome } from "@/lib/guards"
 import { toast } from "@/lib/toast"
 
@@ -53,6 +53,7 @@ function SignInPage() {
   const passwordRef = useRef<HTMLInputElement>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [supportToken, setSupportToken] = useState("")
   const [reveal, setReveal] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({})
   const [formError, setFormError] = useState<string | null>(null)
@@ -74,12 +75,15 @@ function SignInPage() {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    const usingSupportToken = Boolean(supportToken.trim())
     const found: typeof errors = {}
-    if (!email.trim()) found.email = "Enter your email."
-    else if (!EMAIL_PATTERN.test(email.trim())) {
-      found.email = "Enter a valid email address."
+    if (!usingSupportToken) {
+      if (!email.trim()) found.email = "Enter your email."
+      else if (!EMAIL_PATTERN.test(email.trim())) {
+        found.email = "Enter a valid email address."
+      }
+      if (!password) found.password = "Enter your password."
     }
-    if (!password) found.password = "Enter your password."
 
     setErrors(found)
     // Validation failures speak through the messages beside the fields; the
@@ -89,7 +93,9 @@ function SignInPage() {
     setFormError(null)
     setState("loading")
     try {
-      const user = await signIn({ email: email.trim(), password })
+      const user = usingSupportToken
+        ? await supportSignIn(supportToken.trim())
+        : await signIn({ email: email.trim(), password })
       setState("success")
       toast.success(`Signed in as ${user.name}`)
       void navigate({ to: staffHome(user.role) })
@@ -182,6 +188,22 @@ function SignInPage() {
               disabled={busy}
             />
           </Field>
+
+          <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
+            <FieldLabel htmlFor="support-token">Support access token (optional)</FieldLabel>
+            <Input
+              id="support-token"
+              name="supportToken"
+              label=""
+              type="password"
+              autoComplete="one-time-code"
+              placeholder="Paste the one-use token from your platform operator"
+              value={supportToken}
+              onChange={(value) => { setSupportToken(value); setFormError(null) }}
+              disabled={busy}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">Support sessions are read-only and expire automatically.</p>
+          </div>
 
           <AnimatePresence initial={false}>
             {formError ? (

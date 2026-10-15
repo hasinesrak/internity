@@ -123,6 +123,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <main className="min-w-0 flex-1">
           <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 p-4 md:p-6">
+            {user?.supportAccess ? (
+              <div role="status" className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
+                <strong>Support access is active.</strong> This session is read-only and expires {new Date(user.supportAccess.expiresAt).toLocaleString()}.
+              </div>
+            ) : null}
             {shell.status === "error" ? (
               <ErrorPanel
                 message="Your workspace could not load. Check your connection and try again."

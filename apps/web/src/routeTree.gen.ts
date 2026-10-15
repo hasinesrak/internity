@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ForOrganizationsRouteImport } from './routes/for-organizations'
 import { Route as ActivateRouteImport } from './routes/activate'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
@@ -37,6 +38,11 @@ const SignInRoute = SignInRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForOrganizationsRoute = ForOrganizationsRouteImport.update({
+  id: '/for-organizations',
+  path: '/for-organizations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ActivateRoute = ActivateRouteImport.update({
@@ -97,6 +103,7 @@ const AppAssignmentsIdRoute = AppAssignmentsIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activate': typeof ActivateRoute
+  '/for-organizations': typeof ForOrganizationsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/welcome': typeof WelcomeRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activate': typeof ActivateRoute
+  '/for-organizations': typeof ForOrganizationsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/welcome': typeof WelcomeRoute
@@ -129,6 +137,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
   '/activate': typeof ActivateRoute
+  '/for-organizations': typeof ForOrganizationsRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sign-in': typeof SignInRoute
   '/welcome': typeof WelcomeRoute
@@ -146,6 +155,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/activate'
+    | '/for-organizations'
     | '/reset-password'
     | '/sign-in'
     | '/welcome'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/activate'
+    | '/for-organizations'
     | '/reset-password'
     | '/sign-in'
     | '/welcome'
@@ -177,6 +188,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_app'
     | '/activate'
+    | '/for-organizations'
     | '/reset-password'
     | '/sign-in'
     | '/welcome'
@@ -194,6 +206,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AppRoute: typeof AppRouteWithChildren
   ActivateRoute: typeof ActivateRoute
+  ForOrganizationsRoute: typeof ForOrganizationsRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignInRoute: typeof SignInRoute
   WelcomeRoute: typeof WelcomeRoute
@@ -220,6 +233,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/for-organizations': {
+      id: '/for-organizations'
+      path: '/for-organizations'
+      fullPath: '/for-organizations'
+      preLoaderRoute: typeof ForOrganizationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/activate': {
@@ -330,6 +350,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AppRoute: AppRouteWithChildren,
   ActivateRoute: ActivateRoute,
+  ForOrganizationsRoute: ForOrganizationsRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignInRoute: SignInRoute,
   WelcomeRoute: WelcomeRoute,

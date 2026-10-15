@@ -61,6 +61,9 @@ export function useNavigateToNav(role: StaffRole) {
         case "platform":
           void navigate({ to: "/admin/settings" })
           return
+        case "billing":
+          void navigate({ to: "/admin/billing" })
+          return
         case "directory":
           void navigate({ to: "/hr/directory" })
           return
@@ -177,6 +180,7 @@ export function useActiveNavId(role: StaffRole): string | null {
     }
     if (pathname === "/admin/activity") return "activity"
     if (pathname === "/admin/settings") return "platform"
+    if (pathname === "/admin/billing") return "billing"
     return null
   }, [location, role])
 }

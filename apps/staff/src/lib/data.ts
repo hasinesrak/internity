@@ -149,6 +149,18 @@ export function signIn(input: {
   })
 }
 
+/** Consume a one-use platform support token and establish a read-only staff session. */
+export function supportSignIn(token: string): Promise<PublicUser> {
+  return request<{ user: PublicUser }>("/api/auth/support-login", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  }).then((body) => {
+    const user = requireStaff(body.user)
+    remember(user)
+    return user
+  })
+}
+
 export function getMe(): Promise<PublicUser> {
   return request<{ user: PublicUser }>("/api/auth/me").then((body) => {
     const user = requireStaff(body.user)
@@ -247,6 +259,28 @@ export function getAdminDashboard(): Promise<AdminDashboard> {
       activityByDay: activityDays(activity.data, 112),
     }
   })
+}
+
+export type BillingOverview = {
+  plan: { code: string; name: string; monthlyAmountMinor: number; limits: { activeUsers: number; activeInterns: number; storageBytes: number } }
+  subscription: { status: string; currentPeriodStart: string | null; currentPeriodEnd: string | null; cancelAtPeriodEnd: boolean } | null
+  usage: { periodStart: string; periodEnd: string; activeUsers: number; activeInterns: number; departments: number; assignments: number; storageBytes: number; apiRequests: number }
+  selfService: { checkoutAvailable: boolean; portalAvailable: boolean }
+}
+
+export function getBilling(): Promise<{ billing: BillingOverview }> {
+  return request<{ billing: BillingOverview }>("/api/admin/billing")
+}
+
+export function changeBillingPlan(planCode: "starter" | "growth") {
+  return request<{ requestedPlanCode: string; message: string }>("/api/admin/billing/plan", { method: "PATCH", body: JSON.stringify({ planCode }) })
+}
+
+export function startBillingCheckout(planCode: "starter" | "growth") { return request<{ url: string }>("/api/admin/billing/checkout", { method: "POST", body: JSON.stringify({ planCode }) }) }
+export function openBillingPortal() { return request<{ url: string }>("/api/admin/billing/portal", { method: "POST" }) }
+
+export function getBillingInvoices() {
+  return request<{ invoices: Array<{ id: string; number: string; status: string; amountMinor: number; currency: string; dueAt: string | null; paidAt: string | null; hostedInvoiceUrl: string | null; invoicePdfUrl: string | null; createdAt: string }> }>("/api/admin/billing/invoices")
 }
 
 export function getHrDashboard(): Promise<HrDashboard> {

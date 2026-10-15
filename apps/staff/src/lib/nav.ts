@@ -109,6 +109,7 @@ const ADMIN_LEAVES: NavLeaf[] = [
     icon: SlidersHorizontalIcon,
     path: "/admin/settings",
   },
+  { id: "billing", label: "Billing", icon: IdentificationCardIcon, path: "/admin/billing" },
   NAV_SETTINGS,
 ]
 
@@ -170,6 +171,7 @@ const ADMIN_TREE: NavEntry[] = [
   { kind: "leaf", ...ADMIN_LEAVES[5] },
   { kind: "leaf", ...ADMIN_LEAVES[6] },
   { kind: "leaf", ...ADMIN_LEAVES[7] },
+  { kind: "leaf", ...ADMIN_LEAVES[8] },
 ]
 
 const HR_TREE: NavEntry[] = [

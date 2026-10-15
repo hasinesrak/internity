@@ -54,6 +54,7 @@ export interface PublicUser {
   lastLoginAt: string | null
   createdAt: string
   updatedAt: string
+  supportAccess?: { id: string; expiresAt: string; operatorId: string }
 }
 
 export type VerificationAssertion =

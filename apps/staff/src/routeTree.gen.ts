@@ -22,6 +22,7 @@ import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppSubmissionsRouteImport } from './routes/_app/submissions'
 import { Route as AppAdminIndexRouteImport } from './routes/_app/admin.index'
 import { Route as AppAdminActivityRouteImport } from './routes/_app/admin.activity'
+import { Route as AppAdminBillingRouteImport } from './routes/_app/admin.billing'
 import { Route as AppAdminDepartmentsRouteImport } from './routes/_app/admin.departments'
 import { Route as AppAdminHrRouteImport } from './routes/_app/admin.hr'
 import { Route as AppAdminSettingsRouteImport } from './routes/_app/admin.settings'
@@ -102,6 +103,11 @@ const AppAdminIndexRoute = AppAdminIndexRouteImport.update({
 const AppAdminActivityRoute = AppAdminActivityRouteImport.update({
   id: '/admin/activity',
   path: '/admin/activity',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminBillingRoute = AppAdminBillingRouteImport.update({
+  id: '/admin/billing',
+  path: '/admin/billing',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminDepartmentsRoute = AppAdminDepartmentsRouteImport.update({
@@ -203,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AppSettingsRoute
   '/submissions': typeof AppSubmissionsRouteWithChildren
   '/admin/activity': typeof AppAdminActivityRoute
+  '/admin/billing': typeof AppAdminBillingRoute
   '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/hr': typeof AppAdminHrRoute
   '/admin/settings': typeof AppAdminSettingsRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AppSettingsRoute
   '/submissions': typeof AppSubmissionsRouteWithChildren
   '/admin/activity': typeof AppAdminActivityRoute
+  '/admin/billing': typeof AppAdminBillingRoute
   '/admin/departments': typeof AppAdminDepartmentsRoute
   '/admin/hr': typeof AppAdminHrRoute
   '/admin/settings': typeof AppAdminSettingsRoute
@@ -267,6 +275,7 @@ export interface FileRoutesById {
   '/_app/settings': typeof AppSettingsRoute
   '/_app/submissions': typeof AppSubmissionsRouteWithChildren
   '/_app/admin/activity': typeof AppAdminActivityRoute
+  '/_app/admin/billing': typeof AppAdminBillingRoute
   '/_app/admin/departments': typeof AppAdminDepartmentsRoute
   '/_app/admin/hr': typeof AppAdminHrRoute
   '/_app/admin/settings': typeof AppAdminSettingsRoute
@@ -300,6 +309,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/submissions'
     | '/admin/activity'
+    | '/admin/billing'
     | '/admin/departments'
     | '/admin/hr'
     | '/admin/settings'
@@ -331,6 +341,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/submissions'
     | '/admin/activity'
+    | '/admin/billing'
     | '/admin/departments'
     | '/admin/hr'
     | '/admin/settings'
@@ -363,6 +374,7 @@ export interface FileRouteTypes {
     | '/_app/settings'
     | '/_app/submissions'
     | '/_app/admin/activity'
+    | '/_app/admin/billing'
     | '/_app/admin/departments'
     | '/_app/admin/hr'
     | '/_app/admin/settings'
@@ -483,6 +495,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/activity'
       fullPath: '/admin/activity'
       preLoaderRoute: typeof AppAdminActivityRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin/billing': {
+      id: '/_app/admin/billing'
+      path: '/admin/billing'
+      fullPath: '/admin/billing'
+      preLoaderRoute: typeof AppAdminBillingRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/admin/departments': {
@@ -637,6 +656,7 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppSubmissionsRoute: typeof AppSubmissionsRouteWithChildren
   AppAdminActivityRoute: typeof AppAdminActivityRoute
+  AppAdminBillingRoute: typeof AppAdminBillingRoute
   AppAdminDepartmentsRoute: typeof AppAdminDepartmentsRoute
   AppAdminHrRoute: typeof AppAdminHrRoute
   AppAdminSettingsRoute: typeof AppAdminSettingsRoute
@@ -662,6 +682,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppSubmissionsRoute: AppSubmissionsRouteWithChildren,
   AppAdminActivityRoute: AppAdminActivityRoute,
+  AppAdminBillingRoute: AppAdminBillingRoute,
   AppAdminDepartmentsRoute: AppAdminDepartmentsRoute,
   AppAdminHrRoute: AppAdminHrRoute,
   AppAdminSettingsRoute: AppAdminSettingsRoute,
